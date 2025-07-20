@@ -71,7 +71,7 @@ export const UserNav: FC = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-10 w-10 rounded-full" aria-label="User menu">
+        <Button id="user-nav-button" variant="ghost" className="relative h-10 w-10 rounded-full" aria-label="User menu">
           {user ? (
             <Avatar className="h-10 w-10">
               <AvatarImage src={user.profilepictureurl ?? undefined} alt={user.name} />

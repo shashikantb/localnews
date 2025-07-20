@@ -54,7 +54,7 @@ const HomePage: FC = () => {
                       <span className="text-xs sm:text-sm">Live Map</span>
                   </Link>
               </Button>
-              <Button variant="outline" asChild className="h-full text-base shadow-lg hover:shadow-primary/20 bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/50 transition-all duration-300 flex-col sm:flex-row gap-2">
+              <Button id="ai-helper-button" variant="outline" asChild className="h-full text-base shadow-lg hover:shadow-primary/20 bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/50 transition-all duration-300 flex-col sm:flex-row gap-2">
                   <Link href="/helper">
                       <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-accent"/>
                       <span className="text-xs sm:text-sm">AI Helper</span>

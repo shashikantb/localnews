@@ -54,8 +54,9 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
   ];
 
   const renderNavItem = (item: any) => (
-    <div key={item.name} className="flex-1 flex h-full" id={`nav-${item.name.toLowerCase()}`}>
+    <div key={item.name} className="flex-1 flex h-full">
         <Link
+            id={`nav-${item.name.toLowerCase()}`}
             href={item.href}
             className={cn(
                 'relative flex h-full w-full flex-row items-center justify-center space-x-2 border-b-2 px-2 text-sm font-medium transition-colors sm:flex-col sm:space-x-0 sm:space-y-1 sm:pt-2',
@@ -93,6 +94,7 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
           {!user && (
             <div className="flex-1 flex h-full">
                 <Link
+                    id="nav-profile"
                     href="/login"
                     className={cn(
                         'relative flex h-full w-full flex-row items-center justify-center space-x-2 border-b-2 px-2 text-sm font-medium transition-colors sm:flex-col sm:space-x-0 sm:space-y-1 sm:pt-2',

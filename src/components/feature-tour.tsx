@@ -36,7 +36,7 @@ const tourSteps: Step[] = [
         disableBeacon: true,
     },
     {
-        target: 'header > div > div > button', // More specific selector for the user nav in the header
+        target: '#user-nav-button',
         content: "Click on your profile icon to view your profile, manage settings, or start this tour again.",
         placement: 'bottom-end',
     },
@@ -66,12 +66,11 @@ const FeatureTour = () => {
         return null;
     }
 
-    // Adapt step targets for mobile layout if necessary
     const adaptedSteps = tourSteps.map(step => {
-        if (isMobile && step.target === 'header > div > div > button') {
-            // In mobile view, the user nav moves to the bottom bar.
-            // This is a placeholder; a more robust solution would use unique IDs.
-            return { ...step, target: 'nav > div > div:last-child > div' };
+        if (isMobile && step.target === '#user-nav-button') {
+            // In mobile view, the user nav is inside the bottom bar, not the header.
+            // We can target it with the same ID now.
+            return { ...step, placement: 'top-end' as const };
         }
         return step;
     });

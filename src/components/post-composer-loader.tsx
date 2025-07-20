@@ -44,7 +44,7 @@ const PostComposerLoader: FC<PostComposerLoaderProps> = ({ sessionUser }) => {
     return (
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className={cn(
+                <Button id="post-composer-button" variant="outline" className={cn(
                     "w-full h-full justify-center p-2 rounded-xl shadow-lg hover:shadow-primary/20 bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/50 transition-all duration-300",
                     "flex flex-col sm:flex-row items-center gap-2 sm:gap-3"
                 )}>
