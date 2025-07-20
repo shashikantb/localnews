@@ -54,7 +54,7 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
   ];
 
   const renderNavItem = (item: any) => (
-    <div key={item.name} className="flex-1 flex h-full">
+    <div key={item.name} className="flex-1 flex h-full" id={`nav-${item.name.toLowerCase()}`}>
         <Link
             href={item.href}
             className={cn(

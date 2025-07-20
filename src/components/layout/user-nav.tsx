@@ -16,10 +16,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogIn, LogOut, Menu, User, UserPlus } from 'lucide-react';
+import { LogIn, LogOut, Menu, User, UserPlus, PlayCircle } from 'lucide-react';
 import type { User as UserType } from '@/lib/db-types';
 import { logout, getSession } from '@/app/auth/actions';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useTourStore } from '@/hooks/use-tour-store';
 
 // Add type definition for the Android interface
 declare global {
@@ -37,6 +38,7 @@ export const UserNav: FC = () => {
   const pathname = usePathname();
   const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
+  const { startTour } = useTourStore();
 
   useEffect(() => {
     setLoading(true);
@@ -101,6 +103,10 @@ export const UserNav: FC = () => {
                 <span>My Profile</span>
               </Link>
             </DropdownMenuItem>
+             <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
+              <PlayCircle className="mr-2 h-4 w-4" />
+              <span>Feature Tour</span>
+            </DropdownMenuItem>
             <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
               <LogOut className="mr-2 h-4 w-4" />
               <span>Log out</span>
@@ -120,6 +126,11 @@ export const UserNav: FC = () => {
                   <UserPlus className="mr-2 h-4 w-4" />
                   <span>Sign Up</span>
                 </Link>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+               <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
+                <PlayCircle className="mr-2 h-4 w-4" />
+                <span>Feature Tour</span>
               </DropdownMenuItem>
             </DropdownMenuGroup>
           </>

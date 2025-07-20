@@ -12,6 +12,7 @@ import { Providers } from '@/app/providers';
 import { getSession } from '@/app/auth/actions';
 import { cookies } from 'next/headers';
 import dynamic from 'next/dynamic';
+import FeatureTour from '@/components/feature-tour';
 
 const FirebaseMessagingClient = dynamic(
   () => import('@/components/firebase-messaging-client'),
@@ -61,6 +62,7 @@ export default async function RootLayout({
           <Footer />
           <AppInstallPrompt />
           <Toaster />
+          <FeatureTour />
         </Providers>
       </body>
     </html>
