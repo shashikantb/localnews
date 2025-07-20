@@ -16,11 +16,12 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { LogIn, LogOut, Menu, User, UserPlus, PlayCircle } from 'lucide-react';
+import { LogIn, LogOut, User, UserPlus, PlayCircle } from 'lucide-react';
 import type { User as UserType } from '@/lib/db-types';
 import { logout, getSession } from '@/app/auth/actions';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTourStore } from '@/hooks/use-tour-store';
+import { cn } from '@/lib/utils';
 
 // Add type definition for the Android interface
 declare global {
@@ -67,20 +68,32 @@ export const UserNav: FC = () => {
   if (loading) {
     return <Skeleton className="h-10 w-10 rounded-full" />;
   }
+  
+  const isProfileActive = user ? pathname === `/users/${user.id}` : (pathname === '/login' || pathname === '/signup');
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button id="user-nav-button" variant="ghost" className="relative h-10 w-10 rounded-full" aria-label="User menu">
-          {user ? (
-            <Avatar className="h-10 w-10">
-              <AvatarImage src={user.profilepictureurl ?? undefined} alt={user.name} />
-              <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
-            </Avatar>
-          ) : (
-             <Menu className="h-6 w-6" />
-          )}
-        </Button>
+          <button
+            id="user-nav-button"
+            className={cn(
+                'relative flex h-full w-full flex-row items-center justify-center space-x-2 border-b-2 px-2 text-sm font-medium transition-colors sm:flex-col sm:space-x-0 sm:space-y-1 sm:pt-2',
+                isProfileActive
+                ? 'border-primary text-primary'
+                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+            )}
+            aria-label="User menu"
+          >
+            {user ? (
+                <Avatar className="h-6 w-6 sm:h-5 sm:w-5">
+                    <AvatarImage src={user.profilepictureurl ?? undefined} alt={user.name} />
+                    <AvatarFallback>{user.name.charAt(0).toUpperCase()}</AvatarFallback>
+                </Avatar>
+            ) : (
+                <User className="h-5 w-5" />
+            )}
+            <span className="hidden sm:inline">{user ? 'Profile' : 'Login'}</span>
+          </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-56" align="end" forceMount>
         {user ? (
@@ -91,45 +104,49 @@ export const UserNav: FC = () => {
                 <p className="text-xs leading-none text-muted-foreground">
                   {user.email}
                 </p>
-                 <p className="text-xs leading-none text-primary pt-1 font-semibold">
-                  {user.role}
-                </p>
               </div>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <Link href={`/users/${user.id}`} className="cursor-pointer">
-                <User className="mr-2 h-4 w-4" />
-                <span>My Profile</span>
-              </Link>
+            <DropdownMenuGroup>
+                <DropdownMenuItem asChild>
+                  <Link href={`/users/${user.id}`} className="cursor-pointer">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>My Profile</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
+                  <PlayCircle className="mr-2 h-4 w-4" />
+                  <span>Feature Tour</span>
+                </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
             </DropdownMenuItem>
           </>
         ) : (
-          <DropdownMenuGroup>
-            <DropdownMenuItem asChild>
-              <Link href="/login" className="cursor-pointer">
-                <LogIn className="mr-2 h-4 w-4" />
-                <span>Login</span>
-              </Link>
+          <>
+            <DropdownMenuGroup>
+              <DropdownMenuItem asChild>
+                <Link href="/login" className="cursor-pointer">
+                  <LogIn className="mr-2 h-4 w-4" />
+                  <span>Login</span>
+                </Link>
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <Link href="/signup" className="cursor-pointer">
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  <span>Sign Up</span>
+                </Link>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
+              <PlayCircle className="mr-2 h-4 w-4" />
+              <span>Feature Tour</span>
             </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/signup" className="cursor-pointer">
-                <UserPlus className="mr-2 h-4 w-4" />
-                <span>Sign Up</span>
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-        )}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
-          <PlayCircle className="mr-2 h-4 w-4" />
-          <span>Feature Tour</span>
-        </DropdownMenuItem>
-        {user && (
-          <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-            <LogOut className="mr-2 h-4 w-4" />
-            <span>Log out</span>
-          </DropdownMenuItem>
+          </>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
