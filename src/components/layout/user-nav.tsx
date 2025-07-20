@@ -103,37 +103,33 @@ export const UserNav: FC = () => {
                 <span>My Profile</span>
               </Link>
             </DropdownMenuItem>
-             <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
-              <PlayCircle className="mr-2 h-4 w-4" />
-              <span>Feature Tour</span>
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
-            </DropdownMenuItem>
           </>
         ) : (
-          <>
-            <DropdownMenuGroup>
-              <DropdownMenuItem asChild>
-                <Link href="/login" className="cursor-pointer">
-                  <LogIn className="mr-2 h-4 w-4" />
-                  <span>Login</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/signup" className="cursor-pointer">
-                  <UserPlus className="mr-2 h-4 w-4" />
-                  <span>Sign Up</span>
-                </Link>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-               <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
-                <PlayCircle className="mr-2 h-4 w-4" />
-                <span>Feature Tour</span>
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </>
+          <DropdownMenuGroup>
+            <DropdownMenuItem asChild>
+              <Link href="/login" className="cursor-pointer">
+                <LogIn className="mr-2 h-4 w-4" />
+                <span>Login</span>
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/signup" className="cursor-pointer">
+                <UserPlus className="mr-2 h-4 w-4" />
+                <span>Sign Up</span>
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        )}
+        <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => startTour()} className="cursor-pointer">
+          <PlayCircle className="mr-2 h-4 w-4" />
+          <span>Feature Tour</span>
+        </DropdownMenuItem>
+        {user && (
+          <DropdownMenuItem onClick={handleLogout} className="cursor-pointer">
+            <LogOut className="mr-2 h-4 w-4" />
+            <span>Log out</span>
+          </DropdownMenuItem>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
