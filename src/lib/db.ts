@@ -262,7 +262,6 @@ export async function getPostsDb(
     const queryParams: (string | number | null)[] = [];
     let paramIndex = 1;
 
-    // Explicitly cast the user ID parameter to handle nulls gracefully.
     const currentUserIdParam = options.currentUserId || null;
     queryParams.push(currentUserIdParam);
     const userIdParamIndex = paramIndex++;
@@ -279,20 +278,18 @@ export async function getPostsDb(
       case 'comments':
         orderByClause = 'p.commentcount DESC, p.createdat DESC';
         break;
-      case 'newest':
-      default:
-        let distanceCalc = '';
+      case 'nearby':
         if (options.latitude != null && options.longitude != null && !isAdminView) {
             queryParams.push(options.latitude, options.longitude);
-            distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${paramIndex++}, $${paramIndex++}))`;
-             orderByClause = `
+            const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${paramIndex++}, $${paramIndex++}))`;
+            orderByClause = `
                 CASE
-                WHEN ${distanceCalc} < 20000 THEN 1
-                WHEN ${distanceCalc} < 40000 THEN 2
-                WHEN ${distanceCalc} < 60000 THEN 3
-                WHEN ${distanceCalc} < 80000 THEN 4
-                WHEN ${distanceCalc} < 100000 THEN 5
-                ELSE 6
+                    WHEN ${distanceCalc} < 20000 THEN 1
+                    WHEN ${distanceCalc} < 40000 THEN 2
+                    WHEN ${distanceCalc} < 60000 THEN 3
+                    WHEN ${distanceCalc} < 80000 THEN 4
+                    WHEN ${distanceCalc} < 100000 THEN 5
+                    ELSE 6
                 END,
                 p.createdat DESC
             `;
@@ -300,11 +297,14 @@ export async function getPostsDb(
              orderByClause = 'p.createdat DESC';
         }
         break;
+      case 'newest':
+      default:
+        orderByClause = 'p.createdat DESC';
+        break;
     }
     
     let allPosts: Post[] = [];
 
-    // Step 1: Fetch the latest announcement if it's the first page
     if (options.offset === 0 && !isAdminView) {
         const announcementQuery = `
           SELECT 
@@ -313,7 +313,7 @@ export async function getPostsDb(
             ${followCheck} as "isAuthorFollowedByCurrentUser"
           FROM posts p
           LEFT JOIN users u ON p.authorid = u.id
-          WHERE u.email = $2 -- Find user by special email
+          WHERE u.email = $2
           ORDER BY p.createdat DESC
           LIMIT 1
         `;

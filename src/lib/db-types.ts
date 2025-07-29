@@ -1,8 +1,9 @@
 
 
+
 export type UserRole = 'Business' | 'Gorakshak' | 'Gorakshak Admin' | 'Admin' | 'Public(जनता)';
 
-export type SortOption = 'newest' | 'likes' | 'comments';
+export type SortOption = 'newest' | 'likes' | 'comments' | 'nearby';
 
 export type PointTransactionReason = 'initial_signup_bonus' | 'referral_bonus' | 'new_post' | 'post_like_milestone';
 

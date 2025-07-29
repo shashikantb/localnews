@@ -145,7 +145,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const [businessFeed, setBusinessFeed] = useState<BusinessFeedState>(initialBusinessFeedState);
 
   const [activeTab, setActiveTab] = useState<FeedType>('nearby');
-  const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [sortBy, setSortBy] = useState<SortOption>('nearby');
   
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -531,6 +531,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                     <DropdownMenuLabel>Sort By</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => handleSortChange(v as SortOption)}>
+                      <DropdownMenuRadioItem value="nearby">Nearby</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="newest">Newest</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="likes">Most Popular</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="comments">Most Discussed</DropdownMenuRadioItem>
