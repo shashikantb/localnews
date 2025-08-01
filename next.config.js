@@ -1,8 +1,6 @@
 /** @type {import('next').NextConfig} */
 const path = require('path');
 
-const gcsBucketName = process.env.GCS_BUCKET_NAME;
-
 const remotePatterns = [
   {
     protocol: 'https',
@@ -16,22 +14,19 @@ const remotePatterns = [
     port: '',
     pathname: '/**',
   },
-];
-
-if (gcsBucketName) {
-  remotePatterns.push({
+  {
     protocol: 'https',
     hostname: 'storage.googleapis.com',
     port: '',
-    pathname: `/${gcsBucketName}/**`,
-  });
-  remotePatterns.push({
+    pathname: '/**', // Allow any path on the GCS hostname
+  },
+  {
     protocol: 'http',
     hostname: 'storage.googleapis.com',
     port: '',
-    pathname: `/${gcsBucketName}/**`,
-  });
-}
+    pathname: '/**', // Allow any path on the GCS hostname
+  }
+];
 
 const withPWA = require('next-pwa')({
   dest: 'public',
