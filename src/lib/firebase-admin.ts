@@ -9,7 +9,11 @@ if (!serviceAccountJson) {
   );
 } else {
   try {
-    const serviceAccount = JSON.parse(serviceAccountJson);
+    // Correct the formatting of the private key.
+    // Environment variables can escape newlines, causing JSON.parse to fail.
+    const correctedJsonString = serviceAccountJson.replace(/\\n/g, '\n');
+    const serviceAccount = JSON.parse(correctedJsonString);
+    
     if (admin.apps.length === 0) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount),
