@@ -66,7 +66,12 @@ const FirebaseMessagingClient = () => {
             // Check if permission was already granted
             if(Notification.permission === 'granted') {
                 console.log('Notification permission already granted.');
-                const currentToken = await getToken(messaging, { vapidKey: 'YOUR_VAPID_KEY_FROM_FIREBASE_CONSOLE' }); // IMPORTANT: Add your VAPID key
+                const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+                if (!vapidKey) {
+                    console.error("VAPID key is missing in environment variables (NEXT_PUBLIC_FIREBASE_VAPID_KEY). Cannot generate web token.");
+                    return;
+                }
+                const currentToken = await getToken(messaging, { vapidKey: vapidKey });
                 if (currentToken) {
                     console.log('FCM Token:', currentToken);
                     await registerDeviceToken(currentToken);
@@ -76,7 +81,6 @@ const FirebaseMessagingClient = () => {
             } else if (Notification.permission === 'default') {
                 console.log('Requesting notification permission...');
                 // The permission request should be initiated by a user gesture, e.g., a button click.
-                // Forcing it on load is often blocked by browsers.
                 // This logic is now handled by the button in `PostFeedClient`.
             }
 
