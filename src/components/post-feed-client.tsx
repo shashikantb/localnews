@@ -152,7 +152,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<'default' | 'loading' | 'granted'>('default');
+  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<'default' | 'loading' | 'granted' | 'denied'>('default');
   const [showTroubleshootingDialog, setShowTroubleshootingDialog] = useState(false);
   const [unreadFamilyPostCount, setUnreadFamilyPostCount] = useState(0);
   
@@ -311,7 +311,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
             const messaging = getMessaging(app);
             
-            // IMPORTANT: Replace with your actual VAPID key from the Firebase console
             const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
             if (!vapidKey) {
                 console.error("VAPID key is not configured in environment variables.");
