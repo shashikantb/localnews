@@ -70,7 +70,8 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-storage-bucket"
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-messaging-sender-id"
 NEXT_PUBLIC_FIREBASE_APP_ID="your-app-id"
-
+# Add this key for web push notifications. Find it in Firebase Console > Project Settings > Cloud Messaging > Web configuration > Key pair
+NEXT_PUBLIC_FIREBASE_VAPID_KEY="your-web-push-certificate-key-pair"
 ```
 
 **Important Notes:**

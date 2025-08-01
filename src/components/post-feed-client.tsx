@@ -37,6 +37,9 @@ import { BUSINESS_CATEGORIES } from '@/lib/db-types';
 import BusinessCard from './business-card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { getMessaging, getToken } from 'firebase/messaging';
+import { getApp, getApps, initializeApp } from 'firebase/app';
+
 
 interface AndroidInterface {
   getFCMToken?: () => string | null;
@@ -149,12 +152,17 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<'default' | 'loading' | 'granted' | 'denied'>('default');
+  const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<'default' | 'loading' | 'granted'>('default');
   const [showTroubleshootingDialog, setShowTroubleshootingDialog] = useState(false);
   const [unreadFamilyPostCount, setUnreadFamilyPostCount] = useState(0);
   
   const liveSeedingTriggered = useRef(false);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermissionStatus(Notification.permission);
+    }
+  }, []);
   
   // Fetch unread family post count on initial load and periodically
   useEffect(() => {
@@ -286,49 +294,48 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
     setNotificationPermissionStatus('loading');
     
-    const getTokenWithRetries = (retries = 3, delay = 500): Promise<string | null> => {
-        return new Promise((resolve) => {
-            let attempts = 0;
-            const tryGetToken = () => {
-                if (window.Android && typeof window.Android.getFCMToken === 'function') {
-                    const token = window.Android.getFCMToken();
-                    if (token) {
-                        resolve(token);
-                        return;
-                    }
-                }
-                
-                attempts++;
-                if (attempts < retries) {
-                    setTimeout(tryGetToken, delay);
-                } else {
-                    resolve(null);
-                }
-            };
-            tryGetToken();
-        });
-    };
-
     try {
-      if (window.Android && typeof window.Android.getFCMToken === 'function') {
-        const token = await getTokenWithRetries();
-        if (token) {
-          const result = await registerDeviceToken(token, location?.latitude, location?.longitude);
-          if (result.success) {
-            setNotificationPermissionStatus('granted');
-            toast({ title: "Success!", description: "You are now set up for notifications."});
-          } else {
-             console.error("Could not register for notifications:", result.error);
-             setNotificationPermissionStatus('denied');
-          }
+        const permission = await Notification.requestPermission();
+        setNotificationPermissionStatus(permission);
+
+        if (permission === 'granted') {
+            const firebaseConfig = {
+                apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+                authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+                storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+                messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+                appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+            };
+
+            const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+            const messaging = getMessaging(app);
+            
+            // IMPORTANT: Replace with your actual VAPID key from the Firebase console
+            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+            if (!vapidKey) {
+                console.error("VAPID key is not configured in environment variables.");
+                toast({ variant: 'destructive', title: "Configuration Error", description: "Push notifications cannot be set up on the web without a VAPID key." });
+                setNotificationPermissionStatus('denied');
+                return;
+            }
+
+            const token = await getToken(messaging, { vapidKey });
+
+            if (token) {
+                console.log("New FCM Token:", token);
+                const result = await registerDeviceToken(token, location?.latitude, location?.longitude);
+                if (result.success) {
+                    toast({ title: "Success!", description: "You are now set up for notifications."});
+                } else {
+                    throw new Error(result.error || 'Server registration failed.');
+                }
+            } else {
+                throw new Error('Failed to get FCM token.');
+            }
         } else {
-          setShowTroubleshootingDialog(true);
-          setNotificationPermissionStatus('denied');
+            toast({ title: "Permission Denied", description: "You will not receive push notifications." });
         }
-      } else {
-        toast({ title: "Web Notifications", description: "Web push notifications are not yet available. Please use our Android app for real-time updates." });
-        setNotificationPermissionStatus('denied');
-      }
     } catch (error) {
         console.error("Error during notification registration:", error);
         setShowTroubleshootingDialog(true);
