@@ -31,27 +31,28 @@ POSTGRES_SSL=true
 # You can generate a strong secret with the command: openssl rand -hex 32
 JWT_SECRET=your_super_secret_jwt_key_here
 
-# Google Generative AI API Key (if using Genkit features)
-# This key is required to power the "AI Local Helper" feature.
-# It allows the app to connect to Google's Gemini models.
+# --- Genkit & Firebase Admin (MANDATORY for AI & Notification features) ---
+# This key is required to power AI features and to send push notifications.
 # Get your key from Google AI Studio: https://aistudio.google.com/app/apikey
-#
-# COST: The Gemini API has a generous free tier. For many apps, especially
-# during development and early stages, usage will likely fall within this
-# free tier, meaning there is no cost. You only pay for what you use
-# above the free limit, and this requires setting up a billing account.
 GOOGLE_GENAI_API_KEY=your_google_genai_api_key
 
-# SerpApi API Key (MANDATORY for AI Content Seeding)
+# This is the full JSON content of the service account key from your Firebase project.
+# It's used by the server to send push notifications securely.
+# Go to Firebase Console > Project Settings > Service accounts > Generate new private key
+# Store this as a single-line string in your .env.local file.
+FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ...}'
+
+
+# --- SerpApi API Key (MANDATORY for AI Content Seeding) ---
 # This key is required for the content seeding feature to perform live web searches for news.
 # Get your key from https://serpapi.com/
 SERPAPI_API_KEY=your_serpapi_api_key
 
-# Admin Credentials (change these for production)
+# --- Admin Credentials (change these for production) ---
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=password123
 
-# Official User Password (Optional)
+# --- Official User Password (Optional) ---
 # Set this if you want to be able to log in as the official@localpulse.in user.
 # If not set, the account will be locked and cannot be logged into.
 OFFICIAL_USER_PASSWORD=your_official_user_password
@@ -63,13 +64,25 @@ OFFICIAL_USER_PASSWORD=your_official_user_password
 # 2. Go to Project Settings (click the gear icon).
 # 3. Under the "General" tab, scroll down to "Your apps".
 # 4. If you haven't already, add a "Web" app.
-# 5. In the app's configuration, you will find these values.
+# 5. In the app's configuration (select 'Config'), you will find these values.
 NEXT_PUBLIC_FIREBASE_API_KEY="your-api-key"
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-auth-domain"
 NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET="your-storage-bucket"
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-messaging-sender-id"
 NEXT_PUBLIC_FIREBASE_APP_ID="your-app-id"
+
+# --- Google Cloud Storage (for File Uploads) ---
+# The name of your GCS bucket for storing uploads.
+GCS_BUCKET_NAME=your-gcs-bucket-name
+
+# For local development ONLY: Path to the service account key file for GCS.
+# In production on Cloud Run, use GCS_SERVICE_ACCOUNT_JSON instead.
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/gcs-service-account.json
+
+# For production on Cloud Run: The full JSON content of your GCS service account key.
+# This should be stored as a secret in your deployment environment.
+# GCS_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
 
 ```
 
