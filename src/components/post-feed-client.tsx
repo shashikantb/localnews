@@ -304,6 +304,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
     setNotificationPermissionStatus('loading');
     
+    // This is the consolidated logic for getting a token from either the WebView or Web Push API
     const firebaseConfig = {
       apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
       authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -314,39 +315,48 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     };
 
     const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-    if (!vapidKey) {
-        console.error("VAPID key is missing in environment variables (NEXT_PUBLIC_FIREBASE_VAPID_KEY). Cannot generate web token.");
-        toast({ variant: 'destructive', title: 'Setup Error', description: 'Web notification key is not configured on the server.' });
-        setNotificationPermissionStatus('denied');
-        return;
-    }
-    
+
     try {
-      const permission = await Notification.requestPermission();
-      if (permission === 'granted') {
-        const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-        const messaging = getMessaging(app);
-        const token = await getToken(messaging, { vapidKey });
+      let token: string | null = null;
+      // 1. First, try the Android WebView path
+      if (window.Android && typeof window.Android.getFCMToken === 'function') {
+        console.log("Attempting to get token from Android WebView...");
+        token = window.Android.getFCMToken();
+      }
+
+      // 2. If not in WebView or token is null, fall back to Web Push API
+      if (!token) {
+        console.log("Not in WebView or token not found, falling back to Web Push API.");
+        if (!vapidKey) {
+          throw new Error("Web notification key is not configured on the server.");
+        }
         
-        if (token) {
-          const result = await registerDeviceToken(token, location?.latitude, location?.longitude);
-          if (result.success) {
-            setNotificationPermissionStatus('granted');
-            toast({ title: "Success!", description: "You are now set up for notifications."});
-          } else {
-             console.error("Could not register for notifications:", result.error);
-             setNotificationPermissionStatus('denied');
-          }
+        const permission = await Notification.requestPermission();
+        if (permission === 'granted') {
+            const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+            const messaging = getMessaging(app);
+            token = await getToken(messaging, { vapidKey });
         } else {
-            setNotificationPermissionStatus('denied');
-            toast({ variant: 'destructive', title: 'Token Error', description: 'Could not get a notification token. Please try again.' });
+            throw new Error("Notification permission was denied.");
+        }
+      }
+      
+      // 3. If we have a token (from either source), register it.
+      if (token) {
+        const result = await registerDeviceToken(token, location?.latitude, location?.longitude);
+        if (result.success) {
+          setNotificationPermissionStatus('granted');
+          toast({ title: "Success!", description: "You are now set up for notifications."});
+        } else {
+          throw new Error(result.error || "Failed to register token with server.");
         }
       } else {
-        setNotificationPermissionStatus('denied');
-        toast({ variant: 'destructive', title: 'Permission Denied', description: 'You have blocked notifications.' });
+        throw new Error("Could not get a notification token. Please try again.");
       }
-    } catch (error) {
+
+    } catch (error: any) {
         console.error("Error during notification registration:", error);
+        toast({ variant: 'destructive', title: "Registration Failed", description: error.message });
         setShowTroubleshootingDialog(true);
         setNotificationPermissionStatus('denied');
     }
