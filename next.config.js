@@ -25,6 +25,12 @@ if (gcsBucketName) {
     port: '',
     pathname: `/${gcsBucketName}/**`,
   });
+  remotePatterns.push({
+    protocol: 'http',
+    hostname: 'storage.googleapis.com',
+    port: '',
+    pathname: `/${gcsBucketName}/**`,
+  });
 }
 
 const withPWA = require('next-pwa')({
