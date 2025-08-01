@@ -9,10 +9,12 @@ if (!serviceAccountJson) {
   );
 } else {
   try {
-    // Correct the formatting of the private key.
-    // Environment variables can escape newlines, causing JSON.parse to fail.
-    const correctedJsonString = serviceAccountJson.replace(/\\n/g, '\n');
-    const serviceAccount = JSON.parse(correctedJsonString);
+    // This is the most robust way to parse a JSON string from an environment variable
+    // that may have escaping issues with newlines.
+    const serviceAccount = JSON.parse(serviceAccountJson);
+
+    // The private_key needs to have its escaped newlines replaced with actual newlines.
+    serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     
     if (admin.apps.length === 0) {
       admin.initializeApp({
