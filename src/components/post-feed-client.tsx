@@ -258,6 +258,16 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
   }, [sessionUser]);
   
+  // This effect will run ONCE when the location is first detected.
+  // It ensures the "Nearby" feed is immediately refreshed with location-sorted data,
+  // overriding the initial server-rendered posts.
+  useEffect(() => {
+    if (location && activeTab === 'nearby') {
+        console.log("Location detected, fetching nearby posts.");
+        fetchPosts('nearby', 1, sortBy, location);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location]);
 
   const handleTabChange = (value: string) => {
     const newTab = value as FeedType;
@@ -294,47 +304,49 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
     setNotificationPermissionStatus('loading');
     
-    try {
-        const permission = await Notification.requestPermission();
-        setNotificationPermissionStatus(permission);
-
-        if (permission === 'granted') {
-            const firebaseConfig = {
-                apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-                authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-                projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-                storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-                messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-                appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-            };
-
-            const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
-            const messaging = getMessaging(app);
-            
-            const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
-            if (!vapidKey) {
-                console.error("VAPID key is not configured in environment variables.");
-                toast({ variant: 'destructive', title: "Configuration Error", description: "Push notifications cannot be set up on the web without a VAPID key." });
-                setNotificationPermissionStatus('denied');
-                return;
-            }
-
-            const token = await getToken(messaging, { vapidKey });
-
-            if (token) {
-                console.log("New FCM Token:", token);
-                const result = await registerDeviceToken(token, location?.latitude, location?.longitude);
-                if (result.success) {
-                    toast({ title: "Success!", description: "You are now set up for notifications."});
-                } else {
-                    throw new Error(result.error || 'Server registration failed.');
+    const getTokenWithRetries = (retries = 3, delay = 500): Promise<string | null> => {
+        return new Promise((resolve) => {
+            let attempts = 0;
+            const tryGetToken = () => {
+                if (window.Android && typeof window.Android.getFCMToken === 'function') {
+                    const token = window.Android.getFCMToken();
+                    if (token) {
+                        resolve(token);
+                        return;
+                    }
                 }
-            } else {
-                throw new Error('Failed to get FCM token.');
-            }
+                
+                attempts++;
+                if (attempts < retries) {
+                    setTimeout(tryGetToken, delay);
+                } else {
+                    resolve(null);
+                }
+            };
+            tryGetToken();
+        });
+    };
+
+    try {
+      if (window.Android && typeof window.Android.getFCMToken === 'function') {
+        const token = await getTokenWithRetries();
+        if (token) {
+          const result = await registerDeviceToken(token, location?.latitude, location?.longitude);
+          if (result.success) {
+            setNotificationPermissionStatus('granted');
+            toast({ title: "Success!", description: "You are now set up for notifications."});
+          } else {
+             console.error("Could not register for notifications:", result.error);
+             setNotificationPermissionStatus('denied');
+          }
         } else {
-            toast({ title: "Permission Denied", description: "You will not receive push notifications." });
+          setShowTroubleshootingDialog(true);
+          setNotificationPermissionStatus('denied');
         }
+      } else {
+        toast({ title: "Web Notifications", description: "Web push notifications are not yet available. Please use our Android app for real-time updates." });
+        setNotificationPermissionStatus('denied');
+      }
     } catch (error) {
         console.error("Error during notification registration:", error);
         setShowTroubleshootingDialog(true);
@@ -537,6 +549,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                     <DropdownMenuLabel>Sort By</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => handleSortChange(v as SortOption)}>
+                      <DropdownMenuRadioItem value="nearby">Nearby</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="newest">Newest</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="likes">Most Popular</DropdownMenuRadioItem>
                       <DropdownMenuRadioItem value="comments">Most Discussed</DropdownMenuRadioItem>

@@ -279,26 +279,18 @@ export async function getPostsDb(
       case 'comments':
         orderByClause = 'p.commentcount DESC, p.createdat DESC';
         break;
-      case 'newest':
-      default:
-        let distanceCalc = '';
+      case 'nearby':
         if (options.latitude != null && options.longitude != null && !isAdminView) {
             queryParams.push(options.latitude, options.longitude);
-            distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${paramIndex++}, $${paramIndex++}))`;
-             orderByClause = `
-                CASE
-                WHEN ${distanceCalc} < 20000 THEN 1
-                WHEN ${distanceCalc} < 40000 THEN 2
-                WHEN ${distanceCalc} < 60000 THEN 3
-                WHEN ${distanceCalc} < 80000 THEN 4
-                WHEN ${distanceCalc} < 100000 THEN 5
-                ELSE 6
-                END,
-                p.createdat DESC
-            `;
+            const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${paramIndex++}, $${paramIndex++}))`;
+            orderByClause = `${distanceCalc} ASC, p.createdat DESC`;
         } else {
              orderByClause = 'p.createdat DESC';
         }
+        break;
+      case 'newest':
+      default:
+        orderByClause = 'p.createdat DESC';
         break;
     }
     
