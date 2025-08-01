@@ -39,7 +39,7 @@ GOOGLE_GENAI_API_KEY=your_google_genai_api_key
 # This is the full JSON content of the service account key from your Firebase project.
 # It's used by the server to send push notifications securely.
 # Go to Firebase Console > Project Settings > Service accounts > Generate new private key
-# Store this as a single-line string in your .env.local file.
+# Store this as a single-line string in your .env.local file or a secret manager.
 FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ...}'
 
 
@@ -58,7 +58,7 @@ ADMIN_PASSWORD=password123
 OFFICIAL_USER_PASSWORD=your_official_user_password
 
 # --- Firebase Configuration (for Web Push Notifications) ---
-# This is required for handling notification clicks on the web.
+# This is required for handling notification clicks on the web and in the WebView.
 # To find these values:
 # 1. Go to your Firebase project: https://console.firebase.google.com/
 # 2. Go to Project Settings (click the gear icon).
@@ -82,7 +82,7 @@ GCS_BUCKET_NAME=your-gcs-bucket-name
 
 # For production on Cloud Run: The full JSON content of your GCS service account key.
 # This should be stored as a secret in your deployment environment.
-# GCS_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
+GCS_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
 
 ```
 

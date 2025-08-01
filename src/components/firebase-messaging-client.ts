@@ -27,6 +27,12 @@ const FirebaseMessagingClient = () => {
         return;
       }
 
+      // Check if all required Firebase config keys are present
+      if (!firebaseConfig.apiKey || !firebaseConfig.projectId || !firebaseConfig.messagingSenderId) {
+        console.warn("Firebase client configuration is incomplete. Push notifications will be disabled.");
+        return;
+      }
+
       // Initialize Firebase
       if (!getApps().length) {
         initializeApp(firebaseConfig);
