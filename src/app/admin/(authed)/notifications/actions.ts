@@ -2,11 +2,11 @@
 'use server';
 
 import { getAllUsersWithDeviceTokensDb } from '@/lib/db';
-import { admin as firebaseAdmin } from '@/lib/firebase-admin';
+import admin from '@/utils/firebaseAdmin';
 import type { MulticastMessage } from 'firebase-admin/messaging';
 
 export async function sendLpPointsNotification(): Promise<{ success: boolean; error?: string; successCount?: number; failureCount?: number }> {
-  if (!firebaseAdmin) {
+  if (!admin.apps.length) {
     return { success: false, error: 'Firebase Admin not configured. Cannot send notifications.' };
   }
   
@@ -37,7 +37,7 @@ export async function sendLpPointsNotification(): Promise<{ success: boolean; er
 
     // Firebase allows sending up to 500 messages at a time.
     // For larger scale, we would need to batch this. For now, this is sufficient.
-    const batchResponse = await firebaseAdmin.messaging().sendEach(messages as any[]);
+    const batchResponse = await admin.messaging().sendEach(messages as any[]);
     
     console.log(`Notifications sent: ${batchResponse.successCount} success, ${batchResponse.failureCount} failures.`);
 

@@ -7,7 +7,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import { admin as firebaseAdmin } from '@/lib/firebase-admin';
+import admin from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import { seedContent } from '@/ai/flows/seed-content-flow';
 
@@ -133,7 +133,7 @@ export async function getMediaPosts(options?: { page: number; limit: number }): 
 }
 
 async function sendFamilyPostNotification(post: Post, author: User) {
-    if (!firebaseAdmin) return;
+    if (!admin.apps.length) return;
     try {
         const familyMemberIds = await db.getFamilyMemberIdsDb(author.id);
         if (familyMemberIds.length === 0) return;
@@ -158,7 +158,7 @@ async function sendFamilyPostNotification(post: Post, author: User) {
             }
         }));
 
-        const response = await firebaseAdmin.messaging().sendEach(messages as any);
+        const response = await admin.messaging().sendEach(messages as any);
         if (response.successCount > 0) {
             await db.updateNotifiedCountDb(post.id, response.successCount);
         }
@@ -175,7 +175,7 @@ async function sendFamilyPostNotification(post: Post, author: User) {
 
 async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[] = []) {
   try {
-    if (post.is_family_post || !firebaseAdmin) {
+    if (post.is_family_post || !admin.apps.length) {
       return; 
     }
       
@@ -204,7 +204,7 @@ async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[]
                 }
             }));
             
-            const response = await firebaseAdmin.messaging().sendEach(messages as any);
+            const response = await admin.messaging().sendEach(messages as any);
             successCount += response.successCount;
             response.responses.forEach((resp, idx) => {
                 if (!resp.success) failedTokens.push(mentionedUsersTokens[idx].token);
@@ -230,7 +230,7 @@ async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[]
             android: { priority: 'high' as const },
             apns: { payload: { aps: { 'content-available': 1 } } }
         };
-        const response = await firebaseAdmin.messaging().sendEachForMulticast(message as any);
+        const response = await admin.messaging().sendEachForMulticast(message as any);
         successCount += response.successCount;
         response.responses.forEach((resp, idx) => {
             if (!resp.success) failedTokens.push(nearbyOnlyTokens[idx].token);
@@ -255,7 +255,7 @@ async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[]
 
 async function sendChatNotification(conversationId: number, sender: User, content: string, title?: string) {
   try {
-    if (!firebaseAdmin) return;
+    if (!admin.apps.length) return;
     const participants = await db.getConversationParticipantsDb(conversationId);
     if (!participants) return;
 
@@ -292,7 +292,7 @@ async function sendChatNotification(conversationId: number, sender: User, conten
         }
     }));
 
-    const response = await firebaseAdmin.messaging().sendEach(messages as any);
+    const response = await admin.messaging().sendEach(messages as any);
 
     if (response.failureCount > 0) {
       const failedTokens: string[] = [];
@@ -312,7 +312,7 @@ async function sendChatNotification(conversationId: number, sender: User, conten
 
 async function sendNotificationForNewComment(comment: Comment, post: Post) {
   try {
-    if (!post.authorid || !firebaseAdmin) return;
+    if (!post.authorid || !admin.apps.length) return;
     
     const { user: commenterUser } = await getSession();
     if (commenterUser && commenterUser.id === post.authorid) return;
@@ -337,7 +337,7 @@ async function sendNotificationForNewComment(comment: Comment, post: Post) {
         apns: { payload: { aps: { 'content-available': 1 } } }
     }));
 
-    const response = await firebaseAdmin.messaging().sendEach(messages as any);
+    const response = await admin.messaging().sendEach(messages as any);
 
     if (response.failureCount > 0) {
       const failedTokens: string[] = [];
@@ -988,7 +988,7 @@ export async function getFamilyLocations(): Promise<FamilyMemberLocation[]> {
 // --- Chat Actions ---
 
 async function sendReactionNotification(reactor: User, message: Message, reaction: string) {
-    if (!firebaseAdmin || reactor.id === message.sender_id) return;
+    if (!admin.apps.length || reactor.id === message.sender_id) return;
     try {
         const recipientId = message.sender_id;
         const deviceTokens = await db.getDeviceTokensForUsersDb([recipientId]);
@@ -1008,7 +1008,7 @@ async function sendReactionNotification(reactor: User, message: Message, reactio
             }
         }));
 
-        await firebaseAdmin.messaging().sendEach(messages as any);
+        await admin.messaging().sendEach(messages as any);
     } catch (error) {
         console.error('Error sending chat reaction notification:', error);
     }
@@ -1378,7 +1378,7 @@ export async function requestLocationUpdate(targetUserId: number): Promise<{ suc
   if (!requester) {
     return { success: false, error: 'Authentication required.' };
   }
-  if (!firebaseAdmin) {
+  if (!admin.apps.length) {
     return { success: false, error: 'Notification service not configured on server.' };
   }
 
@@ -1406,7 +1406,7 @@ export async function requestLocationUpdate(targetUserId: number): Promise<{ suc
       },
     };
 
-    const response = await firebaseAdmin.messaging().sendEachForMulticast(message as any);
+    const response = await admin.messaging().sendEachForMulticast(message as any);
 
     if (response.successCount > 0) {
       return { success: true };
