@@ -66,17 +66,35 @@ async function initializeDatabase(client: Pool | Client) {
       console.log("Column 'last_family_feed_view_at' added successfully.");
     }
     
-    const mandalIdColumnCheck = await initClient.query(`
-      SELECT 1 FROM information_schema.columns 
-      WHERE table_name='posts' AND column_name='mandal_id'
+    const mandalLikeCountCheck = await initClient.query(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='ganpati_mandals' AND column_name='likecount'
     `);
-    if (mandalIdColumnCheck.rowCount === 0) {
-        console.log("Adding 'mandal_id' column to 'posts' table...");
-        await initClient.query(`ALTER TABLE posts ADD COLUMN mandal_id INTEGER REFERENCES ganpati_mandals(id) ON DELETE SET NULL;`);
-        console.log("Column 'mandal_id' added successfully.");
+    if (mandalLikeCountCheck.rowCount === 0) {
+      console.log("Adding 'likecount' column to 'ganpati_mandals' table...");
+      await initClient.query(`ALTER TABLE ganpati_mandals ADD COLUMN likecount INTEGER DEFAULT 0;`);
     }
 
     // --- End Schema Migrations ---
+
+    // Festival Tables
+    await initClient.query(`
+      CREATE TABLE IF NOT EXISTS ganpati_mandals (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        city VARCHAR(255) NOT NULL,
+        description TEXT,
+        avatar_url TEXT,
+        latitude DOUBLE PRECISION NOT NULL,
+        longitude DOUBLE PRECISION NOT NULL,
+        admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        likecount INTEGER DEFAULT 0,
+        UNIQUE (name, city)
+      );
+    `);
+    
+    await initClient.query(`CREATE TABLE IF NOT EXISTS mandal_likes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (user_id, mandal_id));`);
 
     const createPostsTableQuery = `
         CREATE TABLE IF NOT EXISTS posts (
@@ -135,23 +153,6 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE TABLE IF NOT EXISTS poll_votes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE, option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE, PRIMARY KEY (user_id, poll_id));`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS app_settings (setting_key VARCHAR(255) PRIMARY KEY, setting_value TEXT);`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS city_seed_log (city_name VARCHAR(255) PRIMARY KEY, last_seeded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
-    
-    // Festival Tables
-    await initClient.query(`
-      CREATE TABLE IF NOT EXISTS ganpati_mandals (
-        id SERIAL PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        city VARCHAR(255) NOT NULL,
-        description TEXT,
-        avatar_url TEXT,
-        latitude DOUBLE PRECISION NOT NULL,
-        longitude DOUBLE PRECISION NOT NULL,
-        admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        UNIQUE (name, city)
-      );
-    `);
-    await initClient.query(`CREATE TABLE IF NOT EXISTS posts_mandals_link (post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (post_id, mandal_id));`);
     
     console.log("All tables checked/created.");
 
@@ -2907,32 +2908,44 @@ export async function registerMandalDb(mandal: NewGanpatiMandal): Promise<void> 
     }
 }
 
-export async function getMandalsDb(): Promise<GanpatiMandal[]> {
+export async function getMandalsDb(userId?: number | null): Promise<GanpatiMandal[]> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) return [];
 
     const client = await dbPool.connect();
     try {
+        const userIdParam = userId || null;
         const query = `
-            SELECT * FROM ganpati_mandals ORDER BY name ASC;
+            SELECT 
+                gm.*,
+                EXISTS(SELECT 1 FROM mandal_likes ml WHERE ml.mandal_id = gm.id AND ml.user_id = $1::int) as "isLikedByCurrentUser"
+            FROM ganpati_mandals gm 
+            ORDER BY gm.name ASC;
         `;
-        const result: QueryResult<GanpatiMandal> = await client.query(query);
+        const result: QueryResult<GanpatiMandal> = await client.query(query, [userIdParam]);
         return result.rows;
     } finally {
         client.release();
     }
 }
 
-export async function getMandalByIdDb(mandalId: number): Promise<GanpatiMandal | null> {
+export async function getMandalByIdDb(mandalId: number, userId?: number | null): Promise<GanpatiMandal | null> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) return null;
 
     const client = await dbPool.connect();
     try {
-        const query = `SELECT * FROM ganpati_mandals WHERE id = $1;`;
-        const result: QueryResult<GanpatiMandal> = await client.query(query, [mandalId]);
+        const userIdParam = userId || null;
+        const query = `
+            SELECT 
+                gm.*,
+                EXISTS(SELECT 1 FROM mandal_likes ml WHERE ml.mandal_id = gm.id AND ml.user_id = $2::int) as "isLikedByCurrentUser"
+            FROM ganpati_mandals gm 
+            WHERE gm.id = $1;
+        `;
+        const result: QueryResult<GanpatiMandal> = await client.query(query, [mandalId, userIdParam]);
         return result.rows[0] || null;
     } finally {
         client.release();
@@ -2977,6 +2990,70 @@ export async function updateMandalDb(mandalId: number, data: { name: string; cit
             throw new Error(`A mandal with the name "${data.name}" already exists in ${data.city}.`);
         }
         throw err;
+    } finally {
+        client.release();
+    }
+}
+
+export async function getMandalMediaPostsDb(mandalId: number): Promise<Post[]> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) return [];
+
+  const client = await dbPool.connect();
+  try {
+    const query = `
+      SELECT id, mediaurls, mediatype
+      FROM posts
+      WHERE mandal_id = $1
+        AND mediaurls IS NOT NULL
+        AND array_length(mediaurls, 1) > 0
+      ORDER BY createdat DESC;
+    `;
+    const result = await client.query(query, [mandalId]);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+export async function toggleMandalLikeDb(userId: number, mandalId: number): Promise<GanpatiMandal | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+
+    const client = await dbPool.connect();
+    try {
+        await client.query('BEGIN');
+        
+        const hasLikedRes = await client.query('SELECT 1 FROM mandal_likes WHERE user_id = $1 AND mandal_id = $2', [userId, mandalId]);
+        
+        let updatedMandal: GanpatiMandal | null;
+
+        if (hasLikedRes.rowCount > 0) {
+            // Unlike
+            await client.query('DELETE FROM mandal_likes WHERE user_id = $1 AND mandal_id = $2', [userId, mandalId]);
+            const updateRes = await client.query('UPDATE ganpati_mandals SET likecount = likecount - 1 WHERE id = $1 RETURNING *', [mandalId]);
+            updatedMandal = updateRes.rows[0] || null;
+        } else {
+            // Like
+            await client.query('INSERT INTO mandal_likes (user_id, mandal_id) VALUES ($1, $2)', [userId, mandalId]);
+            const updateRes = await client.query('UPDATE ganpati_mandals SET likecount = likecount + 1 WHERE id = $1 RETURNING *', [mandalId]);
+            updatedMandal = updateRes.rows[0] || null;
+        }
+
+        await client.query('COMMIT');
+        
+        if (updatedMandal) {
+           const finalRes = await getMandalByIdDb(mandalId, userId);
+           return finalRes;
+        }
+        return null;
+
+    } catch (e) {
+        await client.query('ROLLBACK');
+        console.error("Error in toggleMandalLikeDb:", e);
+        throw e;
     } finally {
         client.release();
     }

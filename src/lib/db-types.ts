@@ -164,6 +164,7 @@ export interface Post {
   expires_at?: string | null;
   max_viewers?: number | null;
   poll?: Poll | null;
+  mandal_id?: number | null;
 }
 
 export interface NewPollData {
@@ -187,6 +188,7 @@ export type NewPost = {
   expires_at?: string | null;
   max_viewers?: number | null;
   pollData?: NewPollData | null;
+  mandalId?: number;
 };
 
 // For inserting a new post into the DB
@@ -206,6 +208,7 @@ export type DbNewPost = {
   expires_at?: string | null;
   max_viewers?: number | null;
   pollData?: NewPollData | null;
+  mandal_id?: number | null;
 };
 
 
@@ -395,6 +398,8 @@ export interface GanpatiMandal {
     longitude: number;
     admin_user_id: number;
     created_at: string;
+    likecount: number;
+    isLikedByCurrentUser?: boolean;
 }
 
 export type NewGanpatiMandal = {
@@ -404,4 +409,5 @@ export type NewGanpatiMandal = {
     avatarUrl?: string | null;
     latitude: number;
     longitude: number;
+    admin_user_id: number; // This should be included when creating
 }
