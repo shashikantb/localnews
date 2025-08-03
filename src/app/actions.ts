@@ -1,8 +1,9 @@
 
+
 'use server';
 
 import * as db from '@/lib/db';
-import type { ConversationDetails, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal } from '@/lib/db-types';
+import type { ConversationDetails, GanpatiMandal, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
@@ -404,6 +405,7 @@ export async function addPost(newPostData: ClientNewPost): Promise<{ post?: Post
       expires_at: newPostData.expires_at,
       max_viewers: newPostData.max_viewers,
       pollData: newPostData.pollData,
+      mandal_id: newPostData.mandalId,
     };
 
     const addedPostDb = await db.addPostDb(postDataForDb);
@@ -1535,5 +1537,23 @@ export async function registerMandal(newMandal: NewGanpatiMandal): Promise<{ suc
     } catch (error: any) {
         console.error('Error registering mandal:', error);
         return { success: false, error: error.message || 'An unexpected server error occurred.' };
+    }
+}
+
+export async function getMandalsDb(): Promise<GanpatiMandal[]> {
+    try {
+        return await db.getMandalsDb();
+    } catch (error) {
+        console.error("Server action error fetching mandals:", error);
+        return [];
+    }
+}
+
+export async function getMandalsForUserDb(userId: number): Promise<GanpatiMandal[]> {
+    try {
+        return await db.getMandalsForUserDb(userId);
+    } catch (error) {
+        console.error(`Server action error fetching mandals for user ${userId}:`, error);
+        return [];
     }
 }

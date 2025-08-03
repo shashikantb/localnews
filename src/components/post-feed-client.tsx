@@ -40,6 +40,7 @@ import { cn } from '@/lib/utils';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import RegisterMandalDialog from './register-mandal-dialog';
+import MandalList from './mandal-list';
 
 
 interface AndroidInterface {
@@ -291,7 +292,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             fetchBusinesses(1, businessFeed.category);
         }
     } else if (newTab === 'festival') {
-        // TODO: Implement festival feed fetching logic
+        // Festival tab content is now handled by MandalList component
     }
      else { // nearby
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
@@ -454,7 +455,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 <div className="flex justify-center">
                     <RegisterMandalDialog userLocation={location} />
                 </div>
-                <NoPostsContent feedType="festival" />
+                <MandalList />
             </div>
         );
     }
