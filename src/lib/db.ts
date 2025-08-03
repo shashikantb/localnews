@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal } from '@/lib/db-types';
+import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 
@@ -87,7 +87,8 @@ async function initializeDatabase(client: Pool | Client) {
             hide_location BOOLEAN DEFAULT FALSE,
             expires_at TIMESTAMPTZ,
             max_viewers INTEGER,
-            lp_bonus_awarded BOOLEAN DEFAULT FALSE
+            lp_bonus_awarded BOOLEAN DEFAULT FALSE,
+            mandal_id INTEGER REFERENCES ganpati_mandals(id) ON DELETE SET NULL
         );
     `;
     await initClient.query(createPostsTableQuery);
@@ -480,11 +481,11 @@ export async function addPostDb(newPost: DbNewPost): Promise<Post> {
     await client.query('BEGIN');
 
     const postQuery = `
-      INSERT INTO posts(content, latitude, longitude, mediaurls, mediatype, hashtags, city, authorid, is_family_post, hide_location, expires_at, max_viewers)
-      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+      INSERT INTO posts(content, latitude, longitude, mediaurls, mediatype, hashtags, city, authorid, is_family_post, hide_location, expires_at, max_viewers, mandal_id)
+      VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
       RETURNING *;
     `;
-    const postValues = [newPost.content, newPost.latitude, newPost.longitude, newPost.mediaurls, newPost.mediatype, newPost.hashtags, newPost.city, newPost.authorid, newPost.is_family_post, newPost.hide_location, newPost.expires_at, newPost.max_viewers];
+    const postValues = [newPost.content, newPost.latitude, newPost.longitude, newPost.mediaurls, newPost.mediatype, newPost.hashtags, newPost.city, newPost.authorid, newPost.is_family_post, newPost.hide_location, newPost.expires_at, newPost.max_viewers, newPost.mandal_id];
     const postResult: QueryResult<Post> = await client.query(postQuery, postValues);
     const addedPost = postResult.rows[0];
 
@@ -2858,7 +2859,7 @@ export async function updateLastSeedTimeDb(cityName: string): Promise<void> {
 
 // --- Festival Functions ---
 
-export async function registerMandalDb(mandal: GanpatiMandal): Promise<void> {
+export async function registerMandalDb(mandal: NewGanpatiMandal): Promise<void> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) throw new Error("Database not configured.");
@@ -2871,6 +2872,40 @@ export async function registerMandalDb(mandal: GanpatiMandal): Promise<void> {
         `;
         const values = [mandal.name, mandal.city, mandal.description, mandal.latitude, mandal.longitude, mandal.admin_user_id];
         await client.query(query, values);
+    } finally {
+        client.release();
+    }
+}
+
+export async function getMandalsDb(): Promise<GanpatiMandal[]> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return [];
+
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            SELECT * FROM ganpati_mandals ORDER BY name ASC;
+        `;
+        const result: QueryResult<GanpatiMandal> = await client.query(query);
+        return result.rows;
+    } finally {
+        client.release();
+    }
+}
+
+export async function getMandalsForUserDb(userId: number): Promise<GanpatiMandal[]> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return [];
+
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            SELECT * FROM ganpati_mandals WHERE admin_user_id = $1 ORDER BY name ASC;
+        `;
+        const result: QueryResult<GanpatiMandal> = await client.query(query, [userId]);
+        return result.rows;
     } finally {
         client.release();
     }
