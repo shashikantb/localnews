@@ -66,18 +66,6 @@ async function initializeDatabase(client: Pool | Client) {
       console.log("Column 'last_family_feed_view_at' added successfully.");
     }
     
-    const mandalLikeCountCheck = await initClient.query(`
-      SELECT 1 FROM information_schema.columns
-      WHERE table_name='ganpati_mandals' AND column_name='likecount'
-    `);
-    if (mandalLikeCountCheck.rowCount === 0) {
-      console.log("Adding 'likecount' column to 'ganpati_mandals' table...");
-      await initClient.query(`ALTER TABLE ganpati_mandals ADD COLUMN likecount INTEGER DEFAULT 0;`);
-    }
-
-    // --- End Schema Migrations ---
-
-    // Festival Tables
     await initClient.query(`
       CREATE TABLE IF NOT EXISTS ganpati_mandals (
         id SERIAL PRIMARY KEY,
@@ -94,7 +82,27 @@ async function initializeDatabase(client: Pool | Client) {
       );
     `);
     
-    await initClient.query(`CREATE TABLE IF NOT EXISTS mandal_likes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (user_id, mandal_id));`);
+    const mandalLikeTableCheck = await initClient.query(`
+      SELECT 1 FROM information_schema.tables WHERE table_name='mandal_likes'
+    `);
+    if (mandalLikeTableCheck.rowCount === 0) {
+      console.log("Creating 'mandal_likes' table...");
+      await initClient.query(`CREATE TABLE IF NOT EXISTS mandal_likes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (user_id, mandal_id));`);
+    }
+
+    const mandalLikeCountCheck = await initClient.query(`
+      SELECT 1 FROM information_schema.columns
+      WHERE table_name='ganpati_mandals' AND column_name='likecount'
+    `);
+    if (mandalLikeCountCheck.rowCount === 0) {
+      console.log("Adding 'likecount' column to 'ganpati_mandals' table...");
+      await initClient.query(`ALTER TABLE ganpati_mandals ADD COLUMN likecount INTEGER DEFAULT 0;`);
+    }
+
+    // --- End Schema Migrations ---
+
+    // Festival Tables
+    
 
     const createPostsTableQuery = `
         CREATE TABLE IF NOT EXISTS posts (
@@ -216,7 +224,7 @@ function getDbPool(): Pool | null {
     ssl: process.env.POSTGRES_SSL === 'true' ? { rejectUnauthorized: false } : false,
     max: 10, // Max number of clients in the pool
     idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 10000,
+    connectionTimeoutMillis: 20000,
   });
 
   pool.on('error', (err, client) => {
@@ -3058,3 +3066,4 @@ export async function toggleMandalLikeDb(userId: number, mandalId: number): Prom
         client.release();
     }
 }
+
