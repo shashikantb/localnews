@@ -6,7 +6,7 @@ import { getMandalsForFeed, toggleMandalLike, getMandalMediaPosts } from '@/app/
 import type { GanpatiMandal, User, Post } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter } from 'lucide-react';
+import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter, Edit } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import MandalManagementDialog from './mandal-management-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import MandalMediaViewer from './mandal-media-viewer';
+import RegisterMandalDialog from './register-mandal-dialog';
 
 
 const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; onUpdate: () => void; }> = ({ mandal: initialMandal, sessionUser, onUpdate }) => {
@@ -102,7 +103,7 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
 };
 
 
-const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => {
+const MandalList: React.FC<{ sessionUser: User | null, userLocation: { latitude: number, longitude: number } | null }> = ({ sessionUser, userLocation }) => {
     const [allMandals, setAllMandals] = useState<GanpatiMandal[]>([]);
     const [filteredMandals, setFilteredMandals] = useState<GanpatiMandal[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -147,11 +148,23 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
     }
     
     if (allMandals.length === 0) {
-        return <NoPostsContent feedType="festival" />;
+        return (
+            <div className="text-center py-10">
+                <NoPostsContent feedType="festival" />
+                <div className="mt-6">
+                    <RegisterMandalDialog userLocation={userLocation} />
+                </div>
+            </div>
+        )
     }
     
     return (
         <div className="space-y-4">
+             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center p-3 border bg-card rounded-lg">
+                <p className="text-sm font-medium text-muted-foreground">Know a Mandal not listed here?</p>
+                <RegisterMandalDialog userLocation={userLocation} />
+            </div>
+
             <div className="flex items-center gap-2">
                 <Filter className="w-5 h-5 text-muted-foreground"/>
                 <Select value={selectedCity} onValueChange={setSelectedCity}>

@@ -449,7 +449,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const renderFeedContent = () => {
     if (activeTab === 'festival') {
-        return <MandalList sessionUser={sessionUser} />;
+        return <MandalList sessionUser={sessionUser} userLocation={location} />;
     }
 
     if (activeTab === 'business') {
