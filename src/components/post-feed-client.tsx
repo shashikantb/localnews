@@ -104,7 +104,7 @@ function NotificationButtonContent({
   }
 }
 
-function NoPostsContent({ feedType }: { feedType: FeedType }) {
+export function NoPostsContent({ feedType }: { feedType: FeedType }) {
   const messages = {
     nearby: {
       title: 'The air is quiet here...',

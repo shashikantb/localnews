@@ -7,7 +7,7 @@ import type { GanpatiMandal } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { PartyPopper, MapPin } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
-import { NoPostsContent } from './post-feed-client'; // Assuming this is exported
+import { NoPostsContent } from './post-feed-client';
 
 const MandalCard: React.FC<{ mandal: GanpatiMandal }> = ({ mandal }) => (
     <Card className="hover:shadow-lg transition-shadow">
