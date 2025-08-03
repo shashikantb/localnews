@@ -39,7 +39,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import RegisterMandalDialog from './register-mandal-dialog';
 import MandalList from './mandal-list';
 
 
@@ -120,7 +119,7 @@ export function NoPostsContent({ feedType }: { feedType: FeedType }) {
     },
     festival: {
         title: 'The Festivities Await!',
-        description: 'No mandals have been registered in your area yet. Be the first to register one!'
+        description: 'No mandals have been registered for the selected city yet.'
     }
   }
   const currentMessage = messages[feedType];
@@ -292,7 +291,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             fetchBusinesses(1, businessFeed.category);
         }
     } else if (newTab === 'festival') {
-        // Festival tab content is now handled by MandalList component
+        // Festival tab content is now handled by MandalList component, which fetches its own data
     }
      else { // nearby
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
@@ -376,7 +375,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if(activeTab === 'business') {
         await fetchBusinesses(1, businessFeed.category);
     } else if (activeTab === 'festival') {
-        // TODO: Add refresh logic for festival
+        // MandalList will handle its own refresh
     }
      else {
         if (activeTab === 'family') {
@@ -394,7 +393,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         if (businessFeed.isLoading || !businessFeed.hasMore) return;
         fetchBusinesses(businessFeed.page + 1, businessFeed.category);
     } else if (activeTab === 'festival') {
-        // TODO: Add load more logic for festival
+        // MandalList handles its own loading
     } else {
         const currentFeed = feeds[activeTab];
         if (currentFeed.isLoading || !currentFeed.hasMore) return;
@@ -450,14 +449,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const renderFeedContent = () => {
     if (activeTab === 'festival') {
-        return (
-            <div className="space-y-4">
-                <div className="flex justify-center">
-                    <RegisterMandalDialog userLocation={location} />
-                </div>
-                <MandalList sessionUser={sessionUser}/>
-            </div>
-        );
+        return <MandalList sessionUser={sessionUser} />;
     }
 
     if (activeTab === 'business') {
@@ -579,7 +571,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                     </ScrollArea>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              ) : (
+              ) : activeTab !== 'festival' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">
@@ -598,7 +590,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                     </DropdownMenuRadioGroup>
                   </DropdownMenuContent>
                 </DropdownMenu>
-              )}
+              ) : null}
 
               <Button
                   variant="outline"

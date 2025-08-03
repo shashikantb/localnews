@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState } from 'react';
@@ -13,8 +14,36 @@ interface MandalMediaViewerProps {
   posts: Pick<Post, 'id' | 'mediaurls' | 'mediatype'>[];
 }
 
+const variants = {
+  enter: (direction: number) => {
+    return {
+      x: direction > 0 ? 1000 : -1000,
+      opacity: 0
+    };
+  },
+  center: {
+    zIndex: 1,
+    x: 0,
+    opacity: 1
+  },
+  exit: (direction: number) => {
+    return {
+      zIndex: 0,
+      x: direction < 0 ? 1000 : -1000,
+      opacity: 0
+    };
+  }
+};
+
+const swipeConfidenceThreshold = 10000;
+const swipePower = (offset: number, velocity: number) => {
+  return Math.abs(offset) * velocity;
+};
+
+
 const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
-  const [index, setIndex] = useState(0);
+  const [page, setPage] = useState(0);
+  const [direction, setDirection] = useState(0);
 
   const allMedia = posts.flatMap(post => 
     (post.mediaurls || []).map(url => ({
@@ -23,6 +52,14 @@ const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
       url: url,
     }))
   );
+
+  const imageIndex = page % allMedia.length;
+
+  const paginate = (newDirection: number) => {
+    setPage(page + newDirection);
+    setDirection(newDirection);
+  };
+
 
   if (allMedia.length === 0) {
     return (
@@ -34,37 +71,43 @@ const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
     );
   }
 
-  const currentMedia = allMedia[index];
+  const currentMedia = allMedia[imageIndex];
   
-  const goToNext = () => {
-    setIndex(prev => (prev + 1) % allMedia.length);
-  };
-  
-  const goToPrev = () => {
-    setIndex(prev => (prev - 1 + allMedia.length) % allMedia.length);
-  };
-
   return (
-    <div className="relative w-full aspect-video overflow-hidden rounded-lg border bg-black/80 shadow-inner">
-      <AnimatePresence initial={false}>
+    <div className="relative w-full aspect-video overflow-hidden rounded-lg border bg-black/80 shadow-inner flex items-center justify-center">
+      <AnimatePresence initial={false} custom={direction}>
         <motion.div
-            key={index}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            className="absolute inset-0"
+            key={page}
+            custom={direction}
+            variants={variants}
+            initial="enter"
+            animate="center"
+            exit="exit"
+            transition={{
+                x: { type: "spring", stiffness: 300, damping: 30 },
+                opacity: { duration: 0.2 }
+            }}
+            drag="x"
+            dragConstraints={{ left: 0, right: 0 }}
+            dragElastic={1}
+            onDragEnd={(e, { offset, velocity }) => {
+                const swipe = swipePower(offset.x, velocity.x);
+                if (swipe < -swipeConfidenceThreshold) {
+                    paginate(1);
+                } else if (swipe > swipeConfidenceThreshold) {
+                    paginate(-1);
+                }
+            }}
+            className="absolute w-full h-full"
         >
             {currentMedia.type === 'video' ? (
                 <video
-                    key={currentMedia.url}
                     src={currentMedia.url}
                     controls
                     className="w-full h-full object-contain"
                 />
             ) : (
                 <Image
-                    key={currentMedia.url}
                     src={currentMedia.url}
                     alt="Mandal Media"
                     fill
@@ -79,17 +122,17 @@ const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
       {allMedia.length > 1 && (
         <>
             <div className="absolute top-1/2 left-2 -translate-y-1/2 z-10">
-                <Button variant="secondary" size="icon" onClick={goToPrev} className="h-8 w-8 rounded-full opacity-70 hover:opacity-100 transition-opacity">
+                <Button variant="secondary" size="icon" onClick={() => paginate(-1)} className="h-8 w-8 rounded-full opacity-70 hover:opacity-100 transition-opacity">
                     <ChevronLeft className="h-5 w-5" />
                 </Button>
             </div>
             <div className="absolute top-1/2 right-2 -translate-y-1/2 z-10">
-                <Button variant="secondary" size="icon" onClick={goToNext} className="h-8 w-8 rounded-full opacity-70 hover:opacity-100 transition-opacity">
+                <Button variant="secondary" size="icon" onClick={() => paginate(1)} className="h-8 w-8 rounded-full opacity-70 hover:opacity-100 transition-opacity">
                     <ChevronRight className="h-5 w-5" />
                 </Button>
             </div>
             <div className="absolute bottom-2 left-1/2 -translate-x-1/2 px-2 py-1 bg-black/60 text-white text-xs rounded-md backdrop-blur-sm z-10">
-                {index + 1} / {allMedia.length}
+                {imageIndex + 1} / {allMedia.length}
             </div>
         </>
       )}
@@ -98,4 +141,3 @@ const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
 };
 
 export default MandalMediaViewer;
-

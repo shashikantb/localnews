@@ -1,18 +1,23 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { getMandalsDb, toggleMandalLikeDb } from '@/app/actions';
+import { getMandalsDb } from '@/app/actions';
 import type { GanpatiMandal, User } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PartyPopper, MapPin, ThumbsUp, Loader2 } from 'lucide-react';
+import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import MandalManagementDialog from './mandal-management-dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import {
+  toggleMandalLikeDb
+} from '@/lib/db'
 
 const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; onUpdate: () => void; }> = ({ mandal: initialMandal, sessionUser, onUpdate }) => {
     const [mandal, setMandal] = useState(initialMandal);
@@ -87,12 +92,20 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
 
 const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => {
     const [allMandals, setAllMandals] = useState<GanpatiMandal[]>([]);
+    const [filteredMandals, setFilteredMandals] = useState<GanpatiMandal[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [cities, setCities] = useState<string[]>([]);
+    const [selectedCity, setSelectedCity] = useState<string>('all');
 
     const fetchMandals = useCallback(() => {
         setIsLoading(true);
         getMandalsDb(sessionUser?.id)
-            .then(setAllMandals)
+            .then(mandals => {
+                setAllMandals(mandals);
+                setFilteredMandals(mandals);
+                const uniqueCities = Array.from(new Set(mandals.map(m => m.city))).sort();
+                setCities(uniqueCities);
+            })
             .catch(err => console.error("Failed to fetch mandals:", err))
             .finally(() => setIsLoading(false));
     }, [sessionUser]);
@@ -100,10 +113,19 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
     useEffect(() => {
         fetchMandals();
     }, [fetchMandals]);
+
+    useEffect(() => {
+        if (selectedCity === 'all') {
+            setFilteredMandals(allMandals);
+        } else {
+            setFilteredMandals(allMandals.filter(m => m.city === selectedCity));
+        }
+    }, [selectedCity, allMandals]);
     
     if (isLoading) {
         return (
             <div className="space-y-4">
+                <Skeleton className="h-10 w-full max-w-xs" />
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
                 <Skeleton className="h-24 w-full" />
@@ -117,16 +139,35 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
     
     return (
         <div className="space-y-4">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {allMandals.map(mandal => (
-                   <MandalCard 
-                       key={mandal.id} 
-                       mandal={mandal} 
-                       sessionUser={sessionUser}
-                       onUpdate={fetchMandals}
-                   />
-                ))}
+            <div className="flex items-center gap-2">
+                <Filter className="w-5 h-5 text-muted-foreground"/>
+                <Select value={selectedCity} onValueChange={setSelectedCity}>
+                    <SelectTrigger className="w-full max-w-xs">
+                        <SelectValue placeholder="Filter by city..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="all">All Cities</SelectItem>
+                        {cities.map(city => (
+                            <SelectItem key={city} value={city}>{city}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
             </div>
+            
+            {filteredMandals.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {filteredMandals.map(mandal => (
+                       <MandalCard 
+                           key={mandal.id} 
+                           mandal={mandal} 
+                           sessionUser={sessionUser}
+                           onUpdate={fetchMandals}
+                       />
+                    ))}
+                </div>
+            ) : (
+                <NoPostsContent feedType="festival" />
+            )}
         </div>
     );
 };
