@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { getMandalsForFeed, toggleMandalLike, getMandalMediaPostsDb } from '@/app/actions';
+import { getMandalsForFeed, toggleMandalLike, getMandalMediaPosts } from '@/app/actions';
 import type { GanpatiMandal, User, Post } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -29,7 +29,7 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
 
     useEffect(() => {
         setIsLoadingMedia(true);
-        getMandalMediaPostsDb(mandal.id)
+        getMandalMediaPosts(mandal.id)
             .then(setMediaPosts)
             .finally(() => setIsLoadingMedia(false));
     }, [mandal.id]);
