@@ -29,12 +29,12 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal, isOwner: boolean }> = ({ man
     if (isOwner) {
         return (
             <MandalManagementDialog mandal={mandal}>
-                <div className="cursor-pointer">{cardContent}</div>
+                <div className="cursor-pointer h-full">{cardContent}</div>
             </MandalManagementDialog>
         );
     }
 
-    return cardContent;
+    return <div className="h-full">{cardContent}</div>;
 };
 
 
@@ -96,7 +96,7 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
                     {userMandals.length > 0 && <h3 className="text-lg font-semibold text-muted-foreground pl-1 border-b pb-2">Other Mandals</h3>}
                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {otherMandals.map(mandal => (
-                           <MandalCard key={`other-${mandal.id}`} mandal={mandal} isOwner={false} />
+                           <MandalCard key={`other-${mandal.id}`} mandal={mandal} isOwner={sessionUser?.id === mandal.admin_user_id} />
                         ))}
                     </div>
                 </div>
