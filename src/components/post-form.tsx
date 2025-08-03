@@ -87,6 +87,7 @@ const baseFormSchema = z.object({
   isRadarPost: z.boolean().default(false),
   radarExpiry: z.string().optional(),
   radarMaxViewers: z.number().optional(),
+  mandalId: z.number().optional(),
   // A hidden field to track media files for validation
   mediaFileCount: z.number().default(0),
 });
@@ -124,7 +125,7 @@ const formSchema = z.discriminatedUnion("isPoll", [
 type FormData = z.infer<typeof formSchema>;
 
 interface PostFormProps {
-  onSubmit: (content: string, hashtags: string[], isFamilyPost: boolean, hideLocation: boolean, mediaUrls?: string[], mediaType?: 'image' | 'video' | 'gallery', mentionedUserIds?: number[], pollData?: NewPollData | null, expires_at?: string, max_viewers?: number) => Promise<void>;
+  onSubmit: (content: string, hashtags: string[], isFamilyPost: boolean, hideLocation: boolean, mediaUrls?: string[], mediaType?: 'image' | 'video' | 'gallery', mentionedUserIds?: number[], pollData?: NewPollData | null, expires_at?: string, max_viewers?: number, mandalId?: number) => Promise<void>;
   submitting: boolean;
   sessionUser: UserType | null;
 }
@@ -359,7 +360,7 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser 
               else if (mediaType === 'image') finalMediaType = 'image';
           }
 
-          await onSubmit(data.content || '', hashtagsToSubmit, data.isFamilyPost, data.hideLocation, uploadedUrls, finalMediaType, mentionedUserIds, pollData, expiresAt, maxViewers);
+          await onSubmit(data.content || '', hashtagsToSubmit, data.isFamilyPost, data.hideLocation, uploadedUrls, finalMediaType, mentionedUserIds, pollData, expiresAt, maxViewers, data.mandalId);
 
         } catch (error: any) {
           console.error("A critical error occurred during the upload process:", error);
@@ -369,7 +370,7 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser 
           setIsUploading(false);
         }
       } else {
-        await onSubmit(data.content || '', hashtagsToSubmit, data.isFamilyPost, data.hideLocation, undefined, undefined, mentionedUserIds, pollData, expiresAt, maxViewers);
+        await onSubmit(data.content || '', hashtagsToSubmit, data.isFamilyPost, data.hideLocation, undefined, undefined, mentionedUserIds, pollData, expiresAt, maxViewers, data.mandalId);
       }
       
       form.reset();
