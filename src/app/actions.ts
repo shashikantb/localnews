@@ -1549,12 +1549,19 @@ export async function getMandalsForFeed(userId?: number | null): Promise<Ganpati
     }
 }
 
-export async function getMandalsForUserDb(userId: number): Promise<GanpatiMandal[]> {
+export async function toggleMandalLike(mandalId: number): Promise<{ mandal?: GanpatiMandal | null; error?: string; }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { error: 'You must be logged in to like a mandal.' };
+    }
+    
     try {
-        return await db.getMandalsForUserDb(userId);
-    } catch (error) {
-        console.error(`Server action error fetching mandals for user ${userId}:`, error);
-        return [];
+        const mandal = await db.toggleMandalLikeDb(user.id, mandalId);
+        revalidatePath('/'); // Revalidate the feed
+        return { mandal };
+    } catch (error: any) {
+        console.error(`Error toggling like for mandal ${mandalId}:`, error);
+        return { error: 'Failed to update like status due to a server error.' };
     }
 }
 
@@ -1590,9 +1597,9 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
             return { success: false, error: 'You are not the admin of this mandal.' };
         }
 
-        const nearbyTokens = await db.getNearbyDeviceTokensDb(mandal.latitude, mandal.longitude, 5); // 5km radius for Aarti
+        const nearbyTokens = await db.getNearbyDeviceTokensDb(mandal.latitude, mandal.longitude, 1); // 1km radius for Aarti
         if (nearbyTokens.length === 0) {
-            return { success: false, error: 'No users found nearby to notify.' };
+            return { success: true, sentCount: 0, error: 'No users found within 1km to notify.' };
         }
 
         const message = {

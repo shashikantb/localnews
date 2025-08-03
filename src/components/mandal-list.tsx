@@ -4,8 +4,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { getMandalsForFeed } from '@/app/actions';
-import { toggleMandalLikeDb } from '@/lib/db';
+import { getMandalsForFeed, toggleMandalLike } from '@/app/actions';
 import type { GanpatiMandal, User } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -43,12 +42,12 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
         const newLikeCount = mandal.isLikedByCurrentUser ? mandal.likecount - 1 : mandal.likecount + 1;
         setMandal(prev => ({ ...prev, isLikedByCurrentUser: newIsLiked, likecount: newLikeCount }));
 
-        const result = await toggleMandalLikeDb(sessionUser.id, mandal.id);
-        if (!result) {
+        const result = await toggleMandalLike(mandal.id);
+        if (result.error || !result.mandal) {
              toast({ variant: 'destructive', title: 'Failed to update like.' });
              setMandal(initialMandal); // Revert
         } else {
-             setMandal(result); // Sync with server state
+             setMandal(result.mandal); // Sync with server state
         }
         setIsLiking(false);
     };
