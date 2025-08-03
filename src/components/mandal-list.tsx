@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getMandalsDb } from '@/app/actions';
 import type { GanpatiMandal, User } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -11,9 +11,9 @@ import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import MandalManagementDialog from './mandal-management-dialog';
 
-const MandalCard: React.FC<{ mandal: GanpatiMandal; isOwner: boolean }> = ({ mandal, isOwner }) => {
-    return (
-      <Card className="hover:shadow-lg transition-shadow h-full">
+const MandalCard: React.FC<{ mandal: GanpatiMandal; isOwner: boolean; onMandalUpdate: () => void; }> = ({ mandal, isOwner, onMandalUpdate }) => {
+    const cardContent = (
+      <Card className="hover:shadow-lg transition-shadow h-full w-full">
           <CardHeader>
               <div className="flex justify-between items-start">
                   <div className="flex-1">
@@ -26,18 +26,19 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; isOwner: boolean }> = ({ man
                           {mandal.city}
                       </CardDescription>
                   </div>
-                  {isOwner && (
-                      <MandalManagementDialog mandal={mandal}>
-                          <Button variant="ghost" size="sm">
-                              <Edit className="w-4 h-4 mr-2" />
-                              Manage
-                          </Button>
-                      </MandalManagementDialog>
-                  )}
               </div>
           </CardHeader>
       </Card>
     );
+
+    if (isOwner) {
+        return (
+            <MandalManagementDialog mandal={mandal} onUpdate={onMandalUpdate}>
+                <div className="w-full h-full cursor-pointer">{cardContent}</div>
+            </MandalManagementDialog>
+        );
+    }
+    return cardContent;
 };
 
 
@@ -45,13 +46,17 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
     const [allMandals, setAllMandals] = useState<GanpatiMandal[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    useEffect(() => {
+    const fetchMandals = useCallback(() => {
         setIsLoading(true);
         getMandalsDb()
             .then(setAllMandals)
             .catch(err => console.error("Failed to fetch mandals:", err))
             .finally(() => setIsLoading(false));
     }, []);
+
+    useEffect(() => {
+        fetchMandals();
+    }, [fetchMandals]);
     
     if (isLoading) {
         return (
@@ -84,6 +89,7 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
                        key={mandal.id} 
                        mandal={mandal} 
                        isOwner={sessionUser?.id === mandal.admin_user_id}
+                       onMandalUpdate={fetchMandals}
                    />
                 ))}
             </div>

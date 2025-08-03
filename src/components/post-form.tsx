@@ -128,6 +128,7 @@ interface PostFormProps {
   onSubmit: (content: string, hashtags: string[], isFamilyPost: boolean, hideLocation: boolean, mediaUrls?: string[], mediaType?: 'image' | 'video' | 'gallery', mentionedUserIds?: number[], pollData?: NewPollData | null, expires_at?: string, max_viewers?: number, mandalId?: number) => Promise<void>;
   submitting: boolean;
   sessionUser: UserType | null;
+  mandalId?: number;
 }
 
 interface FilePreview {
@@ -135,7 +136,7 @@ interface FilePreview {
     url: string;
 }
 
-export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser }) => {
+export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser, mandalId }) => {
   const { toast } = useToast();
   const [selectedFiles, setSelectedFiles] = React.useState<FilePreview[]>([]);
   const [mediaType, setMediaType] = React.useState<'image' | 'video' | null>(null);
@@ -166,6 +167,7 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser 
       isRadarPost: false,
       isPoll: false,
       mediaFileCount: 0,
+      mandalId: mandalId,
     },
     mode: 'onChange', // Validate on change to enable/disable button
   });

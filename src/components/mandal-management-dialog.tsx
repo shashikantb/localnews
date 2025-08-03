@@ -2,6 +2,12 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useForm, type SubmitHandler } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useToast } from '@/hooks/use-toast';
+import type { GanpatiMandal } from '@/lib/db-types';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,86 +15,104 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
+  DialogClose,
 } from '@/components/ui/dialog';
-import { useToast } from '@/hooks/use-toast';
-import type { GanpatiMandal, NewPost, User } from '@/lib/db-types';
-import { ScrollArea } from './ui/scroll-area';
-import { Button } from './ui/button';
-import { Bell, Edit, Film, Loader2, PartyPopper } from 'lucide-react';
-import { PostForm } from '@/components/post-form';
-import { getSession } from '@/app/auth/actions';
+import { Bell, Edit, Film, Loader2, PartyPopper, PlusCircle } from 'lucide-react';
+import PostComposerLoader from './post-composer-loader';
+import { updateMandal, sendAartiNotification } from '@/app/actions';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from './ui/form';
+import { Input } from './ui/input';
+import { Textarea } from './ui/textarea';
 
+const mandalEditSchema = z.object({
+  name: z.string().min(3, 'Mandal name must be at least 3 characters long.'),
+  city: z.string().min(2, 'City name is required.'),
+  description: z.string().max(500, 'Description cannot exceed 500 characters.').optional(),
+});
+type MandalEditFormData = z.infer<typeof mandalEditSchema>;
+
+
+const EditMandalForm: React.FC<{ mandal: GanpatiMandal; onUpdateSuccess: () => void }> = ({ mandal, onUpdateSuccess }) => {
+    const { toast } = useToast();
+    const form = useForm<MandalEditFormData>({
+        resolver: zodResolver(mandalEditSchema),
+        defaultValues: {
+            name: mandal.name,
+            city: mandal.city,
+            description: mandal.description || '',
+        },
+    });
+
+    const { isSubmitting } = form.formState;
+
+    const onSubmit: SubmitHandler<MandalEditFormData> = async (data) => {
+        const result = await updateMandal(mandal.id, data);
+        if (result.success) {
+            toast({ title: 'Mandal Updated!', description: 'Your changes have been saved.' });
+            onUpdateSuccess();
+        } else {
+            toast({ variant: 'destructive', title: 'Update Failed', description: result.error });
+        }
+    };
+
+    return (
+        <Dialog>
+            <DialogTrigger asChild>
+                <Button variant="outline"><Edit className="mr-2 h-4 w-4" /> Edit Info</Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit {mandal.name}</DialogTitle>
+                </DialogHeader>
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+                        <FormField control={form.control} name="name" render={({ field }) => (
+                            <FormItem><FormLabel>Mandal Name</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="city" render={({ field }) => (
+                             <FormItem><FormLabel>City</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <FormField control={form.control} name="description" render={({ field }) => (
+                            <FormItem><FormLabel>Description</FormLabel><FormControl><Textarea {...field} /></FormControl><FormMessage /></FormItem>
+                        )} />
+                        <DialogFooter>
+                            <DialogClose asChild><Button type="button" variant="ghost">Cancel</Button></DialogClose>
+                            <Button type="submit" disabled={isSubmitting}>{isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>} Save Changes</Button>
+                        </DialogFooter>
+                    </form>
+                </Form>
+            </DialogContent>
+        </Dialog>
+    );
+};
+
+const SendAartiNotificationButton: React.FC<{ mandalId: number }> = ({ mandalId }) => {
+    const [isSending, setIsSending] = useState(false);
+    const { toast } = useToast();
+
+    const handleSend = async () => {
+        setIsSending(true);
+        const result = await sendAartiNotification(mandalId);
+        if (result.success) {
+            toast({ title: 'Notification Sent!', description: `Sent Aarti notification to ${result.sentCount} nearby users.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Failed to Send', description: result.error });
+        }
+        setIsSending(false);
+    };
+
+    return <Button onClick={handleSend} disabled={isSending}>{isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Send Notification</Button>;
+};
 
 interface MandalManagementDialogProps {
   children: React.ReactNode;
   mandal: GanpatiMandal;
+  onUpdate: () => void;
 }
 
-const MandalPostUploader: React.FC<{ mandal: GanpatiMandal; onPostSuccess: () => void, sessionUser: User | null }> = ({ mandal, onPostSuccess, sessionUser }) => {
-    const { toast } = useToast();
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    const handleAddPost = async (content: string, hashtags: string[], isFamilyPost: boolean, hideLocation: boolean, mediaUrls?: string[], mediaType?: 'image' | 'video' | 'gallery') => {
-        if (!mandal.latitude || !mandal.longitude) {
-            toast({ variant: 'destructive', title: "Mandal Location Missing", description: "This mandal doesn't have a location set." });
-            return;
-        }
-
-        if (!content.trim() && (!mediaUrls || mediaUrls.length === 0)) {
-            toast({ variant: 'destructive', title: "Empty Post", description: "Please write some content or upload media." });
-            return;
-        }
-        
-        setIsSubmitting(true);
-        try {
-            const { addPost } = await import('@/app/actions');
-            const postData: NewPost = {
-                content: content,
-                latitude: mandal.latitude,
-                longitude: mandal.longitude,
-                mediaUrls: mediaUrls,
-                mediaType: mediaType,
-                hashtags: [`#${mandal.name.replace(/\s/g, '')}`, ...(hashtags || [])],
-                isFamilyPost: false,
-                hideLocation: false,
-                authorId: sessionUser?.id,
-                mandalId: mandal.id, // Link post to the mandal
-            };
-            const result = await addPost(postData);
-
-            if (result.error) {
-                toast({ variant: "destructive", title: "Post Failed", description: result.error });
-            } else {
-                toast({ title: "Post Added!", description: "Your pulse for the mandal is now live!" });
-                onPostSuccess();
-            }
-        } catch (error: any) {
-            toast({ variant: "destructive", title: "An Error Occurred", description: "Could not add post." });
-        } finally {
-            setIsSubmitting(false);
-        }
-    };
-
-    if (!sessionUser) return null;
-
-    return (
-        <div className="pt-4 border-t">
-            <h3 className="text-lg font-semibold mb-2">Post an Update for {mandal.name}</h3>
-            <PostForm onSubmit={handleAddPost} submitting={isSubmitting} sessionUser={sessionUser} />
-        </div>
-    );
-};
-
-
-export default function MandalManagementDialog({ children, mandal }: MandalManagementDialogProps) {
+export default function MandalManagementDialog({ children, mandal, onUpdate }: MandalManagementDialogProps) {
     const [isOpen, setIsOpen] = useState(false);
-    const [sessionUser, setSessionUser] = useState<User | null>(null);
-
-    React.useEffect(() => {
-        if (isOpen) {
-            getSession().then(session => setSessionUser(session.user));
-        }
-    }, [isOpen]);
 
     return (
         <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -104,34 +128,30 @@ export default function MandalManagementDialog({ children, mandal }: MandalManag
                     </DialogDescription>
                 </DialogHeader>
 
-                <ScrollArea className="flex-grow -mx-6 px-6">
-                    <div className="space-y-6">
-                        {/* Edit Mandal Info Section */}
-                        <div className="p-4 border rounded-lg">
-                           <h3 className="font-semibold flex items-center gap-2"><Edit className="w-4 h-4"/> Edit Details</h3>
-                           <p className="text-sm text-muted-foreground mt-1 mb-3">Update your mandal's information.</p>
-                           <Button disabled>Edit Info (Coming Soon)</Button>
-                        </div>
-                        
-                         {/* Send Notification Section */}
-                        <div className="p-4 border rounded-lg">
-                           <h3 className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4"/> Send Aarti Notification</h3>
-                           <p className="text-sm text-muted-foreground mt-1 mb-3">Notify nearby users about Aarti timings.</p>
-                           <Button disabled>Send Notification (Coming Soon)</Button>
-                        </div>
-                        
-                        {/* Post Media Section */}
-                        <div className="p-4 border rounded-lg">
-                           <h3 className="font-semibold flex items-center gap-2"><Film className="w-4 h-4"/> Post Media Update</h3>
-                           <p className="text-sm text-muted-foreground mt-1">Share photos or videos from your mandal.</p>
-                           {sessionUser ? (
-                             <MandalPostUploader mandal={mandal} onPostSuccess={() => setIsOpen(false)} sessionUser={sessionUser} />
-                           ) : (
-                             <div className="flex items-center justify-center p-4"><Loader2 className="animate-spin"/></div>
-                           )}
+                <div className="flex-grow space-y-6 overflow-y-auto -mx-6 px-6 pt-2">
+                    {/* Edit Mandal Info Section */}
+                    <div className="p-4 border rounded-lg">
+                        <h3 className="font-semibold flex items-center gap-2"><Edit className="w-4 h-4" /> Edit Details</h3>
+                        <p className="text-sm text-muted-foreground mt-1 mb-3">Update your mandal's information.</p>
+                        <EditMandalForm mandal={mandal} onUpdateSuccess={() => { setIsOpen(false); onUpdate(); }} />
+                    </div>
+
+                    {/* Send Notification Section */}
+                    <div className="p-4 border rounded-lg">
+                        <h3 className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4" /> Send Aarti Notification</h3>
+                        <p className="text-sm text-muted-foreground mt-1 mb-3">Notify nearby users about Aarti timings.</p>
+                        <SendAartiNotificationButton mandalId={mandal.id} />
+                    </div>
+
+                    {/* Post Media Section */}
+                    <div className="p-4 border rounded-lg">
+                        <h3 className="font-semibold flex items-center gap-2"><PlusCircle className="w-4 h-4" /> Post an Update</h3>
+                        <p className="text-sm text-muted-foreground mt-1">Share photos or videos from your mandal. The post will be automatically tagged.</p>
+                        <div className="mt-3">
+                            <PostComposerLoader sessionUser={null} mandalId={mandal.id} isMandalPost={true} onPostSuccess={() => setIsOpen(false)} />
                         </div>
                     </div>
-                </ScrollArea>
+                </div>
             </DialogContent>
         </Dialog>
     );
