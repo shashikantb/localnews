@@ -86,7 +86,7 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
                     <h3 className="text-lg font-semibold text-primary pl-1 border-b-2 border-primary/20 pb-2">Your Registered Mandals</h3>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         {userMandals.map(mandal => (
-                           <MandalCard key={`user-${mandal.id}`} mandal={mandal} isOwner={true} />
+                           <MandalCard key={`user-${mandal.id}`} mandal={mandal} isOwner={sessionUser?.id === mandal.admin_user_id} />
                         ))}
                     </div>
                 </div>

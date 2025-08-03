@@ -15,9 +15,8 @@ import type { GanpatiMandal, NewPost, User } from '@/lib/db-types';
 import { ScrollArea } from './ui/scroll-area';
 import { Button } from './ui/button';
 import { Bell, Edit, Film, Loader2, PartyPopper } from 'lucide-react';
-import PostComposer from './post-composer';
-import { addPost } from '@/app/actions';
-import { getSession } from '../app/auth/actions';
+import { PostForm } from '@/components/post-form';
+import { getSession } from '@/app/auth/actions';
 
 
 interface MandalManagementDialogProps {
@@ -42,6 +41,7 @@ const MandalPostUploader: React.FC<{ mandal: GanpatiMandal; onPostSuccess: () =>
         
         setIsSubmitting(true);
         try {
+            const { addPost } = await import('@/app/actions');
             const postData: NewPost = {
                 content: content,
                 latitude: mandal.latitude,
@@ -74,7 +74,7 @@ const MandalPostUploader: React.FC<{ mandal: GanpatiMandal; onPostSuccess: () =>
     return (
         <div className="pt-4 border-t">
             <h3 className="text-lg font-semibold mb-2">Post an Update for {mandal.name}</h3>
-            <PostComposer sessionUser={sessionUser} onPostSuccess={onPostSuccess} />
+            <PostForm onSubmit={handleAddPost} submitting={isSubmitting} sessionUser={sessionUser} />
         </div>
     );
 };
@@ -136,4 +136,3 @@ export default function MandalManagementDialog({ children, mandal }: MandalManag
         </Dialog>
     );
 }
-
