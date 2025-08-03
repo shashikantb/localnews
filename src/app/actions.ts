@@ -1557,3 +1557,59 @@ export async function getMandalsForUserDb(userId: number): Promise<GanpatiMandal
         return [];
     }
 }
+
+export async function updateMandal(mandalId: number, data: { name: string; city: string; description?: string }): Promise<{ success: boolean, error?: string }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'You must be logged in.' };
+    }
+    // A proper implementation would also check if the user is the admin of this mandal
+    try {
+        await db.updateMandalDb(mandalId, data, user.id);
+        revalidatePath('/');
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: error.message };
+    }
+}
+
+export async function sendAartiNotification(mandalId: number): Promise<{ success: boolean; error?: string; sentCount?: number }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'You must be logged in.' };
+    }
+    if (!admin.apps.length) {
+        return { success: false, error: 'Notification service not configured on server.' };
+    }
+    try {
+        const mandal = await db.getMandalByIdDb(mandalId);
+        if (!mandal) {
+            return { success: false, error: 'Mandal not found.' };
+        }
+        if (mandal.admin_user_id !== user.id) {
+            return { success: false, error: 'You are not the admin of this mandal.' };
+        }
+
+        const nearbyTokens = await db.getNearbyDeviceTokensDb(mandal.latitude, mandal.longitude, 5); // 5km radius for Aarti
+        if (nearbyTokens.length === 0) {
+            return { success: false, error: 'No users found nearby to notify.' };
+        }
+
+        const message = {
+            notification: {
+                title: `Aarti at ${mandal.name}!`,
+                body: `Join the Aarti happening now at ${mandal.name}, ${mandal.city}.`,
+            },
+            tokens: nearbyTokens.map(t => t.token),
+            android: { priority: 'high' as const },
+            apns: { payload: { aps: { 'content-available': 1, sound: 'default' } } }
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message as any);
+        return { success: true, sentCount: response.successCount };
+
+    } catch (error: any) {
+        console.error('Error sending Aarti notification:', error);
+        return { success: false, error: 'An unexpected server error occurred.' };
+    }
+}

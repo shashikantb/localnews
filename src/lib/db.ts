@@ -65,6 +65,17 @@ async function initializeDatabase(client: Pool | Client) {
       `);
       console.log("Column 'last_family_feed_view_at' added successfully.");
     }
+    
+    const mandalIdColumnCheck = await initClient.query(`
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name='posts' AND column_name='mandal_id'
+    `);
+    if (mandalIdColumnCheck.rowCount === 0) {
+        console.log("Adding 'mandal_id' column to 'posts' table...");
+        await initClient.query(`ALTER TABLE posts ADD COLUMN mandal_id INTEGER REFERENCES ganpati_mandals(id) ON DELETE SET NULL;`);
+        console.log("Column 'mandal_id' added successfully.");
+    }
+
     // --- End Schema Migrations ---
 
     const createPostsTableQuery = `
@@ -2913,6 +2924,21 @@ export async function getMandalsDb(): Promise<GanpatiMandal[]> {
     }
 }
 
+export async function getMandalByIdDb(mandalId: number): Promise<GanpatiMandal | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+
+    const client = await dbPool.connect();
+    try {
+        const query = `SELECT * FROM ganpati_mandals WHERE id = $1;`;
+        const result: QueryResult<GanpatiMandal> = await client.query(query, [mandalId]);
+        return result.rows[0] || null;
+    } finally {
+        client.release();
+    }
+}
+
 export async function getMandalsForUserDb(userId: number): Promise<GanpatiMandal[]> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
@@ -2925,6 +2951,32 @@ export async function getMandalsForUserDb(userId: number): Promise<GanpatiMandal
         `;
         const result: QueryResult<GanpatiMandal> = await client.query(query, [userId]);
         return result.rows;
+    } finally {
+        client.release();
+    }
+}
+
+export async function updateMandalDb(mandalId: number, data: { name: string; city: string; description?: string }, adminId: number): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            UPDATE ganpati_mandals
+            SET name = $1, city = $2, description = $3
+            WHERE id = $4 AND admin_user_id = $5;
+        `;
+        const result = await client.query(query, [data.name, data.city, data.description, mandalId, adminId]);
+        if (result.rowCount === 0) {
+            throw new Error("Mandal not found or you do not have permission to edit it.");
+        }
+    } catch (err: any) {
+        if (err.code === '23505') {
+            throw new Error(`A mandal with the name "${data.name}" already exists in ${data.city}.`);
+        }
+        throw err;
     } finally {
         client.release();
     }
