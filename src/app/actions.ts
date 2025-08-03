@@ -1540,9 +1540,9 @@ export async function registerMandal(newMandal: NewGanpatiMandal): Promise<{ suc
     }
 }
 
-export async function getMandalsDb(): Promise<GanpatiMandal[]> {
+export async function getMandalsForFeed(userId?: number | null): Promise<GanpatiMandal[]> {
     try {
-        return await db.getMandalsDb();
+        return await db.getMandalsDb(userId);
     } catch (error) {
         console.error("Server action error fetching mandals:", error);
         return [];

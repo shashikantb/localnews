@@ -4,7 +4,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { getMandalsDb } from '@/app/actions';
+import { getMandalsForFeed } from '@/app/actions';
+import { toggleMandalLikeDb } from '@/lib/db';
 import type { GanpatiMandal, User } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -15,9 +16,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import MandalManagementDialog from './mandal-management-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import {
-  toggleMandalLikeDb
-} from '@/lib/db'
+
 
 const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; onUpdate: () => void; }> = ({ mandal: initialMandal, sessionUser, onUpdate }) => {
     const [mandal, setMandal] = useState(initialMandal);
@@ -99,7 +98,7 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
 
     const fetchMandals = useCallback(() => {
         setIsLoading(true);
-        getMandalsDb(sessionUser?.id)
+        getMandalsForFeed(sessionUser?.id)
             .then(mandals => {
                 setAllMandals(mandals);
                 setFilteredMandals(mandals);
