@@ -383,3 +383,25 @@ export interface UserForNotification {
     token: string;
     user_auth_token: string | null;
 }
+
+// --- Festival Types ---
+export interface GanpatiMandal {
+    id: number;
+    name: string;
+    city: string;
+    description: string | null;
+    avatar_url: string | null;
+    latitude: number;
+    longitude: number;
+    admin_user_id: number;
+    created_at: string;
+}
+
+export type NewGanpatiMandal = {
+    name: string;
+    city: string;
+    description: string | null;
+    latitude: number;
+    longitude: number;
+    admin_user_id: number;
+}

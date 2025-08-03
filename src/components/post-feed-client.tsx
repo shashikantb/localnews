@@ -9,7 +9,7 @@ import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, upd
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase } from 'lucide-react';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -53,7 +53,7 @@ declare global {
 
 const POSTS_PER_PAGE = 5;
 
-type FeedType = 'nearby' | 'family' | 'business';
+type FeedType = 'nearby' | 'family' | 'business' | 'festival';
 
 type FeedState = {
     posts: Post[];
@@ -115,6 +115,10 @@ function NoPostsContent({ feedType }: { feedType: FeedType }) {
     business: {
       title: 'No Businesses Found',
       description: 'No businesses found in your area for the selected category. Try a different filter!'
+    },
+    festival: {
+        title: 'The Festivities Await!',
+        description: 'No mandals have been registered in your area yet. Be the first to register one!'
     }
   }
   const currentMessage = messages[feedType];
@@ -122,7 +126,7 @@ function NoPostsContent({ feedType }: { feedType: FeedType }) {
   return (
     <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
       <CardContent className="flex flex-col items-center">
-        {feedType === 'business' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
+        {feedType === 'business' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : feedType === 'festival' ? <PartyPopper className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
         <p className="text-2xl text-muted-foreground font-semibold">{currentMessage.title}</p>
         <p className="text-md text-muted-foreground/80 mt-2">{currentMessage.description}</p>
       </CardContent>
@@ -285,7 +289,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         if (businessFeed.businesses.length === 0 && !businessFeed.isLoading) {
             fetchBusinesses(1, businessFeed.category);
         }
-    } else { // nearby
+    } else if (newTab === 'festival') {
+        // TODO: Implement festival feed fetching logic
+    }
+     else { // nearby
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
             fetchPosts('nearby', 1, sortBy, location);
         }
@@ -366,7 +373,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     setIsRefreshing(true);
     if(activeTab === 'business') {
         await fetchBusinesses(1, businessFeed.category);
-    } else {
+    } else if (activeTab === 'festival') {
+        // TODO: Add refresh logic for festival
+    }
+     else {
         if (activeTab === 'family') {
             setUnreadFamilyPostCount(0);
             markFamilyFeedAsRead();
@@ -381,6 +391,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if (activeTab === 'business') {
         if (businessFeed.isLoading || !businessFeed.hasMore) return;
         fetchBusinesses(businessFeed.page + 1, businessFeed.category);
+    } else if (activeTab === 'festival') {
+        // TODO: Add load more logic for festival
     } else {
         const currentFeed = feeds[activeTab];
         if (currentFeed.isLoading || !currentFeed.hasMore) return;
@@ -390,8 +402,16 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const observer = useRef<IntersectionObserver>();
   const loaderRef = useCallback((node: HTMLDivElement | null) => {
-    const isLoading = activeTab === 'business' ? businessFeed.isLoading : feeds[activeTab].isLoading;
-    const hasMore = activeTab === 'business' ? businessFeed.hasMore : feeds[activeTab].hasMore;
+    let isLoading = false;
+    let hasMore = false;
+
+    if (activeTab === 'business') {
+        isLoading = businessFeed.isLoading;
+        hasMore = businessFeed.hasMore;
+    } else if (activeTab !== 'festival') {
+        isLoading = feeds[activeTab].isLoading;
+        hasMore = feeds[activeTab].hasMore;
+    }
     
     if (isLoading) return;
     if (observer.current) observer.current.disconnect();
@@ -415,7 +435,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const handleSortChange = (newSortBy: SortOption) => {
     if (newSortBy === sortBy) return;
     setSortBy(newSortBy);
-    if(activeTab !== 'business') {
+    if(activeTab !== 'business' && activeTab !== 'festival') {
         fetchPosts(activeTab, 1, newSortBy, location);
     }
   };
@@ -427,6 +447,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   };
 
   const renderFeedContent = () => {
+    if (activeTab === 'festival') {
+        return <NoPostsContent feedType="festival" />;
+    }
+
     if (activeTab === 'business') {
         if ((businessFeed.isLoading && businessFeed.businesses.length === 0) || isRefreshing) {
             return <PostFeedSkeleton />;
@@ -518,6 +542,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                   </TabsTrigger>
                 )}
                 {sessionUser && <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>}
+                {sessionUser && <TabsTrigger value="festival" className="flex items-center gap-2"><PartyPopper className="w-4 h-4"/> Festival</TabsTrigger>}
             </TabsList>
             <div className="flex items-center gap-2">
               {activeTab === 'business' ? (
@@ -584,6 +609,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         </TabsContent>
         {sessionUser && <TabsContent value="family">{renderFeedContent()}</TabsContent>}
         {sessionUser && <TabsContent value="business">{renderFeedContent()}</TabsContent>}
+        {sessionUser && <TabsContent value="festival">{renderFeedContent()}</TabsContent>}
       </Tabs>
     </div>
   );
