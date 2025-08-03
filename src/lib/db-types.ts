@@ -400,8 +400,8 @@ export interface GanpatiMandal {
 export type NewGanpatiMandal = {
     name: string;
     city: string;
-    description: string | null;
+    description?: string | null;
+    avatarUrl?: string | null;
     latitude: number;
     longitude: number;
-    admin_user_id: number;
 }

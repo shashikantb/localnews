@@ -39,6 +39,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { getApp, getApps, initializeApp } from 'firebase/app';
+import RegisterMandalDialog from './register-mandal-dialog';
 
 
 interface AndroidInterface {
@@ -448,7 +449,14 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const renderFeedContent = () => {
     if (activeTab === 'festival') {
-        return <NoPostsContent feedType="festival" />;
+        return (
+            <div className="space-y-4">
+                <div className="flex justify-center">
+                    <RegisterMandalDialog userLocation={location} />
+                </div>
+                <NoPostsContent feedType="festival" />
+            </div>
+        );
     }
 
     if (activeTab === 'business') {
