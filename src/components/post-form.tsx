@@ -112,11 +112,19 @@ const formSchema = z.discriminatedUnion("isPoll", [
   pollPostSchema,
 ]).superRefine((data, ctx) => {
     // A post must have either text content or at least one media file
-    if (!data.content && data.mediaFileCount === 0) {
+    if (!data.content && data.mediaFileCount === 0 && !data.mandalId) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['content'],
             message: 'A post must have some text or media.',
+        });
+    }
+     // Mandal posts must have media
+    if (data.mandalId && data.mediaFileCount === 0) {
+        ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['mediaFileCount'], // Attach error to a field that exists
+            message: 'Please upload at least one photo or video for your Mandal.',
         });
     }
 });
@@ -375,7 +383,15 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
         await onSubmit(data.content || '', hashtagsToSubmit, data.isFamilyPost, data.hideLocation, undefined, undefined, mentionedUserIds, pollData, expiresAt, maxViewers, data.mandalId);
       }
       
-      form.reset();
+      form.reset({
+        ...form.getValues(), // Keep some values like mandalId
+        content: '',
+        hashtags: [],
+        mediaFileCount: 0,
+        isPoll: false,
+        pollQuestion: '',
+        pollOptions: [],
+      });
       setSelectedFiles(prev => {
         prev.forEach(f => URL.revokeObjectURL(f.url));
         return [];
@@ -385,9 +401,9 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
   };
 
   const isButtonDisabled = submitting || isUploading || !form.formState.isValid;
-  let buttonText = 'Share Your Pulse';
+  let buttonText = mandalId ? 'Add Media to Mandal' : 'Share Your Pulse';
   if (isUploading) buttonText = `Uploading ${uploadProgress} / ${selectedFiles.length}...`;
-  else if (submitting) buttonText = 'Pulsing...';
+  else if (submitting) buttonText = mandalId ? 'Adding Media...' : 'Pulsing...';
 
   const isMediaUploadDisabled = submitting || isUploading || hasDetectedUrl;
 
@@ -405,9 +421,9 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
                 <FormControl>
                   <Textarea
                     id="post-content"
-                    placeholder="Share your local pulse, or paste a YouTube link..."
+                    placeholder={mandalId ? "Add a caption for your media... (optional)" : "Share your local pulse, or paste a YouTube link..."}
                     className="resize-none min-h-[100px] text-base shadow-sm focus:ring-2 focus:ring-primary/50 rounded-lg"
-                    rows={4}
+                    rows={mandalId ? 2 : 4}
                     {...field}
                     disabled={submitting || isUploading}
                   />
@@ -446,118 +462,120 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
             </div>
           )}
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="hashtags"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormControl>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="outline" className="w-full justify-between" disabled={submitting || isUploading}>
-                            <div className="flex items-center gap-2">
-                              <Tag className="w-4 h-4 text-primary" />
-                              <span>Hashtags ({field.value?.length || 0})</span>
+          {!mandalId && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="hashtags"
+                    render={({ field }) => (
+                    <FormItem>
+                        <FormControl>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                            <Button variant="outline" className="w-full justify-between" disabled={submitting || isUploading}>
+                                <div className="flex items-center gap-2">
+                                <Tag className="w-4 h-4 text-primary" />
+                                <span>Hashtags ({field.value?.length || 0})</span>
+                                </div>
+                                <ChevronDown className="ml-2 h-4 w-4" />
+                            </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent className="w-[calc(var(--radix-dropdown-menu-trigger-width))] max-h-80 overflow-y-auto">
+                            {HASHTAG_CATEGORIES.map((category, catIndex) => (
+                                <DropdownMenuGroup key={category.name}>
+                                <DropdownMenuLabel>{category.name}</DropdownMenuLabel>
+                                {category.hashtags.map((tag) => (
+                                    <DropdownMenuCheckboxItem
+                                    key={tag}
+                                    checked={field.value?.includes(tag)}
+                                    onCheckedChange={(checked) => {
+                                        const currentTags = field.value || [];
+                                        const newTags = checked
+                                        ? [...currentTags, tag]
+                                        : currentTags.filter(
+                                            (value) => value !== tag
+                                            );
+                                        field.onChange(newTags);
+                                    }}
+                                    disabled={submitting || isUploading}
+                                    >
+                                    {tag}
+                                    </DropdownMenuCheckboxItem>
+                                ))}
+                                {catIndex < HASHTAG_CATEGORIES.length - 1 && <DropdownMenuSeparator />}
+                                </DropdownMenuGroup>
+                            ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                        </FormControl>
+                        <FormMessage />
+                    </FormItem>
+                    )}
+                />
+                <Dialog open={isTaggingDialogOpen} onOpenChange={setIsTaggingDialogOpen}>
+                    <DialogTrigger asChild>
+                        <Button type="button" variant="outline" disabled={submitting || isUploading}>
+                            <UserPlus className="mr-2 h-4 w-4" />
+                            Tag People ({taggedUsers.length})
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-[425px]">
+                        <DialogHeader>
+                            <DialogTitle>Tag People</DialogTitle>
+                            <DialogDescription>
+                                Search for people to mention in your pulse. They will be notified.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="py-4 space-y-4">
+                            <div className="relative">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search for users..." 
+                                    className="pl-10"
+                                    value={mentionQuery}
+                                    onChange={(e) => setMentionQuery(e.target.value)}
+                                />
                             </div>
-                            <ChevronDown className="ml-2 h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent className="w-[calc(var(--radix-dropdown-menu-trigger-width))] max-h-80 overflow-y-auto">
-                          {HASHTAG_CATEGORIES.map((category, catIndex) => (
-                            <DropdownMenuGroup key={category.name}>
-                              <DropdownMenuLabel>{category.name}</DropdownMenuLabel>
-                              {category.hashtags.map((tag) => (
-                                <DropdownMenuCheckboxItem
-                                  key={tag}
-                                  checked={field.value?.includes(tag)}
-                                  onCheckedChange={(checked) => {
-                                    const currentTags = field.value || [];
-                                    const newTags = checked
-                                      ? [...currentTags, tag]
-                                      : currentTags.filter(
-                                          (value) => value !== tag
-                                        );
-                                    field.onChange(newTags);
-                                  }}
-                                  disabled={submitting || isUploading}
-                                >
-                                  {tag}
-                                </DropdownMenuCheckboxItem>
-                              ))}
-                              {catIndex < HASHTAG_CATEGORIES.length - 1 && <DropdownMenuSeparator />}
-                            </DropdownMenuGroup>
-                          ))}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <Dialog open={isTaggingDialogOpen} onOpenChange={setIsTaggingDialogOpen}>
-                  <DialogTrigger asChild>
-                      <Button type="button" variant="outline" disabled={submitting || isUploading}>
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Tag People ({taggedUsers.length})
-                      </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-[425px]">
-                      <DialogHeader>
-                          <DialogTitle>Tag People</DialogTitle>
-                          <DialogDescription>
-                              Search for people to mention in your pulse. They will be notified.
-                          </DialogDescription>
-                      </DialogHeader>
-                      <div className="py-4 space-y-4">
-                          <div className="relative">
-                              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-                              <Input 
-                                  placeholder="Search for users..." 
-                                  className="pl-10"
-                                  value={mentionQuery}
-                                  onChange={(e) => setMentionQuery(e.target.value)}
-                              />
-                          </div>
-                          <ScrollArea className="h-48 border rounded-md">
-                              {isSearching ? (
-                                  <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>
-                              ) : mentionResults.length > 0 ? (
-                                  <div className="p-1">
-                                      {mentionResults.map(user => (
-                                          <button
-                                              key={user.id}
-                                              type="button"
-                                              onClick={() => addTaggedUser(user)}
-                                              className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-muted"
-                                          >
-                                              <Avatar className="h-8 w-8"><AvatarImage src={user.profilepictureurl || undefined} /><AvatarFallback>{user.name.charAt(0)}</AvatarFallback></Avatar>
-                                              <span className="text-sm font-medium">{user.name}</span>
-                                          </button>
-                                      ))}
-                                  </div>
-                              ) : (
-                                  <div className="p-4 text-center text-sm text-muted-foreground">
-                                      {mentionQuery ? "No users found." : "Type to search."}
-                                  </div>
-                              )}
-                          </ScrollArea>
-                      </div>
-                      <DialogFooter>
-                          <DialogClose asChild>
-                              <Button type="button">Done</Button>
-                          </DialogClose>
-                      </DialogFooter>
-                  </DialogContent>
-              </Dialog>
-          </div>
-
+                            <ScrollArea className="h-48 border rounded-md">
+                                {isSearching ? (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">Searching...</div>
+                                ) : mentionResults.length > 0 ? (
+                                    <div className="p-1">
+                                        {mentionResults.map(user => (
+                                            <button
+                                                key={user.id}
+                                                type="button"
+                                                onClick={() => addTaggedUser(user)}
+                                                className="w-full flex items-center gap-2 p-2 rounded-md text-left hover:bg-muted"
+                                            >
+                                                <Avatar className="h-8 w-8"><AvatarImage src={user.profilepictureurl || undefined} /><AvatarFallback>{user.name.charAt(0)}</AvatarFallback></Avatar>
+                                                <span className="text-sm font-medium">{user.name}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="p-4 text-center text-sm text-muted-foreground">
+                                        {mentionQuery ? "No users found." : "Type to search."}
+                                    </div>
+                                )}
+                            </ScrollArea>
+                        </div>
+                        <DialogFooter>
+                            <DialogClose asChild>
+                                <Button type="button">Done</Button>
+                            </DialogClose>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            </div>
+          )}
+          
           <FormItem>
             <FormLabel htmlFor="media-upload" className="text-sm font-medium text-muted-foreground mb-1 block">
-              Attach Media (Optional)
+              Attach Media {mandalId && <span className="text-destructive">*</span>}
             </FormLabel>
               <>
-                <Input id="file-upload" type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} multiple />
+                <Input id="file-upload" type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} multiple={!mandalId || mediaType !== 'video'} />
                 <Input id="image-capture" type="file" accept="image/*" capture="environment" ref={imageCaptureInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} />
                 <Input id="video-capture" type="file" accept="video/*" capture="environment" ref={videoCaptureInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} />
               </>
@@ -624,148 +642,100 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
                 <AlertDescription>{fileError}</AlertDescription>
               </Alert>
             )}
+            {form.formState.errors.mediaFileCount && (
+                <p className="text-sm font-medium text-destructive">{form.formState.errors.mediaFileCount.message}</p>
+            )}
           </FormItem>
           
-          <div className="space-y-4">
-            <FormField
-              control={form.control}
-              name="isPoll"
-              render={({ field }) => (
-                <FormItem className={cn("flex flex-col space-y-3 rounded-md border p-4 shadow-sm", isPoll ? 'bg-primary/5' : 'bg-muted/50')}>
-                  <div className="flex flex-row items-start space-x-3">
-                    <FormControl>
-                      <Checkbox
-                        checked={field.value}
-                        onCheckedChange={(checked) => {
-                            const isChecked = !!checked;
-                            field.onChange(isChecked);
-                            if (isChecked) {
-                                // When switching to poll, reset poll fields to defaults
-                                form.setValue('pollQuestion', '');
-                                form.setValue('pollOptions', [{ value: '' }, { value: '' }]);
-                            } else {
-                                // When switching off poll, clear values
-                                form.setValue('pollQuestion', undefined);
-                                form.setValue('pollOptions', undefined);
-                            }
-                        }}
-                        disabled={submitting || isUploading}
-                      />
-                    </FormControl>
-                    <div className="space-y-1 leading-none">
-                      <FormLabel className="flex items-center">
-                        <ListOrdered className="mr-2 h-4 w-4 text-primary" />
-                        Create a Poll
-                      </FormLabel>
-                      <p className="text-xs text-muted-foreground">
-                        Engage your community by adding a poll to your post.
-                      </p>
-                    </div>
-                  </div>
-                  {isPoll && (
-                    <div className="space-y-4 pl-8 pt-4 border-t border-primary/20">
-                      <FormField
-                        control={form.control}
-                        name="pollQuestion"
-                        render={({ field: pollField }) => (
-                          <FormItem>
-                            <FormLabel>Poll Question</FormLabel>
-                            <FormControl><Input placeholder="e.g., Best pizza place in town?" {...pollField} /></FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                      <div className="space-y-2">
-                        <FormLabel>Poll Options</FormLabel>
-                        {pollOptionFields.map((item, index) => (
-                          <FormField
-                            key={item.id}
-                            control={form.control}
-                            name={`pollOptions.${index}.value`}
-                            render={({ field: optionField }) => (
-                              <FormItem>
-                                <div className="flex items-center gap-2">
-                                  <FormControl><Input placeholder={`Option ${index + 1}`} {...optionField} /></FormControl>
-                                  {pollOptionFields.length > 2 && (
-                                    <Button type="button" variant="ghost" size="icon" onClick={() => removePollOption(index)} className="h-9 w-9 flex-shrink-0 text-destructive">
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </div>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        ))}
-                      </div>
-                      {pollOptionFields.length < 4 && (
-                        <Button type="button" variant="outline" size="sm" onClick={() => appendPollOption({ value: '' })}>
-                          <PlusCircle className="mr-2 h-4 w-4" /> Add Option
-                        </Button>
-                      )}
-                    </div>
-                  )}
-                </FormItem>
-              )}
-            />
-            {sessionUser && (
+          {!mandalId && (
+            <div className="space-y-4">
                 <FormField
-                  control={form.control}
-                  name="isFamilyPost"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/50">
-                      <FormControl>
+                control={form.control}
+                name="isPoll"
+                render={({ field }) => (
+                    <FormItem className={cn("flex flex-col space-y-3 rounded-md border p-4 shadow-sm", isPoll ? 'bg-primary/5' : 'bg-muted/50')}>
+                    <div className="flex flex-row items-start space-x-3">
+                        <FormControl>
                         <Checkbox
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                          disabled={submitting || isUploading}
+                            checked={field.value}
+                            onCheckedChange={(checked) => {
+                                const isChecked = !!checked;
+                                field.onChange(isChecked);
+                                if (isChecked) {
+                                    // When switching to poll, reset poll fields to defaults
+                                    form.setValue('pollQuestion', '');
+                                    form.setValue('pollOptions', [{ value: '' }, { value: '' }]);
+                                } else {
+                                    // When switching off poll, clear values
+                                    form.setValue('pollQuestion', undefined);
+                                    form.setValue('pollOptions', undefined);
+                                }
+                            }}
+                            disabled={submitting || isUploading}
                         />
-                      </FormControl>
-                      <div className="space-y-1 leading-none">
+                        </FormControl>
+                        <div className="space-y-1 leading-none">
                         <FormLabel className="flex items-center">
-                            <Users className="mr-2 h-4 w-4 text-primary" />
-                            Family Post
+                            <ListOrdered className="mr-2 h-4 w-4 text-primary" />
+                            Create a Poll
                         </FormLabel>
                         <p className="text-xs text-muted-foreground">
-                          Only approved family members will see this post.
+                            Engage your community by adding a poll to your post.
                         </p>
-                      </div>
+                        </div>
+                    </div>
+                    {isPoll && (
+                        <div className="space-y-4 pl-8 pt-4 border-t border-primary/20">
+                        <FormField
+                            control={form.control}
+                            name="pollQuestion"
+                            render={({ field: pollField }) => (
+                            <FormItem>
+                                <FormLabel>Poll Question</FormLabel>
+                                <FormControl><Input placeholder="e.g., Best pizza place in town?" {...pollField} /></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                            )}
+                        />
+                        <div className="space-y-2">
+                            <FormLabel>Poll Options</FormLabel>
+                            {pollOptionFields.map((item, index) => (
+                            <FormField
+                                key={item.id}
+                                control={form.control}
+                                name={`pollOptions.${index}.value`}
+                                render={({ field: optionField }) => (
+                                <FormItem>
+                                    <div className="flex items-center gap-2">
+                                    <FormControl><Input placeholder={`Option ${index + 1}`} {...optionField} /></FormControl>
+                                    {pollOptionFields.length > 2 && (
+                                        <Button type="button" variant="ghost" size="icon" onClick={() => removePollOption(index)} className="h-9 w-9 flex-shrink-0 text-destructive">
+                                        <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    )}
+                                    </div>
+                                    <FormMessage />
+                                </FormItem>
+                                )}
+                            />
+                            ))}
+                        </div>
+                        {pollOptionFields.length < 4 && (
+                            <Button type="button" variant="outline" size="sm" onClick={() => appendPollOption({ value: '' })}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add Option
+                            </Button>
+                        )}
+                        </div>
+                    )}
                     </FormItem>
-                  )}
+                )}
                 />
-            )}
-
-            <FormField
-              control={form.control}
-              name="hideLocation"
-              render={({ field }) => (
-                <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/50">
-                  <FormControl>
-                    <Checkbox
-                      checked={field.value}
-                      onCheckedChange={field.onChange}
-                      disabled={submitting || isUploading}
-                    />
-                  </FormControl>
-                  <div className="space-y-1 leading-none">
-                    <FormLabel className="flex items-center">
-                        <MapPinOff className="mr-2 h-4 w-4 text-primary" />
-                        Don't Display Location
-                    </FormLabel>
-                    <p className="text-xs text-muted-foreground">
-                      Your location will still be used for nearby sorting.
-                    </p>
-                  </div>
-                </FormItem>
-              )}
-            />
-
-             <FormField
-              control={form.control}
-              name="isRadarPost"
-              render={({ field }) => (
-                <FormItem className="flex flex-col space-y-3 rounded-md border p-4 shadow-sm bg-gradient-to-tr from-accent/10 to-primary/10">
-                    <div className="flex flex-row items-start space-x-3">
+                {sessionUser && (
+                    <FormField
+                    control={form.control}
+                    name="isFamilyPost"
+                    render={({ field }) => (
+                        <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/50">
                         <FormControl>
                             <Checkbox
                             checked={field.value}
@@ -774,65 +744,119 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
                             />
                         </FormControl>
                         <div className="space-y-1 leading-none">
-                            <FormLabel className="flex items-center text-primary">
-                                <Zap className="mr-2 h-4 w-4 text-accent" />
-                                Pulse Radar Post
+                            <FormLabel className="flex items-center">
+                                <Users className="mr-2 h-4 w-4 text-primary" />
+                                Family Post
                             </FormLabel>
                             <p className="text-xs text-muted-foreground">
-                                Make this an exclusive, time-limited pulse.
+                            Only approved family members will see this post.
                             </p>
                         </div>
-                    </div>
-                    {isRadarPost && (
-                        <div className="space-y-4 pt-4 border-t border-primary/20">
-                            <FormField
-                                control={form.control}
-                                name="radarExpiry"
-                                render={({ field: expiryField }) => (
-                                <FormItem>
-                                    <FormLabel className="flex items-center text-sm"><Clock className="mr-2 h-4 w-4" /> Expires In</FormLabel>
-                                    <Select onValueChange={expiryField.onChange} defaultValue={expiryField.value}>
-                                    <FormControl>
-                                        <SelectTrigger>
-                                        <SelectValue placeholder="Select expiry time (optional)" />
-                                        </SelectTrigger>
-                                    </FormControl>
-                                    <SelectContent>
-                                        <SelectItem value="30">30 minutes</SelectItem>
-                                        <SelectItem value="60">1 hour</SelectItem>
-                                        <SelectItem value="120">2 hours</SelectItem>
-                                        <SelectItem value="360">6 hours</SelectItem>
-                                        <SelectItem value="720">12 hours</SelectItem>
-                                        <SelectItem value="1440">24 hours</SelectItem>
-                                    </SelectContent>
-                                    </Select>
-                                </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="radarMaxViewers"
-                                render={({ field: viewersField }) => (
-                                <FormItem>
-                                    <FormLabel className="flex items-center text-sm"><Eye className="mr-2 h-4 w-4" /> Max Viewers</FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="number"
-                                            placeholder="e.g., 50 (optional)"
-                                            min="1"
-                                            {...viewersField}
-                                            onChange={event => viewersField.onChange(+event.target.value)}
-                                        />
-                                    </FormControl>
-                                </FormItem>
-                                )}
-                            />
-                        </div>
+                        </FormItem>
                     )}
-                </FormItem>
-              )}
-            />
-          </div>
+                    />
+                )}
+
+                <FormField
+                control={form.control}
+                name="hideLocation"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-center space-x-3 space-y-0 rounded-md border p-4 shadow-sm bg-muted/50">
+                    <FormControl>
+                        <Checkbox
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        disabled={submitting || isUploading}
+                        />
+                    </FormControl>
+                    <div className="space-y-1 leading-none">
+                        <FormLabel className="flex items-center">
+                            <MapPinOff className="mr-2 h-4 w-4 text-primary" />
+                            Don't Display Location
+                        </FormLabel>
+                        <p className="text-xs text-muted-foreground">
+                        Your location will still be used for nearby sorting.
+                        </p>
+                    </div>
+                    </FormItem>
+                )}
+                />
+
+                <FormField
+                control={form.control}
+                name="isRadarPost"
+                render={({ field }) => (
+                    <FormItem className="flex flex-col space-y-3 rounded-md border p-4 shadow-sm bg-gradient-to-tr from-accent/10 to-primary/10">
+                        <div className="flex flex-row items-start space-x-3">
+                            <FormControl>
+                                <Checkbox
+                                checked={field.value}
+                                onCheckedChange={field.onChange}
+                                disabled={submitting || isUploading}
+                                />
+                            </FormControl>
+                            <div className="space-y-1 leading-none">
+                                <FormLabel className="flex items-center text-primary">
+                                    <Zap className="mr-2 h-4 w-4 text-accent" />
+                                    Pulse Radar Post
+                                </FormLabel>
+                                <p className="text-xs text-muted-foreground">
+                                    Make this an exclusive, time-limited pulse.
+                                </p>
+                            </div>
+                        </div>
+                        {isRadarPost && (
+                            <div className="space-y-4 pt-4 border-t border-primary/20">
+                                <FormField
+                                    control={form.control}
+                                    name="radarExpiry"
+                                    render={({ field: expiryField }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center text-sm"><Clock className="mr-2 h-4 w-4" /> Expires In</FormLabel>
+                                        <Select onValueChange={expiryField.onChange} defaultValue={expiryField.value}>
+                                        <FormControl>
+                                            <SelectTrigger>
+                                            <SelectValue placeholder="Select expiry time (optional)" />
+                                            </SelectTrigger>
+                                        </FormControl>
+                                        <SelectContent>
+                                            <SelectItem value="30">30 minutes</SelectItem>
+                                            <SelectItem value="60">1 hour</SelectItem>
+                                            <SelectItem value="120">2 hours</SelectItem>
+                                            <SelectItem value="360">6 hours</SelectItem>
+                                            <SelectItem value="720">12 hours</SelectItem>
+                                            <SelectItem value="1440">24 hours</SelectItem>
+                                        </SelectContent>
+                                        </Select>
+                                    </FormItem>
+                                    )}
+                                />
+                                <FormField
+                                    control={form.control}
+                                    name="radarMaxViewers"
+                                    render={({ field: viewersField }) => (
+                                    <FormItem>
+                                        <FormLabel className="flex items-center text-sm"><Eye className="mr-2 h-4 w-4" /> Max Viewers</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="number"
+                                                placeholder="e.g., 50 (optional)"
+                                                min="1"
+                                                {...viewersField}
+                                                onChange={event => viewersField.onChange(+event.target.value)}
+                                            />
+                                        </FormControl>
+                                    </FormItem>
+                                    )}
+                                />
+                            </div>
+                        )}
+                    </FormItem>
+                )}
+                />
+            </div>
+          )}
+
         </div>
 
         <div className="flex-shrink-0 pt-4 border-t border-border/20">

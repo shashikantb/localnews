@@ -14,9 +14,10 @@ import { useToast } from "@/hooks/use-toast";
 interface PostComposerProps {
   sessionUser: User | null;
   onPostSuccess: () => void;
+  mandalId?: number;
 }
 
-const PostComposer: FC<PostComposerProps> = ({ sessionUser, onPostSuccess }) => {
+const PostComposer: FC<PostComposerProps> = ({ sessionUser, onPostSuccess, mandalId }) => {
   const { toast } = useToast();
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null);
@@ -63,7 +64,13 @@ const PostComposer: FC<PostComposerProps> = ({ sessionUser, onPostSuccess }) => 
         return;
     }
 
-    if (!content.trim() && (!mediaUrls || mediaUrls.length === 0)) {
+    // For mandal posts, media is required. For regular posts, content or media is required.
+    if (mandalId && (!mediaUrls || mediaUrls.length === 0)) {
+       toast({ variant: 'destructive', title: "Media Required", description: "Please upload at least one photo or video for your Mandal." });
+       return;
+    }
+
+    if (!mandalId && !content.trim() && (!mediaUrls || mediaUrls.length === 0)) {
       toast({ variant: 'destructive', title: "Empty Post", description: "Please write some content or upload media to create a pulse." });
       return;
     }
@@ -83,6 +90,7 @@ const PostComposer: FC<PostComposerProps> = ({ sessionUser, onPostSuccess }) => 
         authorId: sessionUser ? sessionUser.id : undefined,
         mentionedUserIds: mentionedUserIds || [],
         pollData: pollData,
+        mandalId: mandalId, // Pass the mandalId
       };
       const result = await addPost(postData);
 
@@ -120,7 +128,7 @@ const PostComposer: FC<PostComposerProps> = ({ sessionUser, onPostSuccess }) => 
         </div>
       )}
       
-      <PostForm onSubmit={handleAddPost} submitting={formSubmitting || loadingLocation} sessionUser={sessionUser} />
+      <PostForm onSubmit={handleAddPost} submitting={formSubmitting || loadingLocation} sessionUser={sessionUser} mandalId={mandalId} />
     </div>
   );
 };
