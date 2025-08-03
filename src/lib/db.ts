@@ -126,7 +126,20 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE TABLE IF NOT EXISTS city_seed_log (city_name VARCHAR(255) PRIMARY KEY, last_seeded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
     
     // Festival Tables
-    await initClient.query(`CREATE TABLE IF NOT EXISTS ganpati_mandals (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, city VARCHAR(255) NOT NULL, description TEXT, avatar_url TEXT, latitude DOUBLE PRECISION NOT NULL, longitude DOUBLE PRECISION NOT NULL, admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
+    await initClient.query(`
+      CREATE TABLE IF NOT EXISTS ganpati_mandals (
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        city VARCHAR(255) NOT NULL,
+        description TEXT,
+        avatar_url TEXT,
+        latitude DOUBLE PRECISION NOT NULL,
+        longitude DOUBLE PRECISION NOT NULL,
+        admin_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE (name, city)
+      );
+    `);
     await initClient.query(`CREATE TABLE IF NOT EXISTS posts_mandals_link (post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (post_id, mandal_id));`);
     
     console.log("All tables checked/created.");
@@ -2872,6 +2885,12 @@ export async function registerMandalDb(mandal: NewGanpatiMandal): Promise<void> 
         `;
         const values = [mandal.name, mandal.city, mandal.description, mandal.latitude, mandal.longitude, mandal.admin_user_id];
         await client.query(query, values);
+    } catch (err: any) {
+        // Check for unique constraint violation
+        if (err.code === '23505') { // PostgreSQL unique violation error code
+            throw new Error(`A mandal with the name "${mandal.name}" already exists in ${mandal.city}. Please choose a different name.`);
+        }
+        throw err; // Re-throw other errors
     } finally {
         client.release();
     }
