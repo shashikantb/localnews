@@ -2,26 +2,39 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { getMandalsDb, getMandalsForUserDb } from '@/app/actions';
+import { getMandalsDb } from '@/app/actions';
 import type { GanpatiMandal, User } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { PartyPopper, MapPin } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { PartyPopper, MapPin, Edit } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import MandalManagementDialog from './mandal-management-dialog';
 
-const MandalCard: React.FC<{ mandal: GanpatiMandal }> = ({ mandal }) => {
+const MandalCard: React.FC<{ mandal: GanpatiMandal; isOwner: boolean }> = ({ mandal, isOwner }) => {
     return (
       <Card className="hover:shadow-lg transition-shadow h-full">
           <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-primary">
-                  <PartyPopper className="w-5 h-5" />
-                  {mandal.name}
-              </CardTitle>
-              <CardDescription className="flex items-center gap-1.5 pt-1">
-                  <MapPin className="w-4 h-4" />
-                  {mandal.city}
-              </CardDescription>
+              <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                      <CardTitle className="flex items-center gap-2 text-primary">
+                          <PartyPopper className="w-5 h-5" />
+                          {mandal.name}
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-1.5 pt-1">
+                          <MapPin className="w-4 h-4" />
+                          {mandal.city}
+                      </CardDescription>
+                  </div>
+                  {isOwner && (
+                      <MandalManagementDialog mandal={mandal}>
+                          <Button variant="ghost" size="sm">
+                              <Edit className="w-4 h-4 mr-2" />
+                              Manage
+                          </Button>
+                      </MandalManagementDialog>
+                  )}
+              </div>
           </CardHeader>
       </Card>
     );
@@ -39,11 +52,7 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
             .catch(err => console.error("Failed to fetch mandals:", err))
             .finally(() => setIsLoading(false));
     }, []);
-
-    const userMandalIds = new Set(allMandals.filter(m => m.admin_user_id === sessionUser?.id).map(m => m.id));
-    const userMandals = allMandals.filter(m => userMandalIds.has(m.id));
-    const otherMandals = allMandals.filter(m => !userMandalIds.has(m.id));
-
+    
     if (isLoading) {
         return (
             <div className="space-y-4">
@@ -57,42 +66,27 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
     if (allMandals.length === 0) {
         return <NoPostsContent feedType="festival" />;
     }
-
-    const renderMandal = (mandal: GanpatiMandal, isOwner: boolean) => {
-        if (isOwner) {
-            return (
-                <MandalManagementDialog mandal={mandal}>
-                    <div className="cursor-pointer h-full">
-                        <MandalCard mandal={mandal} />
-                    </div>
-                </MandalManagementDialog>
-            );
-        }
-        return <MandalCard mandal={mandal} />;
-    };
+    
+    // Sort mandals to show the user's own mandals first
+    const sortedMandals = [...allMandals].sort((a, b) => {
+        const aIsOwner = a.admin_user_id === sessionUser?.id;
+        const bIsOwner = b.admin_user_id === sessionUser?.id;
+        if (aIsOwner && !bIsOwner) return -1;
+        if (!aIsOwner && bIsOwner) return 1;
+        return a.name.localeCompare(b.name);
+    });
 
     return (
-        <div className="space-y-6">
-            {userMandals.length > 0 && (
-                <div className="space-y-3">
-                    <h3 className="text-lg font-semibold text-primary pl-1 border-b-2 border-primary/20 pb-2">Your Registered Mandals</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {userMandals.map(mandal => (
-                           <div key={`user-${mandal.id}`}>{renderMandal(mandal, true)}</div>
-                        ))}
-                    </div>
-                </div>
-            )}
-            {otherMandals.length > 0 && (
-                 <div className="space-y-3">
-                    {userMandals.length > 0 && <h3 className="text-lg font-semibold text-muted-foreground pl-1 border-b pb-2">Other Mandals</h3>}
-                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {otherMandals.map(mandal => (
-                           <div key={`other-${mandal.id}`}>{renderMandal(mandal, false)}</div>
-                        ))}
-                    </div>
-                </div>
-            )}
+        <div className="space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {sortedMandals.map(mandal => (
+                   <MandalCard 
+                       key={mandal.id} 
+                       mandal={mandal} 
+                       isOwner={sessionUser?.id === mandal.admin_user_id}
+                   />
+                ))}
+            </div>
         </div>
     );
 };
