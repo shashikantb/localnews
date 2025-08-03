@@ -129,27 +129,22 @@ export default function MandalManagementDialog({ children, mandal, onUpdate }: M
                 </DialogHeader>
 
                 <div className="flex-grow space-y-6 overflow-y-auto -mx-6 px-6 pt-2">
-                    {/* Edit Mandal Info Section */}
                     <div className="p-4 border rounded-lg">
                         <h3 className="font-semibold flex items-center gap-2"><Edit className="w-4 h-4" /> Edit Details</h3>
                         <p className="text-sm text-muted-foreground mt-1 mb-3">Update your mandal's information.</p>
                         <EditMandalForm mandal={mandal} onUpdateSuccess={() => { setIsOpen(false); onUpdate(); }} />
                     </div>
 
-                    {/* Send Notification Section */}
                     <div className="p-4 border rounded-lg">
                         <h3 className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4" /> Send Aarti Notification</h3>
-                        <p className="text-sm text-muted-foreground mt-1 mb-3">Notify nearby users about Aarti timings.</p>
+                        <p className="text-sm text-muted-foreground mt-1 mb-3">Notify nearby users about Aarti timings (1km radius).</p>
                         <SendAartiNotificationButton mandalId={mandal.id} />
                     </div>
 
-                    {/* Post Media Section */}
                     <div className="p-4 border rounded-lg">
-                        <h3 className="font-semibold flex items-center gap-2"><PlusCircle className="w-4 h-4" /> Post an Update</h3>
-                        <p className="text-sm text-muted-foreground mt-1">Share photos or videos from your mandal. The post will be automatically tagged.</p>
-                        <div className="mt-3">
-                            <PostComposerLoader sessionUser={null} mandalId={mandal.id} isMandalPost={true} onPostSuccess={() => setIsOpen(false)} />
-                        </div>
+                        <h3 className="font-semibold flex items-center gap-2"><PlusCircle className="w-4 h-4" /> Post Media</h3>
+                        <p className="text-sm text-muted-foreground mt-1 mb-3">Share photos or videos. This will only appear in your Mandal's gallery.</p>
+                        <PostComposerLoader sessionUser={null} mandalId={mandal.id} isMandalPost={true} onPostSuccess={() => setIsOpen(false)} />
                     </div>
                 </div>
             </DialogContent>

@@ -176,8 +176,9 @@ async function sendFamilyPostNotification(post: Post, author: User) {
 
 async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[] = []) {
   try {
-    if (post.is_family_post || !admin.apps.length) {
-      return; 
+    // Do not send notifications for Mandal posts or family posts in the main feed
+    if (post.mandal_id || post.is_family_post || !admin.apps.length) {
+      return;
     }
       
     let successCount = 0;
@@ -363,7 +364,13 @@ export async function addPost(newPostData: ClientNewPost): Promise<{ post?: Post
         return { error: 'You must be logged in to create a family post.' };
     }
       
-    if (newPostData.authorId && (!user || user.id !== newPostData.authorId)) {
+    // Mandal posts require an admin to be logged in
+    if (newPostData.mandalId && !user) {
+        return { error: 'You must be logged in as an admin to post to a Mandal.'};
+    }
+    
+    // For regular posts, authorId can be null, but if provided, it must match the session user
+    if (!newPostData.mandalId && newPostData.authorId && (!user || user.id !== newPostData.authorId)) {
         return { error: 'Authentication mismatch. You can only post for yourself.' };
     }
     
@@ -417,6 +424,9 @@ export async function addPost(newPostData: ClientNewPost): Promise<{ post?: Post
     }
 
     revalidatePath('/');
+    if(finalPost.mandal_id) {
+        revalidatePath(`/mandals/${finalPost.mandal_id}`);
+    }
     
     // Run notifications in the background
     if (finalPost.is_family_post && user) {
@@ -1547,6 +1557,15 @@ export async function getMandalsForFeed(userId?: number | null): Promise<Ganpati
         console.error("Server action error fetching mandals:", error);
         return [];
     }
+}
+
+export async function getMandalMediaPosts(mandalId: number): Promise<Post[]> {
+  try {
+    return await db.getMandalMediaPostsDb(mandalId);
+  } catch (error) {
+    console.error(`Server action error fetching media posts for mandal ${mandalId}:`, error);
+    return [];
+  }
 }
 
 export async function toggleMandalLike(mandalId: number): Promise<{ mandal?: GanpatiMandal | null; error?: string; }> {

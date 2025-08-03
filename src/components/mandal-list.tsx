@@ -1,12 +1,10 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import Link from 'next/link';
-import { getMandalsForFeed, toggleMandalLike } from '@/app/actions';
-import type { GanpatiMandal, User } from '@/lib/db-types';
-import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { getMandalsForFeed, toggleMandalLike, getMandalMediaPostsDb } from '@/app/actions';
+import type { GanpatiMandal, User, Post } from '@/lib/db-types';
+import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
@@ -15,16 +13,26 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import MandalManagementDialog from './mandal-management-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import MandalMediaViewer from './mandal-media-viewer';
 
 
 const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; onUpdate: () => void; }> = ({ mandal: initialMandal, sessionUser, onUpdate }) => {
     const [mandal, setMandal] = useState(initialMandal);
+    const [mediaPosts, setMediaPosts] = useState<Post[]>([]);
+    const [isLoadingMedia, setIsLoadingMedia] = useState(true);
     const [isLiking, setIsLiking] = useState(false);
     const { toast } = useToast();
     
     useEffect(() => {
         setMandal(initialMandal);
     }, [initialMandal]);
+
+    useEffect(() => {
+        setIsLoadingMedia(true);
+        getMandalMediaPostsDb(mandal.id)
+            .then(setMediaPosts)
+            .finally(() => setIsLoadingMedia(false));
+    }, [mandal.id]);
 
     const isOwner = sessionUser?.id === mandal.admin_user_id;
 
@@ -37,7 +45,6 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
         }
         setIsLiking(true);
 
-        // Optimistic update
         const newIsLiked = !mandal.isLikedByCurrentUser;
         const newLikeCount = mandal.isLikedByCurrentUser ? mandal.likecount - 1 : mandal.likecount + 1;
         setMandal(prev => ({ ...prev, isLikedByCurrentUser: newIsLiked, likecount: newLikeCount }));
@@ -45,44 +52,51 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
         const result = await toggleMandalLike(mandal.id);
         if (result.error || !result.mandal) {
              toast({ variant: 'destructive', title: 'Failed to update like.' });
-             setMandal(initialMandal); // Revert
+             setMandal(initialMandal);
         } else {
-             setMandal(result.mandal); // Sync with server state
+             setMandal(result.mandal);
         }
         setIsLiking(false);
     };
 
     return (
         <Card className="hover:shadow-lg transition-shadow h-full w-full flex flex-col">
-            <Link href={`/mandals/${mandal.id}`} className="block h-full flex flex-col flex-grow">
-                <CardHeader className="flex-grow">
-                    <CardTitle className="flex items-center gap-2 text-primary">
-                        <PartyPopper className="w-5 h-5" />
-                        {mandal.name}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-1.5 pt-1">
-                        <MapPin className="w-4 h-4" />
-                        {mandal.city}
-                    </CardDescription>
-                </CardHeader>
-                <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="flex-1 justify-start"
-                        onClick={handleLike}
-                        disabled={isLiking}
-                    >
-                        {isLiking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ThumbsUp className={cn("mr-2 h-4 w-4", mandal.isLikedByCurrentUser && "fill-current text-blue-500")} />}
-                        {mandal.likecount} Likes
-                    </Button>
-                    {isOwner && (
-                        <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
-                            <Button variant="secondary" size="sm">Manage</Button>
-                        </MandalManagementDialog>
-                    )}
-                </CardFooter>
-            </Link>
+            <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-primary">
+                    <PartyPopper className="w-5 h-5" />
+                    {mandal.name}
+                </CardTitle>
+                <CardDescription className="flex items-center gap-1.5 pt-1">
+                    <MapPin className="w-4 h-4" />
+                    {mandal.city}
+                </CardDescription>
+            </CardHeader>
+             <CardContent className="p-0">
+                {isLoadingMedia ? (
+                    <div className="aspect-video w-full flex items-center justify-center bg-muted">
+                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                    </div>
+                ) : (
+                    <MandalMediaViewer posts={mediaPosts} />
+                )}
+            </CardContent>
+            <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between">
+                <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="flex-1 justify-start"
+                    onClick={handleLike}
+                    disabled={isLiking}
+                >
+                    {isLiking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ThumbsUp className={cn("mr-2 h-4 w-4", mandal.isLikedByCurrentUser && "fill-current text-blue-500")} />}
+                    {mandal.likecount} Likes
+                </Button>
+                {isOwner && (
+                    <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
+                        <Button variant="secondary" size="sm">Manage</Button>
+                    </MandalManagementDialog>
+                )}
+            </CardFooter>
         </Card>
     );
 };
@@ -124,9 +138,10 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
         return (
             <div className="space-y-4">
                 <Skeleton className="h-10 w-full max-w-xs" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
-                <Skeleton className="h-24 w-full" />
+                <div className="space-y-6">
+                    <Skeleton className="h-64 w-full" />
+                    <Skeleton className="h-64 w-full" />
+                </div>
             </div>
         );
     }
@@ -152,20 +167,22 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
                 </Select>
             </div>
             
-            {filteredMandals.length > 0 ? (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {filteredMandals.map(mandal => (
+            <div className="space-y-6">
+                {filteredMandals.length > 0 ? (
+                    filteredMandals.map(mandal => (
                        <MandalCard 
                            key={mandal.id} 
                            mandal={mandal} 
                            sessionUser={sessionUser}
                            onUpdate={fetchMandals}
                        />
-                    ))}
-                </div>
-            ) : (
-                <NoPostsContent feedType="festival" />
-            )}
+                    ))
+                ) : (
+                    <div className="text-center py-10 text-muted-foreground">
+                        <p>No mandals found for the selected city.</p>
+                    </div>
+                )}
+            </div>
         </div>
     );
 };

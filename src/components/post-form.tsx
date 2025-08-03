@@ -112,7 +112,7 @@ const formSchema = z.discriminatedUnion("isPoll", [
   pollPostSchema,
 ]).superRefine((data, ctx) => {
     // A post must have either text content or at least one media file
-    if (!data.content && data.mediaFileCount === 0 && !data.mandalId) {
+    if (!data.content?.trim() && data.mediaFileCount === 0 && !data.mandalId) {
         ctx.addIssue({
             code: z.ZodIssueCode.custom,
             path: ['content'],
@@ -433,7 +433,7 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
             )}
           />
           
-          {hasDetectedUrl && (
+          {hasDetectedUrl && !mandalId && (
             <Alert variant="default" className="p-2 border-primary/30 bg-primary/5 text-primary">
               <Video className="h-4 w-4" />
               <AlertDescription className="text-xs font-semibold">
@@ -462,7 +462,85 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
             </div>
           )}
 
+          <FormItem>
+            <FormLabel htmlFor="media-upload" className="text-sm font-medium text-muted-foreground mb-1 block">
+              Attach Media {mandalId && <span className="text-destructive">*</span>}
+            </FormLabel>
+              <>
+                <Input id="file-upload" type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} multiple={mediaType !== 'video'} />
+                <Input id="image-capture" type="file" accept="image/*" capture="environment" ref={imageCaptureInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} />
+                <Input id="video-capture" type="file" accept="video/*" capture="environment" ref={videoCaptureInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} />
+              </>
+            
+            {selectedFiles.length > 0 ? (
+              <div className="w-full p-2 border-2 border-dashed rounded-lg border-primary/50 space-y-2">
+                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+                      {selectedFiles.map((f, i) => (
+                          <div key={f.url} className="relative aspect-square group">
+                              {mediaType === 'image' && <Image src={f.url} alt={`Preview ${i+1}`} fill sizes="10vw" className="object-cover rounded-md" data-ai-hint="user uploaded image"/>}
+                              {mediaType === 'video' && <video src={f.url} className="w-full h-full object-cover rounded-md bg-black" />}
+                              <Button type="button" variant="destructive" size="icon" onClick={() => removeSelectedFile(i)} className="absolute -top-1 -right-1 h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <X className="h-3 w-3" />
+                              </Button>
+                          </div>
+                      ))}
+                  </div>
+                   <Button type="button" variant="ghost" size="sm" onClick={(e) => {
+                       e.preventDefault();
+                       setSelectedFiles(prev => {
+                         prev.forEach(f => URL.revokeObjectURL(f.url));
+                         return [];
+                       });
+                       setMediaType(null);
+                       if (fileInputRef.current) fileInputRef.current.value = "";
+                   }} className="w-full text-destructive">
+                      <XCircle className="mr-2 h-4 w-4" /> Clear All
+                  </Button>
+              </div>
+            ) : (
+              <div className="p-4 border-2 border-dashed rounded-lg">
+                <div className={cn("grid gap-2", showCameraOptions ? "grid-cols-1" : "grid-cols-2")}>
+                  {!showCameraOptions && (
+                    <>
+                      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isMediaUploadDisabled}>
+                        <UploadCloud className="mr-2 h-4 w-4" /> Upload File(s)
+                      </Button>
+                      <Button type="button" variant="outline" onClick={() => setShowCameraOptions(true)} disabled={isMediaUploadDisabled}>
+                        <Camera className="mr-2 h-4 w-4" /> Use Camera
+                      </Button>
+                    </>
+                  )}
+                  {showCameraOptions && (
+                    <div className="space-y-2 text-center">
+                      <p className="text-sm text-muted-foreground">Choose a capture option:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                         <Button type="button" variant="secondary" onClick={() => imageCaptureInputRef.current?.click()} disabled={isMediaUploadDisabled}>
+                            <ImageIcon className="mr-2 h-4 w-4" /> Take Photo
+                        </Button>
+                        <Button type="button" variant="secondary" onClick={() => videoCaptureInputRef.current?.click()} disabled={isMediaUploadDisabled}>
+                            <Film className="mr-2 h-4 w-4" /> Record Video
+                        </Button>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => setShowCameraOptions(false)} disabled={isMediaUploadDisabled}>
+                        Cancel
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            {fileError && (
+              <Alert variant="destructive" className="mt-2 p-2 text-sm">
+                <AlertDescription>{fileError}</AlertDescription>
+              </Alert>
+            )}
+            {form.formState.errors.mediaFileCount && (
+                <p className="text-sm font-medium text-destructive">{form.formState.errors.mediaFileCount.message}</p>
+            )}
+          </FormItem>
+          
           {!mandalId && (
+            <div className="space-y-4">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <FormField
                     control={form.control}
@@ -568,88 +646,7 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
                     </DialogContent>
                 </Dialog>
             </div>
-          )}
-          
-          <FormItem>
-            <FormLabel htmlFor="media-upload" className="text-sm font-medium text-muted-foreground mb-1 block">
-              Attach Media {mandalId && <span className="text-destructive">*</span>}
-            </FormLabel>
-              <>
-                <Input id="file-upload" type="file" accept="image/*,video/*" ref={fileInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} multiple={!mandalId || mediaType !== 'video'} />
-                <Input id="image-capture" type="file" accept="image/*" capture="environment" ref={imageCaptureInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} />
-                <Input id="video-capture" type="file" accept="video/*" capture="environment" ref={videoCaptureInputRef} onChange={handleFileChange} className="hidden" disabled={isMediaUploadDisabled} />
-              </>
-            
-            {selectedFiles.length > 0 ? (
-              <div className="w-full p-2 border-2 border-dashed rounded-lg border-primary/50 space-y-2">
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-                      {selectedFiles.map((f, i) => (
-                          <div key={f.url} className="relative aspect-square group">
-                              {mediaType === 'image' && <Image src={f.url} alt={`Preview ${i+1}`} fill sizes="10vw" className="object-cover rounded-md" data-ai-hint="user uploaded image"/>}
-                              {mediaType === 'video' && <video src={f.url} className="w-full h-full object-cover rounded-md bg-black" />}
-                              <Button type="button" variant="destructive" size="icon" onClick={() => removeSelectedFile(i)} className="absolute -top-1 -right-1 h-5 w-5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
-                                  <X className="h-3 w-3" />
-                              </Button>
-                          </div>
-                      ))}
-                  </div>
-                   <Button type="button" variant="ghost" size="sm" onClick={(e) => {
-                       e.preventDefault();
-                       setSelectedFiles(prev => {
-                         prev.forEach(f => URL.revokeObjectURL(f.url));
-                         return [];
-                       });
-                       setMediaType(null);
-                       if (fileInputRef.current) fileInputRef.current.value = "";
-                   }} className="w-full text-destructive">
-                      <XCircle className="mr-2 h-4 w-4" /> Clear All
-                  </Button>
-              </div>
-            ) : (
-              <div className="p-4 border-2 border-dashed rounded-lg">
-                <div className={cn("grid gap-2", showCameraOptions ? "grid-cols-1" : "grid-cols-2")}>
-                  {!showCameraOptions && (
-                    <>
-                      <Button type="button" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isMediaUploadDisabled}>
-                        <UploadCloud className="mr-2 h-4 w-4" /> Upload File(s)
-                      </Button>
-                      <Button type="button" variant="outline" onClick={() => setShowCameraOptions(true)} disabled={isMediaUploadDisabled}>
-                        <Camera className="mr-2 h-4 w-4" /> Use Camera
-                      </Button>
-                    </>
-                  )}
-                  {showCameraOptions && (
-                    <div className="space-y-2 text-center">
-                      <p className="text-sm text-muted-foreground">Choose a capture option:</p>
-                      <div className="grid grid-cols-2 gap-2">
-                         <Button type="button" variant="secondary" onClick={() => imageCaptureInputRef.current?.click()} disabled={isMediaUploadDisabled}>
-                            <ImageIcon className="mr-2 h-4 w-4" /> Take Photo
-                        </Button>
-                        <Button type="button" variant="secondary" onClick={() => videoCaptureInputRef.current?.click()} disabled={isMediaUploadDisabled}>
-                            <Film className="mr-2 h-4 w-4" /> Record Video
-                        </Button>
-                      </div>
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setShowCameraOptions(false)} disabled={isMediaUploadDisabled}>
-                        Cancel
-                      </Button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-            {fileError && (
-              <Alert variant="destructive" className="mt-2 p-2 text-sm">
-                <AlertDescription>{fileError}</AlertDescription>
-              </Alert>
-            )}
-            {form.formState.errors.mediaFileCount && (
-                <p className="text-sm font-medium text-destructive">{form.formState.errors.mediaFileCount.message}</p>
-            )}
-          </FormItem>
-          
-          {!mandalId && (
-            <div className="space-y-4">
-                <FormField
+              <FormField
                 control={form.control}
                 name="isPoll"
                 render={({ field }) => (
@@ -662,11 +659,9 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
                                 const isChecked = !!checked;
                                 field.onChange(isChecked);
                                 if (isChecked) {
-                                    // When switching to poll, reset poll fields to defaults
                                     form.setValue('pollQuestion', '');
                                     form.setValue('pollOptions', [{ value: '' }, { value: '' }]);
                                 } else {
-                                    // When switching off poll, clear values
                                     form.setValue('pollQuestion', undefined);
                                     form.setValue('pollOptions', undefined);
                                 }
