@@ -455,7 +455,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 <div className="flex justify-center">
                     <RegisterMandalDialog userLocation={location} />
                 </div>
-                <MandalList />
+                <MandalList sessionUser={sessionUser}/>
             </div>
         );
     }
