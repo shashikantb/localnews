@@ -260,7 +260,7 @@ const POST_COLUMNS_WITH_JOINS = `
   p.id, p.content, p.latitude, p.longitude, p.createdat, p.likecount, 
   p.commentcount, p.viewcount, p.notifiedcount, p.city, p.hashtags, 
   p.is_family_post, p.hide_location, p.authorid, p.mediatype, p.mediaurls,
-  p.expires_at, p.max_viewers,
+  p.expires_at, p.max_viewers, p.mandal_id,
   u.name as authorname, u.role as authorrole,
   u.profilepictureurl as authorprofilepictureurl
 `;

@@ -12,11 +12,18 @@ import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import MandalManagementDialog from './mandal-management-dialog';
 
-const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; }> = ({ mandal: initialMandal, sessionUser }) => {
+const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; onUpdate: () => void; }> = ({ mandal: initialMandal, sessionUser, onUpdate }) => {
     const [mandal, setMandal] = useState(initialMandal);
     const [isLiking, setIsLiking] = useState(false);
     const { toast } = useToast();
+    
+    useEffect(() => {
+        setMandal(initialMandal);
+    }, [initialMandal]);
+
+    const isOwner = sessionUser?.id === mandal.admin_user_id;
 
     const handleLike = async (e: React.MouseEvent) => {
         e.preventDefault();
@@ -27,27 +34,24 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; }>
         }
         setIsLiking(true);
 
+        // Optimistic update
         const newIsLiked = !mandal.isLikedByCurrentUser;
         const newLikeCount = mandal.isLikedByCurrentUser ? mandal.likecount - 1 : mandal.likecount + 1;
-        
-        // Optimistic update
         setMandal(prev => ({ ...prev, isLikedByCurrentUser: newIsLiked, likecount: newLikeCount }));
 
-        const result = await toggleMandalLikeDb(mandal.id);
+        const result = await toggleMandalLikeDb(sessionUser.id, mandal.id);
         if (!result) {
              toast({ variant: 'destructive', title: 'Failed to update like.' });
-             // Revert optimistic update
-             setMandal(initialMandal);
+             setMandal(initialMandal); // Revert
         } else {
-             // Sync with server state
-             setMandal(result);
+             setMandal(result); // Sync with server state
         }
         setIsLiking(false);
     };
 
     return (
-        <Link href={`/mandals/${mandal.id}`} className="block h-full">
-            <Card className="hover:shadow-lg transition-shadow h-full w-full flex flex-col">
+        <Card className="hover:shadow-lg transition-shadow h-full w-full flex flex-col">
+            <Link href={`/mandals/${mandal.id}`} className="block h-full flex flex-col flex-grow">
                 <CardHeader className="flex-grow">
                     <CardTitle className="flex items-center gap-2 text-primary">
                         <PartyPopper className="w-5 h-5" />
@@ -58,24 +62,25 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; }>
                         {mandal.city}
                     </CardDescription>
                 </CardHeader>
-                <CardFooter className="p-3 border-t bg-muted/50">
+                <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between">
                     <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="w-full"
+                        className="flex-1 justify-start"
                         onClick={handleLike}
                         disabled={isLiking}
                     >
-                        {isLiking ? (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        ) : (
-                            <ThumbsUp className={cn("mr-2 h-4 w-4", mandal.isLikedByCurrentUser && "fill-current text-blue-500")} />
-                        )}
+                        {isLiking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ThumbsUp className={cn("mr-2 h-4 w-4", mandal.isLikedByCurrentUser && "fill-current text-blue-500")} />}
                         {mandal.likecount} Likes
                     </Button>
+                    {isOwner && (
+                        <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
+                            <Button variant="secondary" size="sm">Manage</Button>
+                        </MandalManagementDialog>
+                    )}
                 </CardFooter>
-            </Card>
-        </Link>
+            </Link>
+        </Card>
     );
 };
 
@@ -118,6 +123,7 @@ const MandalList: React.FC<{ sessionUser: User | null }> = ({ sessionUser }) => 
                        key={mandal.id} 
                        mandal={mandal} 
                        sessionUser={sessionUser}
+                       onUpdate={fetchMandals}
                    />
                 ))}
             </div>
