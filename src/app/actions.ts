@@ -2,7 +2,7 @@
 'use server';
 
 import * as db from '@/lib/db';
-import type { ConversationDetails, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction } from '@/lib/db-types';
+import type { ConversationDetails, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
@@ -1518,5 +1518,22 @@ export async function triggerLiveSeeding(latitude: number, longitude: number): P
     } catch (error) {
         // We catch errors here to prevent them from propagating to the client.
         console.error('Error in triggerLiveSeeding action:', error);
+    }
+}
+
+// --- Festival Actions ---
+export async function registerMandal(newMandal: NewGanpatiMandal): Promise<{ success: boolean, error?: string }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'You must be logged in to register a mandal.' };
+    }
+
+    try {
+        await db.registerMandalDb({ ...newMandal, admin_user_id: user.id });
+        revalidatePath('/'); // Revalidate the feed to show the new festival tab content
+        return { success: true };
+    } catch (error: any) {
+        console.error('Error registering mandal:', error);
+        return { success: false, error: error.message || 'An unexpected server error occurred.' };
     }
 }

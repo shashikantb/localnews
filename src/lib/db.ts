@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction } from '@/lib/db-types';
+import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 
@@ -2851,6 +2851,26 @@ export async function updateLastSeedTimeDb(cityName: string): Promise<void> {
             SET last_seeded_at = NOW();
         `;
         await client.query(query, [cityName]);
+    } finally {
+        client.release();
+    }
+}
+
+// --- Festival Functions ---
+
+export async function registerMandalDb(mandal: GanpatiMandal): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            INSERT INTO ganpati_mandals(name, city, description, latitude, longitude, admin_user_id)
+            VALUES($1, $2, $3, $4, $5, $6);
+        `;
+        const values = [mandal.name, mandal.city, mandal.description, mandal.latitude, mandal.longitude, mandal.admin_user_id];
+        await client.query(query, values);
     } finally {
         client.release();
     }
