@@ -154,7 +154,7 @@ async function sendFamilyPostNotification(post: Post, author: User) {
                     user_auth_token: freshToken,
                     type: 'FAMILY_POST' // Custom data to identify the notification type
                 },
-                android: { priority: 'high' as const },
+                android: { priority: 'high' as const, notification: { channelId: 'family_activity'} },
                 apns: { payload: { aps: { 'content-available': 1 } } }
             }
         }));
@@ -201,7 +201,7 @@ async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[]
                     data: {
                         user_auth_token: freshToken
                     },
-                    android: { priority: 'high' as const },
+                    android: { priority: 'high' as const, notification: { channelId: 'new_posts'} },
                     apns: { payload: { aps: { 'content-available': 1 } } }
                 }
             }));
@@ -229,7 +229,7 @@ async function sendNotificationForNewPost(post: Post, mentionedUserIds: number[]
                 user_auth_token: '' // No auth for nearby anonymous users
             },
             tokens: nearbyOnlyTokens.map(t => t.token),
-            android: { priority: 'high' as const },
+            android: { priority: 'high' as const, notification: { channelId: 'new_posts'} },
             apns: { payload: { aps: { 'content-available': 1 } } }
         };
         const response = await admin.messaging().sendEachForMulticast(message as any);
@@ -289,7 +289,7 @@ async function sendChatNotification(conversationId: number, sender: User, conten
             data: {
                 user_auth_token: freshToken
             },
-            android: { priority: 'high' as const },
+            android: { priority: 'high' as const, notification: { channelId: 'chat_messages' } },
             apns: { payload: { aps: { 'content-available': 1 } } }
         }
     }));
@@ -335,7 +335,7 @@ async function sendNotificationForNewComment(comment: Comment, post: Post) {
         data: {
             user_auth_token: freshToken
         },
-        android: { priority: 'high' as const },
+        android: { priority: 'high' as const, notification: { channelId: 'new_posts'} },
         apns: { payload: { aps: { 'content-available': 1 } } }
     }));
 
@@ -863,7 +863,7 @@ async function sendFamilyRequestNotification(requester: User, receiverId: number
             token: t.token,
             notification,
             data: { user_auth_token: freshToken },
-            android: { priority: 'high' as const },
+            android: { priority: 'high' as const, notification: { channelId: 'family_activity' } },
             apns: { payload: { aps: { 'content-available': 1 } } }
         }));
         
@@ -1047,7 +1047,7 @@ async function sendReactionNotification(reactor: User, message: Message, reactio
                 token: token,
                 notification: { title: notificationTitle, body: notificationBody },
                 data: { user_auth_token: freshToken },
-                android: { priority: 'high' as const },
+                android: { priority: 'high' as const, notification: { channelId: 'chat_messages' } },
                 apns: { payload: { aps: { 'content-available': 1 } } }
             }
         }));
@@ -1409,7 +1409,7 @@ export async function sendSosMessage(latitude: number, longitude: number): Promi
                     longitude: String(longitude),
                     url: mapUrl,
                 },
-                android: { priority: 'high' as const },
+                android: { priority: 'high' as const, notification: { channelId: 'sos_alerts' } },
                 apns: { payload: { aps: { 'content-available': 1, sound: 'default' } } }
             }
         }));
@@ -1612,7 +1612,7 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
                 body: `🪔 गणपती बाप्पाची आरती सुरू होत आहे, भक्तांनी लवकरात लवकर यावे. 🌺`,
             },
             tokens: nearbyTokens.map(t => t.token),
-            android: { priority: 'high' as const },
+            android: { priority: 'high' as const, notification: { channelId: 'festival_alerts' } },
             apns: { payload: { aps: { 'content-available': 1, sound: 'default' } } }
         };
 
@@ -1626,4 +1626,5 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
 }
 
     
+
 
