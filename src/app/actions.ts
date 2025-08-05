@@ -1624,7 +1624,7 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
         const message = {
             notification: {
                 title: `Aarti at ${mandal.name}!`,
-                body: `Join the Aarti happening now at ${mandal.name}, ${mandal.city}.`,
+                body: `🪔 गणपती बाप्पाची आरती सुरू होत आहे, भक्तांनी लवकरात लवकर यावे. 🌺 - ${mandal.name}, ${mandal.city}`,
             },
             tokens: nearbyTokens.map(t => t.token),
             android: { priority: 'high' as const },
