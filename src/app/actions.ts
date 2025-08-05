@@ -70,7 +70,7 @@ export async function getPosts(options?: { page: number; limit: number; latitude
         longitude: options.longitude,
         sortBy: options.sortBy,
         currentUserId: user?.id,
-    } : { limit: 10, offset: 0, sortBy: 'newest' as SortOption, currentUserId: user?.id };
+    } : { limit: 10, offset: 0, sortBy: 'nearby' as SortOption, currentUserId: user?.id };
 
     const posts = await db.getPostsDb(dbOptions);
     // Enrich with mentions and polls, which are separate queries.
@@ -847,6 +847,32 @@ export async function getStatusesForFeed(): Promise<UserWithStatuses[]> {
 
 // --- Family Relationship Actions ---
 
+async function sendFamilyRequestNotification(requester: User, receiverId: number) {
+    if (!admin.apps.length) return;
+    try {
+        const tokens = await db.getDeviceTokensForUsersDb([receiverId]);
+        if (tokens.length === 0) return;
+
+        const freshToken = await encrypt({ userId: receiverId });
+        const notification = {
+            title: 'New Family Request!',
+            body: `${requester.name} has sent you a family request.`,
+        };
+        
+        const messages = tokens.map(t => ({
+            token: t.token,
+            notification,
+            data: { user_auth_token: freshToken },
+            android: { priority: 'high' as const },
+            apns: { payload: { aps: { 'content-available': 1 } } }
+        }));
+        
+        await admin.messaging().sendEach(messages as any);
+    } catch (error) {
+        console.error('Error sending family request notification:', error);
+    }
+}
+
 export async function getFamilyRelationshipStatus(sessionUser: User | null, targetUserId: number): Promise<{ status: 'none' | 'pending_from_me' | 'pending_from_them' | 'approved' }> {
   if (!sessionUser || sessionUser.id === targetUserId) {
     return { status: 'none' };
@@ -894,6 +920,12 @@ export async function sendFamilyRequest(targetUserId: number): Promise<{ success
     }
     
     await db.sendFamilyRequestDb(sessionUser.id, targetUserId);
+    
+    // Send notification in the background
+    sendFamilyRequestNotification(sessionUser, targetUserId).catch(err => {
+        console.error("Background family request notification failed:", err);
+    });
+
     revalidatePath(`/users/${targetUserId}`);
     return { success: true };
   } catch (error: any) {
@@ -1027,469 +1059,7 @@ async function sendReactionNotification(reactor: User, message: Message, reactio
 }
 
 export async function startChatAndRedirect(formData: FormData): Promise<void> {
-  const { user } = await getSession();
-  if (!user) {
-    redirect('/login');
-  }
-
-  const otherUserIdRaw = formData.get('otherUserId');
-  if (!otherUserIdRaw) {
-    console.error("startChatAndRedirect: otherUserId is missing from form data.");
-    return;
-  }
-  
-  const otherUserId = parseInt(otherUserIdRaw as string, 10);
-  if (isNaN(otherUserId) || otherUserId === user.id) {
-    return;
-  }
-  
-  const conversationId = await db.findOrCreateConversationDb(user.id, otherUserId);
-  
-  revalidatePath('/chat');
-  redirect(`/chat/${conversationId}`);
-}
-
-export async function getConversations(): Promise<Conversation[]> {
-  const { user } = await getSession();
-  if (!user) return [];
-  try {
-    return await db.getConversationsForUserDb(user.id);
-  } catch (error) {
-    console.error("Server action error fetching conversations:", error);
-    return [];
-  }
-}
-
-export async function getMessages(conversationId: number): Promise<Message[]> {
-  const { user } = await getSession();
-  if (!user) return [];
-  try {
-    // This check is now performed inside the DB function
-    return await db.getMessagesForConversationDb(conversationId, user.id);
-  } catch (error) {
-    console.error(`Server action error fetching messages for conversation ${conversationId}:`, error);
-    return [];
-  }
-}
-
-
-export async function sendMessage(conversationId: number, content: string): Promise<{ message?: Message; error?: string }> {
-  const { user } = await getSession();
-  if (!user) return { error: 'You must be logged in to send messages.' };
-
-  try {
-    const message = await db.addMessageDb({
-      conversationId,
-      senderId: user.id,
-      content,
-    });
-    
-    // Send notification in the background with the default title
-    sendChatNotification(conversationId, user, content).catch(err => {
-        console.error("Background task to send chat notification failed:", err);
-    });
-
-    revalidatePath(`/chat/${conversationId}`);
-    revalidatePath('/chat'); // To update the sidebar
-    return { message };
-  } catch (error: any) {
-    return { error: 'Failed to send message due to a server error.' };
-  }
-}
-
-export async function deleteMessage(messageId: number): Promise<{ success: boolean; error?: string }> {
-  const { user } = await getSession();
-  if (!user) {
-    return { success: false, error: 'You must be logged in.' };
-  }
-  
-  try {
-    const wasDeleted = await db.deleteMessageDb(messageId, user.id);
-    if (wasDeleted) {
-      revalidatePath('/chat/[conversationId]', 'page');
-      return { success: true };
-    } else {
-      return { success: false, error: 'Message not found or you do not have permission to delete it.' };
-    }
-  } catch (error: any) {
-    return { success: false, error: 'Failed to delete message due to a server error.' };
-  }
-}
-
-export async function toggleMessageReaction(messageId: number, reaction: string): Promise<{ success: boolean; error?: string }> {
-    const { user } = await getSession();
-    if (!user) {
-        return { success: false, error: 'You must be logged in to react.' };
-    }
-
-    try {
-        const { wasAdded, message } = await db.toggleMessageReactionDb(messageId, user.id, reaction);
-        if (wasAdded && message) {
-            sendReactionNotification(user, message, reaction).catch(err => {
-                console.error("Background task to send reaction notification failed:", err);
-            });
-        }
-        revalidatePath('/chat/[conversationId]', 'page');
-        return { success: true };
-    } catch (error: any) {
-        console.error("Error toggling message reaction:", error);
-        return { success: false, error: 'Failed to toggle reaction.' };
-    }
-}
-
-
-export async function sendSosMessage(latitude: number, longitude: number): Promise<{ success: boolean; error?: string; message?: string }> {
-  const { user } = await getSession();
-  if (!user) {
-    return { success: false, error: 'You must be logged in to send an SOS.' };
-  }
-
-  try {
-    const recipients = await db.getRecipientsForSosDb(user.id);
-    if (recipients.length === 0) {
-      return { success: false, error: 'You are not sharing your location with any family members. SOS not sent.' };
-    }
-
-    const sosMessageContent = `🔴 SOS EMERGENCY ALERT 🔴\nFrom: ${user.name}\nMy current location is: https://www.google.com/maps?q=${latitude},${longitude}`;
-    const notificationTitle = `🔴 SOS from ${user.name}`;
-    
-    let sentCount = 0;
-    for (const recipient of recipients) {
-      const conversationId = await db.findOrCreateConversationDb(user.id, recipient.id);
-      
-      // Directly add message to DB
-      await db.addMessageDb({
-          conversationId,
-          senderId: user.id,
-          content: sosMessageContent,
-      });
-
-      // Directly send notification with custom title
-      sendChatNotification(conversationId, user, sosMessageContent, notificationTitle).catch(err => {
-          console.error("Background task to send SOS chat notification failed:", err);
-      });
-      
-      sentCount++;
-    }
-    
-    revalidatePath('/chat', 'layout'); // Use layout revalidation to update sidebar and unread counts
-    return { success: true, message: `SOS alert sent to ${sentCount} family member(s).` };
-
-  } catch (error: any) {
-    console.error('Error sending SOS message:', error);
-    return { success: false, error: 'Failed to send SOS message due to a server error.' };
-  }
-}
-
-
-export async function getConversationDetails(conversationId: number): Promise<ConversationDetails | null> {
-    const { user } = await getSession();
-    if (!user) return null;
-    try {
-        return await db.getConversationDetailsDb(conversationId, user.id);
-    } catch (error) {
-        console.error(`Server action error fetching details for conversation ${conversationId}:`, error);
-        return null;
-    }
-}
-
-export async function getUnreadMessageCount(): Promise<number> {
-    const { user } = await getSession();
-    if (!user) return 0;
-    try {
-        return await db.getTotalUnreadMessagesDb(user.id);
-    } catch (error) {
-        console.error("Server action error fetching unread message count:", error);
-        return 0;
-    }
-}
-
-export async function markConversationAsRead(conversationId: number): Promise<void> {
-    const { user } = await getSession();
-    if (!user) return;
-    try {
-        await db.markConversationAsReadDb(conversationId, user.id);
-        revalidatePath('/chat'); // Revalidate sidebar and nav badge
-    } catch (error) {
-        console.error(`Server action error marking conversation ${conversationId} as read:`, error);
-    }
-}
-
-export async function createGroup(groupName: string, memberIds: number[]): Promise<{ success: boolean; error?: string; conversationId?: number }> {
-    const { user } = await getSession();
-    if (!user) {
-        return { success: false, error: 'You must be logged in to create a group.' };
-    }
-    if (!groupName.trim()) {
-        return { success: false, error: 'Group name cannot be empty.' };
-    }
-    if (memberIds.length === 0) {
-        return { success: false, error: 'A group must have at least one other member.' };
-    }
-
-    try {
-        const allMemberIds = Array.from(new Set([user.id, ...memberIds]));
-        const newConversation = await db.createGroupConversationDb(user.id, groupName.trim(), allMemberIds);
-        
-        revalidatePath('/chat');
-        return { success: true, conversationId: newConversation.id };
-
-    } catch (error: any) {
-        console.error('Error creating group:', error);
-        return { success: false, error: 'Failed to create group due to a server error.' };
-    }
-}
-
-export async function leaveGroup(conversationId: number): Promise<{ success: boolean; error?: string; }> {
-    const { user } = await getSession();
-    if (!user) {
-        return { success: false, error: 'Authentication required.' };
-    }
-    try {
-        await db.removeParticipantFromGroupDb(conversationId, user.id);
-        revalidatePath('/chat');
-        redirect('/chat');
-        return { success: true };
-    } catch(e: any) {
-        return { success: false, error: e.message };
-    }
-}
-
-export async function removeMemberFromGroup(conversationId: number, userIdToRemove: number): Promise<{ success: boolean, error?: string }> {
-    const { user: sessionUser } = await getSession();
-    if (!sessionUser) return { success: false, error: "Authentication required." };
-    
-    const isAdmin = await db.isUserGroupAdminDb(conversationId, sessionUser.id);
-    if (!isAdmin) return { success: false, error: "You are not an admin of this group." };
-    
-    try {
-        await db.removeParticipantFromGroupDb(conversationId, userIdToRemove);
-        revalidatePath(`/chat/${conversationId}`);
-        return { success: true };
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
-}
-
-export async function makeUserGroupAdmin(conversationId: number, userIdToPromote: number): Promise<{ success: boolean; error?: string }> {
-  const { user: sessionUser } = await getSession();
-  if (!sessionUser) return { success: false, error: "Authentication required." };
-
-  const isSessionUserAdmin = await db.isUserGroupAdminDb(conversationId, sessionUser.id);
-  if (!isSessionUserAdmin) return { success: false, error: "Only admins can promote other members." };
-
-  try {
-    await db.makeUserGroupAdminDb(conversationId, userIdToPromote);
-    revalidatePath(`/chat/${conversationId}`);
-    return { success: true };
-  } catch (e: any) {
-    return { success: false, error: e.message };
-  }
-}
-
-export async function addMembersToGroup(conversationId: number, userIdsToAdd: number[]): Promise<{ success: boolean; error?: string }> {
-    const { user: sessionUser } = await getSession();
-    if (!sessionUser) return { success: false, error: "Authentication required." };
-    
-    const isAdmin = await db.isUserGroupAdminDb(conversationId, sessionUser.id);
-    if (!isAdmin) return { success: false, error: "You are not an admin of this group." };
-
-    try {
-        await db.addParticipantsToGroupDb(conversationId, userIdsToAdd);
-        revalidatePath(`/chat/${conversationId}`);
-        return { success: true };
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
-}
-
-export async function updateGroupAvatar(conversationId: number, imageUrl: string): Promise<{ success: boolean; error?: string }> {
-    const { user: sessionUser } = await getSession();
-    if (!sessionUser) return { success: false, error: "Authentication required." };
-
-    const isAdmin = await db.isUserGroupAdminDb(conversationId, sessionUser.id);
-    if (!isAdmin) return { success: false, error: "You are not an admin of this group." };
-
-    try {
-        await db.updateGroupAvatarDb(conversationId, imageUrl);
-        revalidatePath(`/chat/${conversationId}`);
-        revalidatePath('/chat');
-        return { success: true };
-    } catch (e: any) {
-        return { success: false, error: e.message };
-    }
-}
-
-
-// --- Business Actions ---
-export async function getNearbyBusinesses(options: { page: number; limit: number; latitude: number | null; longitude: number | null; category?: string; }): Promise<BusinessUser[]> {
-  try {
-    if (!options.latitude || !options.longitude) return [];
-    
-    const businesses = await db.getNearbyBusinessesDb({
-      ...options,
-      latitude: options.latitude,
-      longitude: options.longitude,
-      offset: (options.page - 1) * options.limit,
-    });
-    return businesses;
-  } catch (error) {
-    console.error("Server action error fetching nearby businesses:", error);
-    return [];
-  }
-}
-
-export async function getBusinessesForMap(bounds: { ne: { lat: number, lng: number }, sw: { lat: number, lng: number } }): Promise<BusinessUser[]> {
-  try {
-    const businesses = await db.getBusinessesInBoundsDb(bounds);
-    return businesses;
-  } catch (error) {
-    console.error("Server action error fetching businesses for map:", error);
-    return [];
-  }
-}
-
-// --- Gorakshak Admin Actions ---
-export async function getGorakshakReport(adminLat: number, adminLon: number): Promise<GorakshakReportUser[]> {
-  try {
-    const gorakshaks = await db.getGorakshaksSortedByDistanceDb(adminLat, adminLon);
-    return gorakshaks;
-  } catch (error) {
-    console.error("Server action error fetching Gorakshak report:", error);
-    return [];
-  }
-}
-
-// --- LP Points Actions ---
-export async function getPointHistory(userId: number): Promise<PointTransaction[]> {
-  const { user } = await getSession();
-  if (!user || user.id !== userId) {
-    // Users can only view their own point history
-    return [];
-  }
-  try {
-    return await db.getPointHistoryForUserDb(userId);
-  } catch (error) {
-    console.error(`Error fetching point history for user ${userId}:`, error);
-    return [];
-  }
-}
-
-export async function getTopLpPointUsers(): Promise<Pick<User, 'id' | 'name' | 'profilepictureurl' | 'lp_points'>[]> {
-    try {
-        return await db.getTopLpPointUsersDb();
-    } catch (error) {
-        console.error("Server action error fetching top LP point users:", error);
-        return [];
-    }
-}
-
-// --- Location Request Action ---
-export async function requestLocationUpdate(targetUserId: number): Promise<{ success: boolean; error?: string }> {
-  const { user: requester } = await getSession();
-  if (!requester) {
-    return { success: false, error: 'Authentication required.' };
-  }
-  if (!admin.apps.length) {
-    return { success: false, error: 'Notification service not configured on server.' };
-  }
-
-  try {
-    const tokens = await db.getDeviceTokensForUsersDb([targetUserId]);
-    if (tokens.length === 0) {
-      return { success: false, error: 'User is not available or has notifications disabled.' };
-    }
-
-    const message = {
-      data: {
-        type: 'REQUEST_LOCATION_UPDATE',
-        requesterName: requester.name,
-      },
-      tokens: tokens.map(t => t.token),
-      android: {
-        priority: 'high' as const,
-      },
-      apns: {
-        payload: {
-          aps: {
-            'content-available': 1,
-          },
-        },
-      },
-    };
-
-    const response = await admin.messaging().sendEachForMulticast(message as any);
-
-    if (response.successCount > 0) {
-      return { success: true };
-    } else {
-      console.error('Failed to send location request notification:', response.responses);
-      return { success: false, error: 'Could not send location request. User may be offline.' };
-    }
-  } catch (error: any) {
-    console.error('Error sending location request notification:', error);
-    return { success: false, error: 'An unexpected server error occurred.' };
-  }
-}
-
-// --- File Upload Action ---
-export async function getSignedUploadUrl(
-  fileName: string,
-  fileType: string
-): Promise<{ success: boolean; error?: string; uploadUrl?: string; publicUrl?: string; }> {
-  const { user } = await getSession();
-  if (!user) {
-    return { success: false, error: 'You must be logged in to upload files.' };
-  }
-
-  const gcsClient = getGcsClient();
-  const bucketName = getGcsBucketName();
-
-  if (!gcsClient || !bucketName) {
-    return { success: false, error: 'File upload service is not configured on the server.' };
-  }
-
-  // Create a more robust file path to avoid name collisions
-  const cleanFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
-  const path = `uploads/${user.id}/${Date.now()}-${cleanFileName}`;
-  const file = gcsClient.bucket(bucketName).file(path);
-
-  try {
-    const options = {
-      version: 'v4' as const,
-      action: 'write' as const,
-      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
-      contentType: fileType,
-    };
-
-    const [uploadUrl] = await file.getSignedUrl(options);
-    const publicUrl = `https://storage.googleapis.com/${bucketName}/${path}`;
-
-    return { success: true, uploadUrl, publicUrl };
-  } catch (error: any) {
-    console.error('Error getting signed URL:', error);
-    return { success: false, error: 'Could not get an upload URL.' };
-  }
-}
-
-export async function getUnreadFamilyPostCount(): Promise<number> {
-    const { user } = await getSession();
-    if (!user) return 0;
-    try {
-        return await db.getUnreadFamilyPostCountDb(user.id);
-    } catch (error) {
-        console.error("Server action error fetching unread family post count:", error);
-        return 0;
-    }
-}
-
-export async function markFamilyFeedAsRead(): Promise<void> {
-    const { user } = await getSession();
-    if (!user) return;
-    try {
-        await db.markFamilyFeedAsReadDb(user.id);
-        revalidatePath('/'); // Revalidate to ensure updated state is fetched
-    } catch (error) {
+  const { user } } catch (error: any) {
         console.error("Server action error marking family feed as read:", error);
     }
 }
@@ -1639,3 +1209,5 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
         return { success: false, error: 'An unexpected server error occurred.' };
     }
 }
+
+    
