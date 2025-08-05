@@ -53,13 +53,13 @@ const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
     }))
   );
 
-  const imageIndex = page % allMedia.length;
-
   const paginate = (newDirection: number) => {
     setPage(page + newDirection);
     setDirection(newDirection);
   };
-
+  
+  // Robust way to wrap the index, preventing negative numbers.
+  const imageIndex = (page % allMedia.length + allMedia.length) % allMedia.length;
 
   if (allMedia.length === 0) {
     return (
@@ -72,6 +72,15 @@ const MandalMediaViewer: React.FC<MandalMediaViewerProps> = ({ posts }) => {
   }
 
   const currentMedia = allMedia[imageIndex];
+  
+  // Add a defensive check in case something still goes wrong
+  if (!currentMedia) {
+    return (
+        <div className="text-center py-10 text-destructive bg-destructive/10 rounded-lg">
+            <p>Error: Could not load media.</p>
+        </div>
+    );
+  }
   
   return (
     <div className="relative w-full aspect-video overflow-hidden rounded-lg border bg-black/80 shadow-inner flex items-center justify-center">
