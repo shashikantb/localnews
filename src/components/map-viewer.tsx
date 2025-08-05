@@ -10,12 +10,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap, useMapEvents } from 'react-leaflet';
 import type { LatLngExpression, Map as LeafletMap } from 'leaflet';
 import L from 'leaflet';
-import { Briefcase, Loader2 } from 'lucide-react';
+import { Briefcase, Loader2, Users } from 'lucide-react';
 import Link from 'next/link';
-import { getPostsForMap, getBusinessesForMap } from '@/app/actions';
-import type { Post, BusinessUser } from '@/lib/db-types';
+import { getPostsForMap, getBusinessesForMap, getFamilyLocations } from '@/app/actions';
+import type { Post, BusinessUser, FamilyMemberLocation } from '@/lib/db-types';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInHours } from 'date-fns';
+import { differenceInHours, formatDistanceToNowStrict } from 'date-fns';
 import { Button } from './ui/button';
 
 declare module 'leaflet' {
@@ -84,6 +84,7 @@ export default function MapViewer() {
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [businesses, setBusinesses] = useState<BusinessUser[]>([]);
+  const [familyLocations, setFamilyLocations] = useState<FamilyMemberLocation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
@@ -114,6 +115,19 @@ export default function MapViewer() {
     shadowSize: [41, 41]
   });
 
+  const createFamilyIcon = (imageUrl: string | null | undefined) => {
+    return L.divIcon({
+        html: `
+            <div style="background-image: url(${imageUrl || '/images/default-avatar.png'});" class="w-10 h-10 rounded-full bg-cover bg-center border-2 border-green-500 shadow-md">
+            </div>
+        `,
+        className: 'bg-transparent border-0',
+        iconSize: [40, 40],
+        iconAnchor: [20, 40],
+        popupAnchor: [0, -40]
+    });
+  };
+
   const getPulseClassName = (postDate: string): string => {
     const hours = differenceInHours(new Date(), new Date(postDate));
     if (hours < 1) return 'pulse-fast';
@@ -129,12 +143,14 @@ export default function MapViewer() {
         ne: { lat: bounds.getNorthEast().lat, lng: bounds.getNorthEast().lng },
         sw: { lat: bounds.getSouthWest().lat, lng: bounds.getSouthWest().lng },
       };
-      const [fetchedPosts, fetchedBusinesses] = await Promise.all([
+      const [fetchedPosts, fetchedBusinesses, fetchedFamily] = await Promise.all([
         getPostsForMap(mapBounds),
-        getBusinessesForMap(mapBounds)
+        getBusinessesForMap(mapBounds),
+        getFamilyLocations() // Fetches locations for the logged-in user
       ]);
       setPosts(fetchedPosts);
       setBusinesses(fetchedBusinesses);
+      setFamilyLocations(fetchedFamily);
     } catch (err) {
       console.error("Failed to fetch map data", err);
       toast({
@@ -247,7 +263,25 @@ export default function MapViewer() {
                 </Marker>
             )
         })}
+
+        {familyLocations.map(member => {
+            if (!member || !member.latitude || !member.longitude) return null;
+            return (
+                <Marker key={`family-${member.id}`} position={[member.latitude, member.longitude]} icon={createFamilyIcon(member.profilepictureurl)}>
+                    <Popup>
+                        <div className="w-48">
+                            <p className="font-semibold text-base mb-1 truncate flex items-center gap-2 text-green-700"><Users className="w-4 h-4" />{member.name}</p>
+                            <p className="text-xs text-muted-foreground mb-2">Last updated: {formatDistanceToNowStrict(new Date(member.last_updated), { addSuffix: true })}</p>
+                            <Button asChild size="sm" className="w-full">
+                                <Link href={`/users/${member.id}`}>View Profile</Link>
+                            </Button>
+                        </div>
+                    </Popup>
+                </Marker>
+            )
+        })}
       </MapContainer>
     </div>
   );
 }
+
