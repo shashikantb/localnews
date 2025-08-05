@@ -3,8 +3,9 @@
 import React, { type FC } from 'react'; // Import React
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import dynamic from 'next/dynamic';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import type { Post, Comment as CommentType, User } from '@/lib/db-types';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { UserCircle, MessageCircle, Share2, ThumbsUp, PlayCircle, VolumeX, Volume2, AlertTriangle, RefreshCw } from 'lucide-react';
@@ -190,6 +191,13 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
   
   const isYouTubeVideo = post.mediaurls?.[0]?.includes('youtube.com/embed');
 
+  const AuthorInfo: FC<{children: React.ReactNode}> = ({ children }) => {
+    if (post.authorid) {
+        return <Link href={`/users/${post.authorid}`} className="hover:opacity-80 transition-opacity">{children}</Link>
+    }
+    return <>{children}</>;
+  }
+
   return (
     <div className="h-full w-full flex flex-col items-center justify-center bg-black relative text-white">
       <div className="w-full flex-grow flex items-center justify-center overflow-hidden relative" onClick={handleVideoTap}>
@@ -259,17 +267,20 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
 
       <div className="absolute bottom-16 left-0 right-0 p-4 pb-2 bg-gradient-to-t from-black/60 via-black/30 to-transparent flex justify-between items-end">
         <div className="flex-1 space-y-1.5 max-w-[calc(100%-5rem)]">
-          <div className="flex items-center space-x-2">
-            <Avatar className="h-9 w-9 border-2 border-white/60">
-              <AvatarFallback className="bg-gray-700 text-sm">
-                <UserCircle className="h-6 w-6" />
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="text-sm font-semibold">{post.authorname || 'Anonymous Pulsar'}</p>
-              <p className="text-xs text-gray-300">{timeAgo} {post.city && post.city !== "Unknown City" ? `· ${post.city}`: ''}</p>
+          <AuthorInfo>
+            <div className="flex items-center space-x-2">
+              <Avatar className="h-9 w-9 border-2 border-white/60">
+                <AvatarImage src={post.authorprofilepictureurl ?? undefined} alt={post.authorname || 'User'} />
+                <AvatarFallback className="bg-gray-700 text-sm">
+                  <UserCircle className="h-6 w-6" />
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <p className="text-sm font-semibold">{post.authorname || 'Anonymous Pulsar'}</p>
+                <p className="text-xs text-gray-300">{timeAgo} {post.city && post.city !== "Unknown City" ? `· ${post.city}`: ''}</p>
+              </div>
             </div>
-          </div>
+          </AuthorInfo>
           <p className="text-sm leading-tight line-clamp-2 whitespace-pre-wrap break-words">{post.content}</p>
           {post.hashtags && post.hashtags.length > 0 && (
             <div className="mt-1 flex flex-wrap gap-1 max-h-10 overflow-y-hidden">
