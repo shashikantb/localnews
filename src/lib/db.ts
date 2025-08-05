@@ -320,8 +320,18 @@ export async function getPostsDb(
       case 'nearby':
         if (options.latitude != null && options.longitude != null && !isAdminView) {
             queryParams.push(options.latitude, options.longitude);
-            const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${paramIndex++}, $${paramIndex++}))`;
-            orderByClause = `${distanceCalc} ASC, p.createdat DESC`;
+            const latParamIndex = paramIndex++;
+            const lonParamIndex = paramIndex++;
+            const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${latParamIndex}, $${lonParamIndex}))`;
+            orderByClause = `
+              CASE
+                WHEN ${distanceCalc} <= 5000 THEN 1
+                WHEN ${distanceCalc} <= 20000 THEN 2
+                WHEN ${distanceCalc} <= 50000 THEN 3
+                ELSE 4
+              END,
+              p.createdat DESC
+            `;
         } else {
              orderByClause = 'p.createdat DESC';
         }
@@ -356,8 +366,8 @@ export async function getPostsDb(
     const officialUserSubquery = `SELECT id FROM users WHERE email = '${OFFICIAL_USER_EMAIL}'`;
 
     queryParams.push(options.limit, options.offset);
-    const limitParamIndex = paramIndex++;
-    const offsetParamIndex = paramIndex++;
+    const limitParamIndex = queryParams.length - 1;
+    const offsetParamIndex = queryParams.length;
 
     const postsQuery = `
       SELECT 
@@ -3066,4 +3076,5 @@ export async function toggleMandalLikeDb(userId: number, mandalId: number): Prom
         client.release();
     }
 }
+
 
