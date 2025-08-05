@@ -1375,11 +1375,25 @@ export async function sendSosMessage(latitude: number, longitude: number): Promi
         
         const recipientIds = recipients.map(r => r.id);
         const deviceTokens = await db.getDeviceTokensForUsersDb(recipientIds);
-        if(deviceTokens.length === 0) {
-            return { success: true, message: "SOS location recorded, but no family members have notifications enabled."};
-        }
         
         const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        const sosContent = `🆘 EMERGENCY SOS from ${user.name}! 🆘\n\nTheir current location is: ${mapUrl}`;
+
+        // Send a message to the chat for each recipient
+        for (const recipientId of recipientIds) {
+            try {
+                const conversationId = await db.findOrCreateConversationDb(user.id, recipientId);
+                await sendMessage(conversationId, sosContent);
+            } catch (chatError) {
+                console.error(`Failed to send SOS chat message to user ${recipientId}:`, chatError);
+                // Continue to send notifications even if chat fails
+            }
+        }
+        
+        if(deviceTokens.length === 0) {
+            return { success: true, message: "SOS message sent in chat, but no family members have notifications enabled."};
+        }
+        
         const messages = await Promise.all(deviceTokens.map(async ({ token, user_id }) => {
             const freshToken = await encrypt({ userId: user_id });
             return {
@@ -1612,3 +1626,4 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
 }
 
     
+
