@@ -1059,7 +1059,408 @@ async function sendReactionNotification(reactor: User, message: Message, reactio
 }
 
 export async function startChatAndRedirect(formData: FormData): Promise<void> {
-  const { user } } catch (error: any) {
+  const { user } = await getSession();
+  if (!user) {
+    redirect('/login');
+    return;
+  }
+  
+  const otherUserIdStr = formData.get('otherUserId');
+  if (!otherUserIdStr || typeof otherUserIdStr !== 'string') {
+    // Handle error case, maybe redirect back with an error message
+    return;
+  }
+  const otherUserId = parseInt(otherUserIdStr, 10);
+  
+  if(isNaN(otherUserId) || otherUserId === user.id) {
+    // Handle error case
+    return;
+  }
+  
+  const conversationId = await db.findOrCreateConversationDb(user.id, otherUserId);
+  redirect(`/chat/${conversationId}`);
+}
+
+export async function createGroup(groupName: string, memberIds: number[]): Promise<{ success: boolean; error?: string; conversationId?: number }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'You must be logged in.' };
+    }
+    if (!groupName.trim()) {
+        return { success: false, error: 'Group name cannot be empty.' };
+    }
+    if (memberIds.length === 0) {
+        return { success: false, error: 'You must add at least one member to the group.' };
+    }
+    
+    try {
+        const allMemberIds = Array.from(new Set([user.id, ...memberIds]));
+        const newConversation = await db.createGroupConversationDb(user.id, groupName.trim(), allMemberIds);
+        revalidatePath('/chat');
+        return { success: true, conversationId: newConversation.id };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to create group.' };
+    }
+}
+
+export async function getMessages(conversationId: number): Promise<Message[]> {
+    const { user } = await getSession();
+    if (!user) return [];
+    try {
+        return await db.getMessagesForConversationDb(conversationId, user.id);
+    } catch (error) {
+        console.error(`Error fetching messages for conversation ${conversationId}:`, error);
+        return [];
+    }
+}
+
+export async function sendMessage(conversationId: number, content: string): Promise<{ message?: Message; error?: string }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { error: 'You must be logged in to send a message.' };
+    }
+    try {
+        const newMessage = await db.addMessageDb({ conversationId, senderId: user.id, content });
+        // Don't await notification, let it run in background
+        sendChatNotification(conversationId, user, content).catch(err => console.error("Chat notification failed:", err));
+        revalidatePath(`/chat`);
+        revalidatePath(`/chat/${conversationId}`);
+        return { message: newMessage };
+    } catch (error: any) {
+        return { error: 'Failed to send message.' };
+    }
+}
+
+export async function deleteMessage(messageId: number): Promise<{ success: boolean; error?: string }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'You must be logged in.' };
+    }
+    try {
+        const wasDeleted = await db.deleteMessageDb(messageId, user.id);
+        if (wasDeleted) {
+            revalidatePath('/chat'); // Revalidating all chats might be necessary
+            return { success: true };
+        } else {
+            return { success: false, error: 'Message not found or you do not have permission to delete it.' };
+        }
+    } catch (error: any) {
+        return { success: false, error: 'Failed to delete message.' };
+    }
+}
+
+export async function getConversations(): Promise<Conversation[]> {
+    const { user } = await getSession();
+    if (!user) return [];
+    try {
+        return await db.getConversationsForUserDb(user.id);
+    } catch (error) {
+        console.error(`Error fetching conversations for user ${user.id}:`, error);
+        return [];
+    }
+}
+
+export async function markConversationAsRead(conversationId: number) {
+    try {
+        const { user } = await getSession();
+        if (user) {
+            await db.markConversationAsReadDb(conversationId, user.id);
+            revalidatePath(`/chat`);
+        }
+    } catch (error: any) {
+        console.error("Server action error marking conversation as read:", error);
+    }
+}
+
+export async function getUnreadMessageCount(): Promise<number> {
+    try {
+        const { user } = await getSession();
+        if (user) {
+            return await db.getTotalUnreadMessagesDb(user.id);
+        }
+        return 0;
+    } catch (error: any) {
+        console.error("Server action error getting unread message count:", error);
+        return 0;
+    }
+}
+
+export async function getConversationDetails(conversationId: number): Promise<ConversationDetails | null> {
+    try {
+        const { user } = await getSession();
+        if (user) {
+            return await db.getConversationDetailsDb(conversationId, user.id);
+        }
+        return null;
+    } catch (error) {
+        console.error("Server action error getting conversation details:", error);
+        return null;
+    }
+}
+
+export async function leaveGroup(conversationId: number): Promise<{ success: boolean; error?: string }> {
+    const { user } = await getSession();
+    if (!user) return { success: false, error: 'You must be logged in.' };
+    try {
+        await db.removeParticipantFromGroupDb(conversationId, user.id);
+        revalidatePath('/chat');
+        redirect('/chat');
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to leave group.' };
+    }
+}
+
+export async function removeMemberFromGroup(conversationId: number, memberId: number): Promise<{ success: boolean; error?: string }> {
+    const { user } = await getSession();
+    if (!user) return { success: false, error: 'You must be logged in.' };
+    try {
+        const isAdmin = await db.isUserGroupAdminDb(conversationId, user.id);
+        if(!isAdmin) return { success: false, error: 'You are not an admin of this group.' };
+        await db.removeParticipantFromGroupDb(conversationId, memberId);
+        revalidatePath(`/chat/${conversationId}`);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to remove member.' };
+    }
+}
+
+export async function addMembersToGroup(conversationId: number, memberIds: number[]): Promise<{ success: boolean; error?: string }> {
+    const { user } = await getSession();
+    if (!user) return { success: false, error: 'You must be logged in.' };
+    try {
+        const isAdmin = await db.isUserGroupAdminDb(conversationId, user.id);
+        if(!isAdmin) return { success: false, error: 'You are not an admin of this group.' };
+        await db.addParticipantsToGroupDb(conversationId, memberIds);
+        revalidatePath(`/chat/${conversationId}`);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to add members.' };
+    }
+}
+
+export async function makeUserGroupAdmin(conversationId: number, memberId: number): Promise<{ success: boolean; error?: string }> {
+    const { user } = await getSession();
+    if (!user) return { success: false, error: 'You must be logged in.' };
+    try {
+        const isAdmin = await db.isUserGroupAdminDb(conversationId, user.id);
+        if(!isAdmin) return { success: false, error: 'You are not an admin of this group.' };
+        await db.makeUserGroupAdminDb(conversationId, memberId);
+        revalidatePath(`/chat/${conversationId}`);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to make admin.' };
+    }
+}
+
+export async function updateGroupAvatar(conversationId: number, imageUrl: string): Promise<{ success: boolean; error?: string }> {
+  const { user } = await getSession();
+  if (!user) return { success: false, error: 'You must be logged in.' };
+
+  try {
+    const isAdmin = await db.isUserGroupAdminDb(conversationId, user.id);
+    if (!isAdmin) return { success: false, error: 'You are not an admin of this group.' };
+    await db.updateGroupAvatarDb(conversationId, imageUrl);
+    revalidatePath(`/chat/${conversationId}`);
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: 'Failed to update group avatar.' };
+  }
+}
+
+export async function toggleMessageReaction(messageId: number, reaction: string): Promise<{ success: boolean; error?: string }> {
+    const { user } = await getSession();
+    if (!user) return { success: false, error: 'You must be logged in.' };
+    try {
+        const { wasAdded, message } = await db.toggleMessageReactionDb(messageId, user.id, reaction);
+        if (wasAdded && message) {
+            // Don't await, run in background
+            sendReactionNotification(user, message, reaction).catch(err => console.error("Reaction notification failed:", err));
+        }
+        revalidatePath('/chat'); // Revalidate all chats for simplicity
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to toggle reaction.' };
+    }
+}
+
+export async function getPointHistory(userId: number): Promise<PointTransaction[]> {
+    try {
+        return await db.getPointHistoryForUserDb(userId);
+    } catch (error) {
+        console.error(`Failed to get point history for user ${userId}:`, error);
+        return [];
+    }
+}
+
+export async function getTopLpPointUsers(): Promise<Pick<User, 'id' | 'name' | 'profilepictureurl' | 'lp_points'>[]> {
+    try {
+        return await db.getTopLpPointUsersDb();
+    } catch (error) {
+        console.error("Failed to get top LP point users:", error);
+        return [];
+    }
+}
+
+export async function getSignedUploadUrl(fileName: string, fileType: string): Promise<{ success: boolean; uploadUrl?: string; publicUrl?: string; error?: string; }> {
+  const gcsClient = getGcsClient();
+  const bucketName = getGcsBucketName();
+
+  if (!gcsClient || !bucketName) {
+    return { success: false, error: "Cloud Storage is not configured on the server." };
+  }
+
+  const cleanFileName = `${Date.now()}-${fileName.replace(/[^a-zA-Z0-9.]/g, '_')}`;
+  const file = gcsClient.bucket(bucketName).file(`uploads/${cleanFileName}`);
+
+  try {
+    const options = {
+      version: 'v4' as const,
+      action: 'write' as const,
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      contentType: fileType,
+    };
+
+    const [url] = await file.getSignedUrl(options);
+    const publicUrl = `https://storage.googleapis.com/${bucketName}/uploads/${cleanFileName}`;
+    
+    return { success: true, uploadUrl: url, publicUrl: publicUrl };
+  } catch (error: any) {
+    console.error("Failed to get signed URL:", error);
+    return { success: false, error: "Could not create an upload URL." };
+  }
+}
+
+export async function getNearbyBusinesses(options: { page: number; limit: number; latitude: number; longitude: number; category?: string;}): Promise<BusinessUser[]> {
+    try {
+        return await db.getNearbyBusinessesDb({
+            ...options,
+            page: options.page || 1,
+            limit: options.limit || 10,
+        });
+    } catch (error) {
+        console.error("Error fetching nearby businesses:", error);
+        return [];
+    }
+}
+
+export async function getBusinessesForMap(bounds: { ne: { lat: number, lng: number }, sw: { lat: number, lng: number } }): Promise<BusinessUser[]> {
+    try {
+        return await db.getBusinessesInBoundsDb(bounds);
+    } catch (error) {
+        console.error("Error fetching businesses for map:", error);
+        return [];
+    }
+}
+
+export async function getGorakshakReport(adminLat: number, adminLon: number): Promise<GorakshakReportUser[]> {
+    try {
+        return await db.getGorakshaksSortedByDistanceDb(adminLat, adminLon);
+    } catch (error) {
+        console.error("Error fetching Gorakshak report:", error);
+        return [];
+    }
+}
+
+export async function sendSosMessage(latitude: number, longitude: number): Promise<{ success: boolean; message?: string; error?: string; }> {
+    const { user } = await getSession();
+    if (!user) return { success: false, error: "You must be logged in to send an SOS." };
+    if (!admin.apps.length) return { success: false, error: "Notification service is not configured." };
+    
+    try {
+        const recipients = await db.getRecipientsForSosDb(user.id);
+        if(recipients.length === 0) {
+            return { success: false, error: "You are not sharing your location with any family members. No one to notify." };
+        }
+        
+        const recipientIds = recipients.map(r => r.id);
+        const deviceTokens = await db.getDeviceTokensForUsersDb(recipientIds);
+        if(deviceTokens.length === 0) {
+            return { success: true, message: "SOS location recorded, but no family members have notifications enabled."};
+        }
+        
+        const mapUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+        const messages = await Promise.all(deviceTokens.map(async ({ token, user_id }) => {
+            const freshToken = await encrypt({ userId: user_id });
+            return {
+                token: token,
+                notification: {
+                    title: `🆘 SOS from ${user.name}!`,
+                    body: `Emergency alert! Tap to see their location.`
+                },
+                data: {
+                    user_auth_token: freshToken,
+                    type: 'SOS',
+                    latitude: String(latitude),
+                    longitude: String(longitude),
+                    url: mapUrl,
+                },
+                android: { priority: 'high' as const },
+                apns: { payload: { aps: { 'content-available': 1, sound: 'default' } } }
+            }
+        }));
+
+        const response = await admin.messaging().sendEach(messages as any);
+        return { success: true, message: `SOS sent to ${response.successCount} family member(s).` };
+
+    } catch(error: any) {
+        return { success: false, error: "Failed to send SOS due to a server error."};
+    }
+}
+
+export async function requestLocationUpdate(targetUserId: number): Promise<{ success: boolean; error?: string }> {
+    const { user: requester } = await getSession();
+    if (!requester || !admin.apps.length) {
+        return { success: false, error: "User not logged in or notifications not configured." };
+    }
+    
+    try {
+        const targetTokens = await db.getDeviceTokensForUsersDb([targetUserId]);
+        if (targetTokens.length === 0) return { success: false, error: "Target user does not have notifications enabled." };
+
+        const messages = await Promise.all(targetTokens.map(async ({ token, user_id }) => {
+            const freshToken = await encrypt({ userId: user_id });
+            return {
+                token: token,
+                data: {
+                    user_auth_token: freshToken,
+                    type: 'REQUEST_LOCATION_UPDATE',
+                    requesterName: requester.name
+                },
+                // No notification payload, this is a silent data-only push
+                android: { priority: 'high' as const },
+                apns: { payload: { aps: { 'content-available': 1 } } }
+            }
+        }));
+
+        await admin.messaging().sendEach(messages as any);
+        return { success: true };
+    } catch (error) {
+        console.error("Error requesting location update:", error);
+        return { success: false, error: "Failed to send request." };
+    }
+}
+
+export async function getUnreadFamilyPostCount(): Promise<number> {
+    try {
+        const { user } = await getSession();
+        if (user) {
+            return await db.getUnreadFamilyPostCountDb(user.id);
+        }
+        return 0;
+    } catch(error: any) {
+        return 0;
+    }
+}
+
+export async function markFamilyFeedAsRead() {
+    try {
+        const { user } = await getSession();
+        if(user) {
+            await db.markFamilyFeedAsReadDb(user.id);
+            revalidatePath('/'); // Revalidate to update UI state if needed
+        }
+    } catch (error: any) {
         console.error("Server action error marking family feed as read:", error);
     }
 }
@@ -1194,7 +1595,7 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
         const message = {
             notification: {
                 title: `Aarti at ${mandal.name}!`,
-                body: `🪔 गणपती बाप्पाची आरती सुरू होत आहे, भक्तांनी लवकरात लवकर यावे. 🌺 - ${mandal.name}, ${mandal.city}`,
+                body: `🪔 गणपती बाप्पाची आरती सुरू होत आहे, भक्तांनी लवकरात लवकर यावे. 🌺`,
             },
             tokens: nearbyTokens.map(t => t.token),
             android: { priority: 'high' as const },
