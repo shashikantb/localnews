@@ -1,5 +1,4 @@
 
-
 import { Pool, Client, type QueryResult } from 'pg';
 import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
@@ -807,6 +806,21 @@ export async function getNearbyDeviceTokensDb(latitude: number, longitude: numbe
   } finally {
     client.release();
   }
+}
+
+export async function getAnonymousDeviceTokensDb(): Promise<string[]> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return [];
+
+    const client = await dbPool.connect();
+    try {
+        const query = 'SELECT token FROM device_tokens WHERE user_id IS NULL';
+        const result = await client.query(query);
+        return result.rows.map(row => row.token);
+    } finally {
+        client.release();
+    }
 }
 
 export async function deleteDeviceTokenDb(token: string): Promise<void> {

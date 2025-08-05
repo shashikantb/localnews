@@ -1,7 +1,7 @@
 
 'use server';
 
-import { getAllUsersWithDeviceTokensDb } from '@/lib/db';
+import { getAllUsersWithDeviceTokensDb, getAnonymousDeviceTokensDb } from '@/lib/db';
 import admin from '@/utils/firebaseAdmin';
 import type { MulticastMessage } from 'firebase-admin/messaging';
 
@@ -55,4 +55,36 @@ export async function sendLpPointsNotification(): Promise<{ success: boolean; er
     console.error('Error sending LP points notification:', error);
     return { success: false, error: 'An unexpected server error occurred.' };
   }
+}
+
+
+export async function sendRegistrationReminderNotification(): Promise<{ success: boolean; error?: string; successCount?: number; failureCount?: number }> {
+    if (!admin.apps.length) {
+        return { success: false, error: 'Firebase Admin not configured. Cannot send notifications.' };
+    }
+
+    try {
+        const tokens = await getAnonymousDeviceTokensDb();
+        if (tokens.length === 0) {
+            return { success: false, error: 'No unregistered users with devices found to notify.' };
+        }
+
+        const message = {
+            notification: {
+                title: 'Complete Your LocalPulse Profile! 🚀',
+                body: 'Sign up to post, earn LP Points, and unlock all features. Join the community now!',
+            },
+            tokens: tokens,
+        };
+
+        const batchResponse = await admin.messaging().sendEachForMulticast(message);
+
+        console.log(`Registration reminders sent: ${batchResponse.successCount} success, ${batchResponse.failureCount} failures.`);
+
+        return { success: true, successCount: batchResponse.successCount, failureCount: batchResponse.failureCount };
+
+    } catch (error: any) {
+        console.error('Error sending registration reminder:', error);
+        return { success: false, error: 'An unexpected server error occurred.' };
+    }
 }
