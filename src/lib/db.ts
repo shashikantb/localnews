@@ -308,7 +308,7 @@ export async function getPostsDb(
     const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $${userIdParamIndex}::int)`;
     const followCheck = `p.authorid IS NOT NULL AND EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $${userIdParamIndex}::int)`;
 
-    const sortBy = options.sortBy || 'newest';
+    const sortBy = options.sortBy || 'nearby';
 
     switch(sortBy) {
       case 'likes':
@@ -2308,10 +2308,12 @@ export async function getRecipientsForSosDb(senderId: number): Promise<{ id: num
     const client = await dbPool.connect();
     try {
         const query = `
+            -- Get users that the sender (user_id_1) is sharing with
             SELECT user_id_2 AS recipient_id
             FROM family_relationships
             WHERE user_id_1 = $1 AND status = 'approved' AND share_location_from_1_to_2 = TRUE
             UNION
+            -- Get users that the sender (user_id_2) is sharing with
             SELECT user_id_1 AS recipient_id
             FROM family_relationships
             WHERE user_id_2 = $1 AND status = 'approved' AND share_location_from_2_to_1 = TRUE;
@@ -3078,3 +3080,6 @@ export async function toggleMandalLikeDb(userId: number, mandalId: number): Prom
 }
 
 
+
+
+    
