@@ -28,7 +28,7 @@ const signupSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters.'),
   email: z.string().email('Please enter a valid email address.'),
   password: z.string().min(8, 'Password must be at least 8 characters.'),
-  role: z.enum(['Business', 'Gorakshak', 'Public(जनता)'], { required_error: 'You must select a role.' }),
+  role: z.enum(['Public(जनता)', 'Business', 'Gorakshak'], { required_error: 'You must select a role.' }),
   countryCode: z.string().min(1, 'Country code is required.'),
   mobilenumber: z.string().regex(/^\d{10}$/, "A valid 10-digit mobile number is required."),
   business_category: z.string().optional(),
@@ -87,6 +87,7 @@ const SignupPage: FC = () => {
       name: '',
       email: '',
       password: '',
+      role: 'Public(जनता)',
       countryCode: '+91',
       mobilenumber: '',
       referral_code: refCodeFromUrl,
@@ -277,6 +278,15 @@ const SignupPage: FC = () => {
                         className="grid grid-cols-1 sm:grid-cols-3 gap-4"
                         disabled={isSubmitting}
                       >
+                         <FormItem>
+                          <FormControl>
+                            <RadioGroupItem value="Public(जनता)" id="role-public" className="peer sr-only" />
+                          </FormControl>
+                          <Label htmlFor="role-public" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
+                            <User className="mb-3 h-6 w-6" />
+                            Public(जनता)
+                          </Label>
+                        </FormItem>
                         <FormItem>
                            <FormControl>
                             <RadioGroupItem value="Business" id="role-business" className="peer sr-only" />
@@ -293,15 +303,6 @@ const SignupPage: FC = () => {
                           <Label htmlFor="role-gorakshak" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
                             <ShieldCheck className="mb-3 h-6 w-6" />
                             Gorakshak
-                          </Label>
-                        </FormItem>
-                         <FormItem>
-                          <FormControl>
-                            <RadioGroupItem value="Public(जनता)" id="role-public" className="peer sr-only" />
-                          </FormControl>
-                          <Label htmlFor="role-public" className="flex flex-col items-center justify-between rounded-md border-2 border-muted bg-popover p-4 hover:bg-accent hover:text-accent-foreground peer-data-[state=checked]:border-primary [&:has([data-state=checked])]:border-primary cursor-pointer">
-                            <User className="mb-3 h-6 w-6" />
-                            Public(जनता)
                           </Label>
                         </FormItem>
                       </RadioGroup>
