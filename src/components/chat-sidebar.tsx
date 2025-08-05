@@ -11,7 +11,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Skeleton } from './ui/skeleton';
-import { Input } from '@/components/ui/input';
+import { Input } from './ui/input';
 import { Search, Loader2, Users } from 'lucide-react';
 import CreateGroupDialog from './create-group-dialog';
 import { Button } from './ui/button';
@@ -57,7 +57,7 @@ const ConversationItem = ({ conv }: { conv: Conversation }) => {
                     )}
                 </div>
                 <div className="flex justify-between items-center mt-0.5">
-                    <p className={cn("text-sm text-muted-foreground break-words", showUnread ? "font-bold text-foreground" : "")}>
+                    <p className={cn("text-sm text-muted-foreground break-words truncate", showUnread ? "font-bold text-foreground" : "")}>
                         {conv.last_message_content || 'No messages yet.'}
                     </p>
                     {showUnread && (
