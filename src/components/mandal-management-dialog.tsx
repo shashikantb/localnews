@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState } from 'react';
@@ -87,24 +88,6 @@ const EditMandalForm: React.FC<{ mandal: GanpatiMandal; onUpdateSuccess: () => v
     );
 };
 
-const SendAartiNotificationButton: React.FC<{ mandalId: number }> = ({ mandalId }) => {
-    const [isSending, setIsSending] = useState(false);
-    const { toast } = useToast();
-
-    const handleSend = async () => {
-        setIsSending(true);
-        const result = await sendAartiNotification(mandalId);
-        if (result.success) {
-            toast({ title: 'Notification Sent!', description: `Sent Aarti notification to ${result.sentCount} nearby users.` });
-        } else {
-            toast({ variant: 'destructive', title: 'Failed to Send', description: result.error });
-        }
-        setIsSending(false);
-    };
-
-    return <Button onClick={handleSend} disabled={isSending}>{isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} Send Notification</Button>;
-};
-
 interface MandalManagementDialogProps {
   children: React.ReactNode;
   mandal: GanpatiMandal;
@@ -124,7 +107,7 @@ export default function MandalManagementDialog({ children, mandal, onUpdate }: M
                         Manage {mandal.name}
                     </DialogTitle>
                     <DialogDescription>
-                        Edit details, post media, and send notifications for your mandal.
+                        Edit details and post media for your mandal.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -133,12 +116,6 @@ export default function MandalManagementDialog({ children, mandal, onUpdate }: M
                         <h3 className="font-semibold flex items-center gap-2"><Edit className="w-4 h-4" /> Edit Details</h3>
                         <p className="text-sm text-muted-foreground mt-1 mb-3">Update your mandal's information.</p>
                         <EditMandalForm mandal={mandal} onUpdateSuccess={() => { setIsOpen(false); onUpdate(); }} />
-                    </div>
-
-                    <div className="p-4 border rounded-lg">
-                        <h3 className="font-semibold flex items-center gap-2"><Bell className="w-4 h-4" /> Send Aarti Notification</h3>
-                        <p className="text-sm text-muted-foreground mt-1 mb-3">Notify nearby users about Aarti timings (1km radius).</p>
-                        <SendAartiNotificationButton mandalId={mandal.id} />
                     </div>
 
                     <div className="p-4 border rounded-lg">

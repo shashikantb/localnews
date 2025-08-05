@@ -1,12 +1,13 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { getMandalsForFeed, toggleMandalLike, getMandalMediaPosts } from '@/app/actions';
+import { getMandalsForFeed, toggleMandalLike, getMandalMediaPosts, sendAartiNotification } from '@/app/actions';
 import type { GanpatiMandal, User, Post } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter, Edit } from 'lucide-react';
+import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter, Edit, Bell } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,49 @@ import MandalManagementDialog from './mandal-management-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import MandalMediaViewer from './mandal-media-viewer';
 import RegisterMandalDialog from './register-mandal-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+
+
+const SendAartiNotificationButton: React.FC<{ mandal: GanpatiMandal }> = ({ mandal }) => {
+    const [isSending, setIsSending] = useState(false);
+    const { toast } = useToast();
+
+    const handleSend = async () => {
+        setIsSending(true);
+        const result = await sendAartiNotification(mandal.id);
+        if (result.success) {
+            toast({ title: 'Notification Sent!', description: `Sent Aarti notification to ${result.sentCount} nearby users.` });
+        } else {
+            toast({ variant: 'destructive', title: 'Failed to Send', description: result.error });
+        }
+        setIsSending(false);
+    };
+
+    return (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+            <Button variant="outline" size="sm" className="h-9">
+                <Bell className="mr-2 h-4 w-4" /> Notify
+            </Button>
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+            <AlertDialogHeader>
+                <AlertDialogTitle>Send Aarti Notification for {mandal.name}?</AlertDialogTitle>
+                <AlertDialogDescription>
+                    This will send a push notification to all users within a 1km radius of your mandal. This action cannot be undone. Are you sure you want to proceed?
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSend} disabled={isSending}>
+                    {isSending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                    Yes, Send Notification
+                </AlertDialogAction>
+            </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    )
+};
 
 
 const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; onUpdate: () => void; }> = ({ mandal: initialMandal, sessionUser, onUpdate }) => {
@@ -81,11 +125,11 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
                     <MandalMediaViewer posts={mediaPosts} />
                 )}
             </CardContent>
-            <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between">
+            <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between flex-wrap gap-2">
                 <Button 
                     variant="ghost" 
                     size="sm" 
-                    className="flex-1 justify-start"
+                    className="flex-1 justify-start h-9"
                     onClick={handleLike}
                     disabled={isLiking}
                 >
@@ -93,9 +137,12 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
                     {mandal.likecount} Likes
                 </Button>
                 {isOwner && (
-                    <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
-                        <Button variant="secondary" size="sm">Manage</Button>
-                    </MandalManagementDialog>
+                    <div className="flex items-center gap-2">
+                        <SendAartiNotificationButton mandal={mandal} />
+                        <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
+                            <Button variant="secondary" size="sm" className="h-9">Manage</Button>
+                        </MandalManagementDialog>
+                    </div>
                 )}
             </CardFooter>
         </Card>
