@@ -178,7 +178,8 @@ const MandalList: React.FC<{ sessionUser: User | null, userLocation: { latitude:
         if (selectedCity === 'all') {
             setFilteredMandals(allMandals);
         } else {
-            setFilteredMandals(allMandals.filter(m => m.city === selectedCity));
+            const cityFiltered = allMandals.filter(m => m.city === selectedCity);
+            setFilteredMandals(cityFiltered.sort((a, b) => a.name.localeCompare(b.name)));
         }
     }, [selectedCity, allMandals]);
     
@@ -219,7 +220,7 @@ const MandalList: React.FC<{ sessionUser: User | null, userLocation: { latitude:
                         <SelectValue placeholder="Filter by city..." />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value="all">All Cities</SelectItem>
+                        <SelectItem value="all">All Cities (by Likes)</SelectItem>
                         {cities.map(city => (
                             <SelectItem key={city} value={city}>{city}</SelectItem>
                         ))}

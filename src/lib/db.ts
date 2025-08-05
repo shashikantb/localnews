@@ -2308,15 +2308,17 @@ export async function getRecipientsForSosDb(senderId: number): Promise<{ id: num
     const client = await dbPool.connect();
     try {
         const query = `
-            -- Get users that the sender (user_id_1) is sharing with
-            SELECT user_id_2 AS recipient_id
-            FROM family_relationships
-            WHERE user_id_1 = $1 AND status = 'approved' AND share_location_from_1_to_2 = TRUE
-            UNION
-            -- Get users that the sender (user_id_2) is sharing with
-            SELECT user_id_1 AS recipient_id
-            FROM family_relationships
-            WHERE user_id_2 = $1 AND status = 'approved' AND share_location_from_2_to_1 = TRUE;
+            SELECT recipient_id FROM (
+                -- Get users that the sender (as user_id_1) is sharing with
+                SELECT user_id_2 AS recipient_id
+                FROM family_relationships
+                WHERE user_id_1 = $1 AND status = 'approved' AND share_location_from_1_to_2 = TRUE
+                UNION
+                -- Get users that the sender (as user_id_2) is sharing with
+                SELECT user_id_1 AS recipient_id
+                FROM family_relationships
+                WHERE user_id_2 = $1 AND status = 'approved' AND share_location_from_2_to_1 = TRUE
+            ) as recipients;
         `;
         const result = await client.query(query, [senderId]);
         return result.rows.map(row => ({ id: row.recipient_id }));
@@ -2941,7 +2943,7 @@ export async function getMandalsDb(userId?: number | null): Promise<GanpatiManda
                 gm.*,
                 EXISTS(SELECT 1 FROM mandal_likes ml WHERE ml.mandal_id = gm.id AND ml.user_id = $1::int) as "isLikedByCurrentUser"
             FROM ganpati_mandals gm 
-            ORDER BY gm.name ASC;
+            ORDER BY gm.likecount DESC, gm.name ASC;
         `;
         const result: QueryResult<GanpatiMandal> = await client.query(query, [userIdParam]);
         return result.rows;
