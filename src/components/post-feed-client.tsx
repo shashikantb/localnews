@@ -532,18 +532,20 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
             <TabsList>
                 <TabsTrigger value="nearby" className="flex items-center gap-2"><Rss className="w-4 h-4"/> Nearby</TabsTrigger>
+                <TabsTrigger value="festival" className="flex items-center gap-2"><PartyPopper className="w-4 h-4"/> Festival</TabsTrigger>
                 {sessionUser && (
-                  <TabsTrigger value="family" className="flex items-center gap-2 relative">
-                    <Users className="w-4 h-4"/> Family
-                    {unreadFamilyPostCount > 0 && (
-                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
-                            {unreadFamilyPostCount > 9 ? '9+' : unreadFamilyPostCount}
-                        </span>
-                    )}
-                  </TabsTrigger>
+                  <>
+                    <TabsTrigger value="family" className="flex items-center gap-2 relative">
+                        <Users className="w-4 h-4"/> Family
+                        {unreadFamilyPostCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
+                                {unreadFamilyPostCount > 9 ? '9+' : unreadFamilyPostCount}
+                            </span>
+                        )}
+                    </TabsTrigger>
+                    <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>
+                  </>
                 )}
-                {sessionUser && <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>}
-                {sessionUser && <TabsTrigger value="festival" className="flex items-center gap-2"><PartyPopper className="w-4 h-4"/> Festival</TabsTrigger>}
             </TabsList>
             <div className="flex items-center gap-2">
               {activeTab === 'business' ? (
@@ -608,9 +610,9 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         <TabsContent value="nearby">
            {renderFeedContent()}
         </TabsContent>
+        <TabsContent value="festival">{renderFeedContent()}</TabsContent>
         {sessionUser && <TabsContent value="family">{renderFeedContent()}</TabsContent>}
         {sessionUser && <TabsContent value="business">{renderFeedContent()}</TabsContent>}
-        {sessionUser && <TabsContent value="festival">{renderFeedContent()}</TabsContent>}
       </Tabs>
     </div>
   );
