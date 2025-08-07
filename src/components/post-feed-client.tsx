@@ -533,7 +533,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             <TabsList>
                 <TabsTrigger value="nearby" className="flex items-center gap-2"><Rss className="w-4 h-4"/> Nearby</TabsTrigger>
                 <TabsTrigger value="festival" className="flex items-center gap-2"><PartyPopper className="w-4 h-4"/> Festival</TabsTrigger>
-                {sessionUser && (
+                {sessionUser ? (
                   <>
                     <TabsTrigger value="family" className="flex items-center gap-2 relative">
                         <Users className="w-4 h-4"/> Family
@@ -545,6 +545,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                     </TabsTrigger>
                     <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>
                   </>
+                ): (
+                    <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>
                 )}
             </TabsList>
             <div className="flex items-center gap-2">
@@ -612,7 +614,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         </TabsContent>
         <TabsContent value="festival">{renderFeedContent()}</TabsContent>
         {sessionUser && <TabsContent value="family">{renderFeedContent()}</TabsContent>}
-        {sessionUser && <TabsContent value="business">{renderFeedContent()}</TabsContent>}
+        <TabsContent value="business">{renderFeedContent()}</TabsContent>
       </Tabs>
     </div>
   );

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState } from 'react';
@@ -7,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useToast } from '@/hooks/use-toast';
 import { registerMandal } from '@/app/actions';
-import type { NewGanpatiMandal } from '@/lib/db-types';
+import type { NewGanpatiMandal, User } from '@/lib/db-types';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -22,6 +23,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, PartyPopper } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 const mandalSchema = z.object({
   name: z.string().min(3, 'Mandal name must be at least 3 characters long.'),
@@ -33,11 +35,13 @@ type MandalFormData = z.infer<typeof mandalSchema>;
 
 interface RegisterMandalDialogProps {
     userLocation: { latitude: number, longitude: number } | null;
+    sessionUser: User | null;
 }
 
-export default function RegisterMandalDialog({ userLocation }: RegisterMandalDialogProps) {
+export default function RegisterMandalDialog({ userLocation, sessionUser }: RegisterMandalDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
+  const router = useRouter();
 
   const form = useForm<MandalFormData>({
     resolver: zodResolver(mandalSchema),
@@ -51,6 +55,17 @@ export default function RegisterMandalDialog({ userLocation }: RegisterMandalDia
   const { isSubmitting } = form.formState;
 
   const onSubmit: SubmitHandler<MandalFormData> = async (data) => {
+    if (!sessionUser) {
+        toast({
+            variant: 'destructive',
+            title: 'Login Required',
+            description: 'Please log in to register a mandal. Redirecting...',
+        });
+        setIsOpen(false);
+        router.push('/login');
+        return;
+    }
+
     if (!userLocation) {
         toast({
             variant: 'destructive',
@@ -64,6 +79,7 @@ export default function RegisterMandalDialog({ userLocation }: RegisterMandalDia
         ...data,
         latitude: userLocation.latitude,
         longitude: userLocation.longitude,
+        admin_user_id: sessionUser.id
     };
     
     const result = await registerMandal(newMandal);

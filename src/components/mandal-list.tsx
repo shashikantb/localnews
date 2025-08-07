@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import MandalMediaViewer from './mandal-media-viewer';
 import RegisterMandalDialog from './register-mandal-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
+import { useRouter } from 'next/navigation';
 
 
 const SendAartiNotificationButton: React.FC<{ mandal: GanpatiMandal }> = ({ mandal }) => {
@@ -67,6 +68,7 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
     const [isLoadingMedia, setIsLoadingMedia] = useState(true);
     const [isLiking, setIsLiking] = useState(false);
     const { toast } = useToast();
+    const router = useRouter();
     
     useEffect(() => {
         setMandal(initialMandal);
@@ -85,7 +87,8 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
         e.preventDefault();
         e.stopPropagation();
         if (!sessionUser) {
-            toast({ variant: 'destructive', title: 'You must be logged in to like a mandal.' });
+            toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to like a mandal. Redirecting...' });
+            router.push('/login');
             return;
         }
         setIsLiking(true);
@@ -200,7 +203,7 @@ const MandalList: React.FC<{ sessionUser: User | null, userLocation: { latitude:
             <div className="text-center py-10">
                 <NoPostsContent feedType="festival" />
                 <div className="mt-6">
-                    <RegisterMandalDialog userLocation={userLocation} />
+                    <RegisterMandalDialog userLocation={userLocation} sessionUser={sessionUser}/>
                 </div>
             </div>
         )
@@ -210,7 +213,7 @@ const MandalList: React.FC<{ sessionUser: User | null, userLocation: { latitude:
         <div className="space-y-4">
              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center p-3 border bg-card rounded-lg">
                 <p className="text-sm font-medium text-muted-foreground">Know a Mandal not listed here?</p>
-                <RegisterMandalDialog userLocation={userLocation} />
+                <RegisterMandalDialog userLocation={userLocation} sessionUser={sessionUser} />
             </div>
 
             <div className="flex items-center gap-2">
