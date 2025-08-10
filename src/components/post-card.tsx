@@ -30,6 +30,8 @@ import {
 } from '@/components/ui/alert-dialog';
 import FollowButton from './follow-button';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from './ui/tooltip';
+import { useModalBack } from "@/hooks/useModalBack";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 const CommentSectionSkeleton = () => (
   <div className="px-5 pb-4 border-t border-border/30 pt-4 bg-muted/20 space-y-4">
@@ -128,6 +130,9 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
   const [pollState, setPollState] = useState<Poll | null | undefined>(post.poll);
   const [isVoting, setIsVoting] = useState(false);
   const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false);
+
+  useModalBack(isMediaViewerOpen, () => setIsMediaViewerOpen(false), `post:${post.id}`);
+  useBodyScrollLock(isMediaViewerOpen);
 
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);

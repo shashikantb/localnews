@@ -8,6 +8,8 @@ import type { UserWithStatuses } from '@/lib/db-types';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { Progress } from './ui/progress';
+import { useModalBack } from "@/hooks/useModalBack";
+import { useBodyScrollLock } from "@/hooks/useBodyScrollLock";
 
 interface StatusViewerProps {
   users: UserWithStatuses[];
@@ -27,6 +29,9 @@ const StatusViewer: React.FC<StatusViewerProps> = ({ users, initialUserIndex, on
   const videoRef = useRef<HTMLVideoElement>(null);
   const timerRef = useRef<NodeJS.Timeout>();
   const progressTimerRef = useRef<NodeJS.Timer>();
+
+  useModalBack(true, onClose, "status-viewer");
+  useBodyScrollLock(true);
 
   const currentUser = users[currentUserIndex];
   const currentStatus = currentUser?.statuses[currentStatusIndex];
