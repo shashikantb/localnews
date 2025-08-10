@@ -1,4 +1,5 @@
 
+
 'use client';
 import type { FC } from 'react';
 import React, { useState, useEffect, useRef } from 'react';
@@ -431,10 +432,10 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
             {isYouTubeVideo ? (
               <iframe src={post.mediaurls[0]} title="YouTube video player" frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen className="w-full h-full max-w-4xl aspect-video mx-auto"></iframe>
             ) : post.mediatype === 'image' ? (
-              <Image src={post.mediaurls[0]} alt="Post image" fill style={{ objectFit: "contain" }} sizes="90vw" />
+              <Image src={post.mediaurls[0]} alt="Post image" fill style={{ objectFit: "contain" }} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 600px, 700px" />
             ) : post.mediatype === 'gallery' ? (
               <div className="relative w-full h-full">
-                <Image src={post.mediaurls[currentImageIndex]} alt={`Post image ${currentImageIndex + 1}`} fill style={{ objectFit: "contain" }} sizes="90vw" />
+                <Image src={post.mediaurls[currentImageIndex]} alt={`Post image ${currentImageIndex + 1}`} fill style={{ objectFit: "contain" }} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 600px, 700px" />
                 {post.mediaurls.length > 1 && (
                   <>
                     <div className="absolute top-1/2 left-2 -translate-y-1/2">
@@ -602,10 +603,10 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
                             className="w-full h-full pointer-events-none"
                         ></iframe>
                     ) : post.mediatype === 'image' ? (
-                        <Image src={post.mediaurls[0]} alt="Post image" fill style={{ objectFit: "contain" }} sizes="(max-width: 768px) 100vw, 50vw" className="transition-transform duration-300 group-hover:scale-105" data-ai-hint="user generated content" priority={isFirst} />
+                        <Image src={post.mediaurls[0]} alt="Post image" fill style={{ objectFit: "contain" }} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 600px, 700px" className="transition-transform duration-300 group-hover:scale-105" data-ai-hint="user generated content" priority={isFirst} />
                     ) : post.mediatype === 'gallery' ? (
                         <>
-                            <Image src={post.mediaurls[currentImageIndex]} alt={`Post image ${currentImageIndex + 1}`} fill style={{ objectFit: "contain" }} sizes="(max-width: 768px) 100vw, 50vw" className="transition-opacity duration-300" data-ai-hint="user generated content" priority={isFirst} />
+                            <Image src={post.mediaurls[currentImageIndex]} alt={`Post image ${currentImageIndex + 1}`} fill style={{ objectFit: "contain" }} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 600px, 700px" className="transition-opacity duration-300" data-ai-hint="user generated content" priority={isFirst} />
                             {post.mediaurls.length > 1 && (
                                 <>
                                     <div className="absolute top-1/2 left-2 -translate-y-1/2 z-10">
@@ -738,15 +739,15 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
         )}
 
         <div className="px-5 pb-4 pt-2 flex items-center space-x-2 border-t border-border/30 bg-card/20 flex-wrap gap-y-2">
-          <Button variant="ghost" size="sm" onClick={handleLikeClick} disabled={isLiking || (!sessionUser && isLikedByClient)} className="flex items-center space-x-1.5 text-muted-foreground hover:text-primary transition-colors duration-150 group disabled:opacity-50 disabled:cursor-not-allowed">
+          <Button variant="ghost" size="sm" onClick={handleLikeClick} disabled={isLiking || (!sessionUser && isLikedByClient)} className="flex items-center space-x-1.5 text-muted-foreground hover:text-primary transition-colors duration-150 group disabled:opacity-50 disabled:cursor-not-allowed" aria-label="Like this post" title="Like">
             <ThumbsUp className={cn('w-5 h-5 transition-all duration-200 group-hover:scale-110 group-hover:text-blue-500', isLikedByClient ? 'text-blue-500 fill-blue-500' : 'text-muted-foreground')} />
             <span className="font-medium text-sm">{displayLikeCount} {displayLikeCount === 1 ? 'Like' : 'Likes'}</span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="flex items-center space-x-1.5 text-muted-foreground hover:text-primary transition-colors duration-150 group">
+          <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="flex items-center space-x-1.5 text-muted-foreground hover:text-primary transition-colors duration-150 group" aria-label="View comments" title="Comments">
             <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="font-medium text-sm">{displayCommentCount} {showComments ? 'Hide' : (displayCommentCount === 1 ? 'Comment' : 'Comments')}</span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleShare} className="flex items-center space-x-1.5 text-muted-foreground hover:text-blue-500 transition-colors duration-150 group">
+          <Button variant="ghost" size="sm" onClick={handleShare} className="flex items-center space-x-1.5 text-muted-foreground hover:text-blue-500 transition-colors duration-150 group" aria-label="Share this post" title="Share">
             <Share2 className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="font-medium text-sm">Share</span>
           </Button>

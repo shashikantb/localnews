@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import type { FC } from 'react';
@@ -66,6 +67,7 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
             aria-current={item.current ? 'page' : undefined}
         >
             <item.icon className="h-5 w-5" />
+            <span className="text-[10px] leading-3 mt-1 sm:hidden">{item.name}</span>
             <span className="hidden sm:inline">{item.name}</span>
             {item.badgeCount > 0 && (
                 <span className="absolute top-1 right-2 sm:right-auto sm:left-1/2 sm:ml-4 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
@@ -102,6 +104,7 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
                     )}
                 >
                     <UserIcon className="h-5 w-5" />
+                    <span className="text-[10px] leading-3 mt-1 sm:hidden">Profile</span>
                     <span className="hidden sm:inline">Profile</span>
                 </Link>
             </div>

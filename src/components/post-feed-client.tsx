@@ -131,6 +131,15 @@ export function NoPostsContent({ feedType }: { feedType: FeedType }) {
         {feedType === 'business' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : feedType === 'festival' ? <PartyPopper className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
         <p className="text-2xl text-muted-foreground font-semibold">{currentMessage.title}</p>
         <p className="text-md text-muted-foreground/80 mt-2">{currentMessage.description}</p>
+        <div className="mt-6">
+          <a
+            href="#"
+            onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+            className="inline-flex items-center rounded-md border px-3 py-2 text-sm bg-background hover:bg-muted"
+          >
+            Share your first Pulse
+          </a>
+        </div>
       </CardContent>
     </Card>
   );
@@ -611,4 +620,3 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 };
 
 export default PostFeedClient;
-
