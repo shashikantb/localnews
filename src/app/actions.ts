@@ -8,47 +8,25 @@ import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import admin from '@/utils/firebaseAdmin';
+import admin, { getAi } from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import { seedContent } from '@/ai/flows/seed-content-flow';
 import ngeohash from "ngeohash";
+import { z } from 'zod';
 
+const ai = getAi();
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
-  const R = 6371; // Radius of Earth in kilometers
-  const toRad = (x: number) => (x * Math.PI) / 180;
-  const dLat = toRad(lat2 - lat1);
-  const dLon = toRad(lon2 - lon1);
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(toRad(lat1)) *
-      Math.cos(toRad(lat2)) *
-      Math.sin(dLon / 2) *
-      Math.sin(dLon / 2);
-  return 2 * R * Math.asin(Math.sqrt(a));
-}
-
-function resolveCityFromCoords(lat: number, lon: number): string {
-  const CITIES = [
-    { name: "Pune",   lat: 18.5204, lon: 73.8567 },
-    { name: "PCMC",   lat: 18.6298, lon: 73.7997 }, // Pimpri-Chinchwad
-    { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
-    { name: "Thane",  lat: 19.2183, lon: 72.9781 },
-    { name: "Nashik", lat: 19.9975, lon: 73.7898 },
-    { name: 'Dhule', lat: 20.9042, lon: 74.7749 },
-    { name: 'Shirpur', lat: 21.3486, lon: 74.8797 },
-    { name: 'Dondaicha', lat: 21.3197, lon: 74.5765 },
-  ];
-  
-  let best = { name: "Unknown City", d: Infinity };
-  for (const c of CITIES) {
-    const d = haversineKm(lat, lon, c.lat, c.lon);
-    if (d < best.d) {
-      best = { name: c.name, d };
+async function resolveCityFromCoords(lat: number, lon: number): Promise<string> {
+    try {
+        const { text: city } = await ai.generate({
+            prompt: `Based on the coordinates latitude: ${lat} and longitude: ${lon}, what is the most specific, commonly known name of the city, major suburb, or administrative area? Respond with only the city name and nothing else.`,
+            model: 'googleai/gemini-1.5-flash',
+        });
+        return city.trim();
+    } catch(err) {
+        console.error("AI city resolution failed, falling back to unknown.", err);
+        return "Unknown City";
     }
-  }
-  // Only accept if within 40 km of the nearest city centroid
-  return best.d <= 40 ? best.name : "Unknown City";
 }
 
 
@@ -409,7 +387,7 @@ export async function addPost(newPostData: ClientNewPost): Promise<{ post?: Post
       }
     }
 
-    const cityName = resolveCityFromCoords(newPostData.latitude, newPostData.longitude);
+    const cityName = await resolveCityFromCoords(newPostData.latitude, newPostData.longitude);
 
     const postDataForDb: DbNewPost = {
       content: content, // Use potentially modified content
