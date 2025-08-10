@@ -44,14 +44,14 @@ async function initializeDatabase(client: Pool | Client) {
         lp_points INTEGER DEFAULT 0,
         referral_code VARCHAR(10) UNIQUE,
         referred_by_id INTEGER REFERENCES users(id),
-        last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        last_family_feed_view_at TIMESTAMPTZ DEFAULT '2024-07-01 12:00:00+00'
       );
     `;
     await initClient.query(createUsersTableQuery);
     console.log("Table 'users' checked/created.");
     
     // --- Start Schema Migrations ---
-    // Add last_family_feed_view_at column to users table if it doesn't exist
     const columnCheckRes = await initClient.query(`
       SELECT 1 FROM information_schema.columns 
       WHERE table_name='users' AND column_name='last_family_feed_view_at'
@@ -65,7 +65,7 @@ async function initializeDatabase(client: Pool | Client) {
       `);
       console.log("Column 'last_family_feed_view_at' added successfully.");
     }
-    
+
     await initClient.query(`
       CREATE TABLE IF NOT EXISTS ganpati_mandals (
         id SERIAL PRIMARY KEY,
@@ -81,28 +81,12 @@ async function initializeDatabase(client: Pool | Client) {
         UNIQUE (name, city)
       );
     `);
-    
-    const mandalLikeTableCheck = await initClient.query(`
-      SELECT 1 FROM information_schema.tables WHERE table_name='mandal_likes'
-    `);
-    if (mandalLikeTableCheck.rowCount === 0) {
-      console.log("Creating 'mandal_likes' table...");
-      await initClient.query(`CREATE TABLE IF NOT EXISTS mandal_likes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (user_id, mandal_id));`);
-    }
+    console.log("Table 'ganpati_mandals' checked/created.");
 
-    const mandalLikeCountCheck = await initClient.query(`
-      SELECT 1 FROM information_schema.columns
-      WHERE table_name='ganpati_mandals' AND column_name='likecount'
-    `);
-    if (mandalLikeCountCheck.rowCount === 0) {
-      console.log("Adding 'likecount' column to 'ganpati_mandals' table...");
-      await initClient.query(`ALTER TABLE ganpati_mandals ADD COLUMN likecount INTEGER DEFAULT 0;`);
-    }
+    await initClient.query(`CREATE TABLE IF NOT EXISTS mandal_likes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, mandal_id INTEGER NOT NULL REFERENCES ganpati_mandals(id) ON DELETE CASCADE, PRIMARY KEY (user_id, mandal_id));`);
+    console.log("Table 'mandal_likes' checked/created.");
 
     // --- End Schema Migrations ---
-
-    // Festival Tables
-    
 
     const createPostsTableQuery = `
         CREATE TABLE IF NOT EXISTS posts (
@@ -180,6 +164,15 @@ async function initializeDatabase(client: Pool | Client) {
       );
     `);
     
+    // Table for Password Reset
+    await initClient.query(`
+      CREATE TABLE IF NOT EXISTS password_reset_tokens (
+        email VARCHAR(255) PRIMARY KEY,
+        otp VARCHAR(6) NOT NULL,
+        expires_at TIMESTAMPTZ NOT NULL
+      );
+    `);
+
     console.log("All tables checked/created.");
 
     // Create indexes for performance
@@ -3121,7 +3114,7 @@ export async function toggleMandalLikeDb(userId: number, mandalId: number): Prom
     }
 }
 
-// --- OTP Functions ---
+// --- OTP & Password Reset Functions ---
 
 export async function createPendingRegistration(data: Omit<NewUser, 'passwordplaintext'> & { passwordhash: string }, otp: string): Promise<void> {
     await ensureDbInitialized();
@@ -3192,4 +3185,65 @@ export async function deletePendingRegistration(email: string): Promise<void> {
     }
 }
 
+export async function createPasswordResetToken(email: string, otp: string): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            INSERT INTO password_reset_tokens (email, otp, expires_at)
+            VALUES ($1, $2, NOW() + INTERVAL '10 minutes')
+            ON CONFLICT (email) DO UPDATE
+            SET otp = EXCLUDED.otp,
+                expires_at = EXCLUDED.expires_at;
+        `;
+        await client.query(query, [email, otp]);
+    } finally {
+        client.release();
+    }
+}
+
+export async function getPasswordResetToken(email: string, otp: string): Promise<{ otp: string } | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            SELECT otp FROM password_reset_tokens
+            WHERE email = $1 AND otp = $2 AND expires_at > NOW();
+        `;
+        const result = await client.query(query, [email, otp]);
+        return result.rows[0] || null;
+    } finally {
+        client.release();
+    }
+}
+
+export async function updateUserPasswordDb(email: string, passwordhash: string): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+    const client = await dbPool.connect();
+    try {
+        const query = `UPDATE users SET passwordhash = $1 WHERE email = $2`;
+        await client.query(query, [passwordhash, email]);
+    } finally {
+        client.release();
+    }
+}
+
+export async function deletePasswordResetToken(email: string): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return;
+    const client = await dbPool.connect();
+    try {
+        await client.query('DELETE FROM password_reset_tokens WHERE email = $1', [email]);
+    } finally {
+        client.release();
+    }
+}
     
+
