@@ -1625,5 +1625,3 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
         return { success: false, error: 'An unexpected server error occurred.' };
     }
 }
-
-    

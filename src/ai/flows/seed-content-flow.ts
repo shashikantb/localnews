@@ -12,16 +12,17 @@ import type { DbNewPost, SeedContentInput, SeedContentFlowOutput } from '@/lib/d
 import { z } from 'zod';
 import { getGcsClient, getGcsBucketName } from '@/lib/gcs';
 import { getJson } from 'google-search-results-nodejs';
+import { revalidatePath } from 'next/cache';
 
 const ai = getAi();
 
 const SeedContentInputSchema = z.object({
   latitude: z.number().describe('The latitude of the location.'),
   longitude: z.number().describe('The longitude of the location.'),
+  city_hint: z.string().optional().describe('An optional city name hint from a reverse geocoder.'),
 });
 
 const SeedContentOutputSchema = z.object({
-  city: z.string().describe('The most specific, commonly known name of the city, major suburb, or administrative area for the given coordinates (e.g., "Pimpri-Chinchwad", not just "Pune").'),
   posts: z.array(
     z.object({
       content: z.string().describe('The rewritten, engaging local news update or "pulse" for the app.'),
@@ -103,6 +104,24 @@ async function uploadImageToGcs(base64Data: string, city: string): Promise<strin
     return `https://storage.googleapis.com/${bucketName}/${fileName}`;
 }
 
+async function reverseGeocode(lat: number, lon: number): Promise<string> {
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'LocalPulse/1.0 (contact@localpulse.space)' }});
+    if (!res.ok) {
+        throw new Error(`Nominatim API failed with status ${res.status}`);
+    }
+    const data = await res.json();
+    const a = data?.address ?? {};
+    return (
+      a.city || a.town || a.municipality || a.village || a.suburb || a.city_district || a.county || a.state_district || a.state || 'Unknown'
+    );
+  } catch (error) {
+    console.error("Reverse geocoding failed:", error);
+    return "Unknown City"; // Fallback on error
+  }
+}
+
 
 const generateContentPrompt = ai.definePrompt({
     name: 'seedContentPrompt',
@@ -112,9 +131,9 @@ const generateContentPrompt = ai.definePrompt({
     tools: [searchTheWeb],
     prompt: `You are an AI for a social media app called LocalPulse. Your task is to act as a local news curator.
     
-    1.  **First, you MUST determine the most specific, commonly known name of the city, major suburb, or administrative area for the given latitude: {{{latitude}}} and longitude: {{{longitude}}}. For example, if the coordinates are in Pimpri-Chinchwad, use "Pimpri-Chinchwad", not just "Pune". Be as local as possible.**
+    1.  **The city for the coordinates is very likely "{{{city_hint}}}". Use exactly this name unless you are certain it is wrong.**
     2.  Determine the primary local language for that location. For India, use the state language (e.g., Marathi for Maharashtra, Kannada for Karnataka). For other countries, use their primary language (e.g., German for Germany).
-    3.  Use the 'searchTheWeb' tool to find 2-3 of the most recent and relevant news updates for that city. Use a search query like "latest news in [city name]".
+    3.  Use the 'searchTheWeb' tool to find 2-3 of the most recent and relevant news updates for that city. Use a search query like "latest news in {{{city_hint}}}".
     4.  **IMPORTANT**: Ignore any news related to political campaigns, election ads, or political advertising. Focus on local events, infrastructure, traffic, or general community news.
     5.  For each piece of news you find, rewrite it in the determined **LOCAL LANGUAGE** as a short, realistic, and engaging local news update or "pulse" for the app.
     6.  Keep each pulse under 280 characters.
@@ -129,23 +148,27 @@ const generateContentPrompt = ai.definePrompt({
 const seedContentFlow = ai.defineFlow(
   {
     name: 'seedContentFlow',
-    inputSchema: SeedContentInputSchema,
+    inputSchema: z.object({ latitude: z.number(), longitude: z.number() }),
     outputSchema: z.custom<SeedContentFlowOutput>(),
   },
   async (input) => {
-    // 1. Generate the content from the AI, which will also determine the city.
-    const { output } = await generateContentPrompt(input);
-    
-    if (!output || !output.city) {
-      return { success: false, message: 'AI failed to identify city from coordinates.', postCount: 0, cityName: 'Unknown' };
+    // 1. Get the authoritative city name from reverse geocoding
+    const cityName = await reverseGeocode(input.latitude, input.longitude);
+    if (cityName === 'Unknown' || cityName === 'Unknown City') {
+      return { success: false, message: 'Could not determine a valid city from coordinates.', postCount: 0, cityName: 'Unknown' };
     }
-    const cityName = output.city;
-
-    if (!output.posts || output.posts.length === 0) {
+    
+    // 2. Generate the content from the AI, providing the city name as a strong hint.
+    const { output } = await generateContentPrompt({
+        ...input,
+        city_hint: cityName,
+    });
+    
+    if (!output || !output.posts || output.posts.length === 0) {
         return { success: false, message: `AI failed to generate content for ${cityName}.`, postCount: 0, cityName };
     }
     
-    // 2. Loop through the generated content and create posts
+    // 3. Loop through the generated content and create posts
     let createdCount = 0;
     for (const post of output.posts) {
         if (post.content) {
@@ -178,7 +201,7 @@ const seedContentFlow = ai.defineFlow(
               longitude: input.longitude,
               mediaurls: mediaUrls,
               mediatype: mediaType,
-              city: cityName,
+              city: cityName, // Use the authoritative city name from reverse geocoding
               authorid: null, // Post as anonymous
               is_family_post: false,
               hide_location: false,
@@ -187,6 +210,10 @@ const seedContentFlow = ai.defineFlow(
             await addPostDb(postDataForDb);
             createdCount++;
         }
+    }
+    
+    if (createdCount > 0) {
+      revalidatePath('/'); // Revalidate the home feed to show new posts
     }
 
     return { 
@@ -203,14 +230,9 @@ export async function seedCityContent(city: string): Promise<SeedContentFlowOutp
     if (!city) {
         throw new Error(`City name must be provided for manual content seeding.`);
     }
-    // Note: Manual seeding via the admin panel doesn't have specific coordinates.
-    // We'll use a placeholder or lookup if we want to add it back.
-    // For now, let's throw an error because the flow requires lat/lon.
-    // A better implementation would be to geocode the city name here.
-    // For simplicity, we are disabling manual seeding until that is implemented.
-    // throw new Error("Manual seeding by city name is temporarily disabled. Please use live seeding.");
-    console.warn(`Manual seeding for "${city}" is using placeholder coordinates. Geocoding should be implemented.`);
-    const placeholderCoords = { latitude: 51.5072, longitude: -0.1276 }; // London placeholder
+    
+    console.warn(`Manual seeding for "${city}" is using placeholder coordinates. This may not be accurate. Live seeding is recommended.`);
+    const placeholderCoords = { latitude: 51.5072, longitude: -0.1276 }; // London placeholder, less likely to be used
     return await seedContentFlow({ latitude: placeholderCoords.latitude, longitude: placeholderCoords.longitude });
 }
 
