@@ -411,3 +411,12 @@ export type NewGanpatiMandal = {
     longitude: number;
     admin_user_id: number; // This should be included when creating
 }
+
+// For OTP
+export interface PendingRegistration extends Omit<NewUser, 'passwordplaintext'> {
+    id: number;
+    passwordhash: string;
+    otp: string;
+    otp_expires_at: string;
+    created_at: string;
+}

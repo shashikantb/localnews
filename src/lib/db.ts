@@ -1,4 +1,5 @@
 
+
 import { Pool, Client, type QueryResult } from 'pg';
 import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
@@ -160,6 +161,24 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE TABLE IF NOT EXISTS poll_votes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE, option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE, PRIMARY KEY (user_id, poll_id));`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS app_settings (setting_key VARCHAR(255) PRIMARY KEY, setting_value TEXT);`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS city_seed_log (city_name VARCHAR(255) PRIMARY KEY, last_seeded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
+    
+    // Table for OTP
+    await initClient.query(`
+      CREATE TABLE IF NOT EXISTS pending_registrations (
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        passwordhash VARCHAR(255) NOT NULL,
+        role VARCHAR(50) NOT NULL,
+        mobilenumber VARCHAR(20),
+        business_category VARCHAR(255),
+        business_other_category VARCHAR(255),
+        referral_code VARCHAR(20),
+        otp VARCHAR(6) NOT NULL,
+        otp_expires_at TIMESTAMPTZ NOT NULL,
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
     
     console.log("All tables checked/created.");
 
@@ -3095,7 +3114,75 @@ export async function toggleMandalLikeDb(userId: number, mandalId: number): Prom
     }
 }
 
+// --- OTP Functions ---
 
+export async function createPendingRegistration(data: Omit<NewUser, 'passwordplaintext'> & { passwordhash: string }, otp: string): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
 
+    const client = await dbPool.connect();
+    try {
+        const fullMobileNumber = `${data.countryCode}${data.mobilenumber}`;
+        const query = `
+            INSERT INTO pending_registrations (email, name, passwordhash, role, mobilenumber, business_category, business_other_category, referral_code, otp, otp_expires_at)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + INTERVAL '10 minutes')
+            ON CONFLICT (email) DO UPDATE
+            SET name = EXCLUDED.name,
+                passwordhash = EXCLUDED.passwordhash,
+                role = EXCLUDED.role,
+                mobilenumber = EXCLUDED.mobilenumber,
+                business_category = EXCLUDED.business_category,
+                business_other_category = EXCLUDED.business_other_category,
+                referral_code = EXCLUDED.referral_code,
+                otp = EXCLUDED.otp,
+                otp_expires_at = NOW() + INTERVAL '10 minutes';
+        `;
+        const values = [
+            data.email.toLowerCase(),
+            data.name,
+            data.passwordhash,
+            data.role,
+            fullMobileNumber,
+            data.business_category,
+            data.business_other_category,
+            data.referral_code,
+            otp
+        ];
+        await client.query(query, values);
+    } finally {
+        client.release();
+    }
+}
+
+export async function getPendingRegistrationByOtp(email: string, otp: string) {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            SELECT * FROM pending_registrations
+            WHERE email = $1 AND otp = $2 AND otp_expires_at > NOW();
+        `;
+        const result = await client.query(query, [email.toLowerCase(), otp]);
+        return result.rows[0] || null;
+    } finally {
+        client.release();
+    }
+}
+
+export async function deletePendingRegistration(email: string): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return;
+    const client = await dbPool.connect();
+    try {
+        await client.query('DELETE FROM pending_registrations WHERE email = $1', [email.toLowerCase()]);
+    } finally {
+        client.release();
+    }
+}
 
     
