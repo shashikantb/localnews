@@ -340,9 +340,6 @@ export async function getPostsDb(
             const lonParamIndex = paramIndex++;
             const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${latParamIndex}, $${lonParamIndex}))`;
             
-            // Add distance filter to WHERE clause
-            whereClause += ` AND ${distanceCalc} <= 50000`; // 50km radius limit
-
             orderByClause = `
               CASE
                 WHEN ${distanceCalc} <= 5000 THEN 1
@@ -3249,6 +3246,7 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 
 
 
