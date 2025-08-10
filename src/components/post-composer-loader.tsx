@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 import { Zap, PlusCircle } from 'lucide-react';
 import type { User } from '@/lib/db-types';
 import { cn } from '@/lib/utils';
+import { useModalBack } from "@/hooks/useModalBack";
 
 // The skeleton now represents the trigger button, not the full composer.
 export const PostComposerSkeleton = () => (
@@ -39,6 +40,9 @@ interface PostComposerLoaderProps {
 
 const PostComposerLoader: FC<PostComposerLoaderProps> = ({ sessionUser, mandalId, isMandalPost = false, onPostSuccess }) => {
     const [isDialogOpen, setIsDialogOpen] = useState(false);
+    
+    // Wire up the back button hook to the dialog state.
+    useModalBack(isDialogOpen, () => setIsDialogOpen(false), 'post-composer');
 
     const handlePostSuccessInternal = () => {
         setIsDialogOpen(false);
