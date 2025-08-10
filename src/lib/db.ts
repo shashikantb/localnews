@@ -1015,8 +1015,15 @@ export async function createUserDb(newUser: NewUser, status: UserStatus): Promis
     try {
       await client.query('BEGIN');
 
-      const salt = await bcrypt.genSalt(10);
-      const passwordhash = await bcrypt.hash(newUser.passwordplaintext, salt);
+      let passwordhash: string;
+      // Check if the provided password is already a hash
+      if (newUser.passwordplaintext.startsWith('$2a$') || newUser.passwordplaintext.startsWith('$2b$')) {
+        passwordhash = newUser.passwordplaintext;
+      } else {
+        const salt = await bcrypt.genSalt(10);
+        passwordhash = await bcrypt.hash(newUser.passwordplaintext, salt);
+      }
+      
       const fullMobileNumber = `${newUser.countryCode}${newUser.mobilenumber}`;
       
       let referredById = null;
