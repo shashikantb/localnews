@@ -1,5 +1,8 @@
 import admin from "firebase-admin";
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/googleai';
 
+// Initialize Firebase Admin
 if (!admin.apps.length) {
   if (!process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
     console.warn("FIREBASE_SERVICE_ACCOUNT_B64 is not set, Firebase Admin features will be disabled.");
@@ -20,6 +23,23 @@ if (!admin.apps.length) {
         console.error("❌ Failed to initialize Firebase Admin from Base64 env var", error);
     }
   }
+}
+
+// Initialize Genkit AI
+const ai = genkit({
+  plugins: [
+    googleAI({
+      apiKey: process.env.GOOGLE_GENAI_API_KEY,
+    }),
+  ],
+  // Disabling these features is crucial to prevent Next.js build errors,
+  // as they pull in server-side dependencies incompatible with Webpack.
+  enableTracingAndMetrics: false,
+});
+
+// Getter function for the AI instance
+export function getAi() {
+    return ai;
 }
 
 export default admin;

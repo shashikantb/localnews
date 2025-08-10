@@ -8,12 +8,14 @@
  * - SeedContentOutput - The return type for the seedContent function.
  */
 
-import { ai } from '@/ai/ai-instance';
+import { getAi } from '@/utils/firebaseAdmin';
 import { addPostDb } from '@/lib/db';
 import type { DbNewPost } from '@/lib/db-types';
 import { z } from 'zod';
 import { getGcsClient, getGcsBucketName } from '@/lib/gcs';
 import { getJson } from 'google-search-results-nodejs';
+
+const ai = getAi();
 
 const SeedContentInputSchema = z.object({
   latitude: z.number().describe('The latitude of the location.'),
@@ -117,7 +119,7 @@ const generateContentPrompt = ai.definePrompt({
     name: 'seedContentPrompt',
     input: { schema: SeedContentInputSchema },
     output: { schema: SeedContentOutputSchema },
-    model: 'googleai/gemini-2.0-flash',
+    model: 'googleai/gemini-1.5-flash',
     tools: [searchTheWeb],
     prompt: `You are an AI for a social media app called LocalPulse. Your task is to act as a local news curator.
     

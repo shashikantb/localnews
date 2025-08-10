@@ -8,10 +8,12 @@
  * - LocalHelperOutput - The return type for the localHelper function.
  */
 
-import { ai } from '@/ai/ai-instance';
+import { getAi } from '@/utils/firebaseAdmin';
 import { getNearbyBusinessesDb, searchNearbyPostsDb } from '@/lib/db';
 import type { BusinessUser, Post } from '@/lib/db-types';
 import { z } from 'zod';
+
+const ai = getAi();
 
 const LocalHelperInputSchema = z.object({
   query: z.string().describe('The user question about their local area.'),
@@ -129,7 +131,7 @@ The user is at latitude ${input.latitude} and longitude ${input.longitude}.
 
 User's Question: ${input.query}`,
       tools: [findNearbyBusinessesTool, searchNearbyPostsTool],
-      model: 'googleai/gemini-2.0-flash', // Use a powerful model for tool use
+      model: 'googleai/gemini-1.5-flash',
     });
 
     return text;

@@ -7,9 +7,11 @@
  * - SendOtpInput - The input type for the sendOtp function.
  */
 
-import { ai } from '@/ai/ai-instance';
+import { getAi } from '@/utils/firebaseAdmin';
 import { z } from 'zod';
 import sgMail from '@sendgrid/mail';
+
+const ai = getAi();
 
 export const SendOtpInputSchema = z.object({
   name: z.string().describe('The name of the user to address in the email.'),
