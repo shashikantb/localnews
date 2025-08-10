@@ -120,16 +120,18 @@ const SignupPage: FC = () => {
           description: 'A verification code has been sent to your email address.',
         });
         setEmailToVerify(data.email);
+        setIsSubmitting(false); // Turn off submitting before changing step
         setStep('verify');
+        return; // Prevent finally block from running
       } else {
         setError(result.error || 'Failed to create account.');
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred.';
       setError(errorMessage);
-    } finally {
-      setIsSubmitting(false);
     }
+    // Only set submitting to false if there was an error
+    setIsSubmitting(false);
   };
 
   const onOtpSubmit: SubmitHandler<OtpFormInputs> = async (data) => {
@@ -185,7 +187,24 @@ const SignupPage: FC = () => {
                     <FormItem>
                       <Label htmlFor="otp">Verification Code</Label>
                       <FormControl>
-                        <Input id="otp" {...field} disabled={isSubmitting} placeholder="••••••" />
+                        <Input
+                          id="otp"
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          autoComplete="one-time-code"
+                          autoCorrect="off"
+                          autoCapitalize="off"
+                          maxLength={6}
+                          placeholder="••••••"
+                          disabled={isSubmitting}
+                          {...field}
+                          onChange={(e) => {
+                            // allow only digits, max 6
+                            const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+                            field.onChange(v);
+                          }}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
