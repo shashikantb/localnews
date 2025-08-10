@@ -93,7 +93,6 @@ GCS_BUCKET_NAME=your-gcs-bucket-name
 # For production on Cloud Run: The full JSON content of your GCS service account key.
 # This should be stored as a secret in your deployment environment.
 GCS_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
-
 ```
 
 **Important Notes:**
@@ -228,3 +227,13 @@ The solution is to force your browser to load the latest version of the applicat
 - On Mac: Press `Cmd+Shift+R`.
 
 This will clear the cache for the page and resolve the mismatch.
+
+## Developer Notes
+
+Remember, the XML structure you generate is the only mechanism for applying changes to the user's code. Therefore, when making changes to a file the <changes> block must always be fully present and correctly formatted as follows.
+
+<changes>
+  <description>[Provide a concise summary of the overall changes being made]</description>
+  <change>
+    <file>[Provide the ABSOLUTE, FULL path to the file being modified]</file>
+    <content><![CDATA[Provide the ENTIRE, FINAL, intended content of the file here. Do NOT provide diffs or partial snippets. Ensure all code is properly escaped within the CDATA section.
