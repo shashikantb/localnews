@@ -366,30 +366,33 @@ export async function getPostsDb(
     
     let allPosts: Post[] = [];
     
-    // Only prepend announcement if sorting allows and it's the first page
+    const sortingNearby = (sortBy === 'nearby');
+    // Only prepend announcement if it's the first page and NOT sorting by nearby (unless it's actually nearby)
     if (options.offset === 0 && !isAdminView) {
-        let announcementQuery = `
-          SELECT 
-            ${POST_COLUMNS_WITH_JOINS},
-            ${likeCheck} as "isLikedByCurrentUser",
-            ${followCheck} as "isAuthorFollowedByCurrentUser"
-          FROM posts p
-          LEFT JOIN users u ON p.authorid = u.id
-          WHERE u.email = $2
-        `;
-        const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
-
-        // If sorting by nearby, only include announcement if it's within 30km
-        if (sortBy === 'nearby' && options.latitude != null && options.longitude != null) {
-            announcementQuery += ` AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($3, $4)) <= 30000`;
-            announcementParams.push(options.latitude, options.longitude);
-        }
-        
-        announcementQuery += ` ORDER BY p.createdat DESC LIMIT 1`;
-        
-        const announcementResult = await client.query(announcementQuery, announcementParams);
-        if (announcementResult.rows.length > 0) {
-            allPosts = announcementResult.rows;
+        if (!sortingNearby || (sortingNearby && options.latitude != null && options.longitude != null)) {
+            let announcementQuery = `
+              SELECT 
+                ${POST_COLUMNS_WITH_JOINS},
+                ${likeCheck} as "isLikedByCurrentUser",
+                ${followCheck} as "isAuthorFollowedByCurrentUser"
+              FROM posts p
+              LEFT JOIN users u ON p.authorid = u.id
+              WHERE u.email = $2
+            `;
+            const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
+            
+            // If sorting by nearby, only include announcement if it's within 30km
+            if (sortingNearby && options.latitude != null && options.longitude != null) {
+                announcementQuery += ` AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($3, $4)) <= 30000`;
+                announcementParams.push(options.latitude, options.longitude);
+            }
+            
+            announcementQuery += ` ORDER BY p.createdat DESC LIMIT 1`;
+            
+            const announcementResult = await client.query(announcementQuery, announcementParams);
+            if (announcementResult.rows.length > 0) {
+                allPosts = announcementResult.rows;
+            }
         }
     }
 
@@ -2953,6 +2956,24 @@ export async function updateLastSeedTimeDb(cityName: string): Promise<void> {
     }
 }
 
+export async function countRecentPostsNearbyDb(lat: number, lon: number, radiusKm = 12, hours = 6): Promise<number> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) return 0;
+  const client = await dbPool.connect();
+  try {
+    const q = `
+      SELECT COUNT(*)::int AS c
+      FROM posts p
+      WHERE p.latitude IS NOT NULL AND p.longitude IS NOT NULL
+        AND p.createdat > NOW() - ($4::int || ' hours')::interval
+        AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($1,$2)) <= $3 * 1000
+    `;
+    const r = await client.query(q, [lat, lon, radiusKm, hours]);
+    return r.rows[0]?.c ?? 0;
+  } finally { client.release(); }
+}
+
 // --- Festival Functions ---
 
 export async function registerMandalDb(mandal: NewGanpatiMandal): Promise<void> {
@@ -3262,6 +3283,7 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 
 
 

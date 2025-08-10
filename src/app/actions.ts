@@ -11,6 +11,7 @@ import { cookies } from 'next/headers';
 import admin from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import { seedContent } from '@/ai/flows/seed-content-flow';
+import ngeohash from "ngeohash";
 
 
 function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
@@ -1501,28 +1502,28 @@ export async function triggerLiveSeeding(latitude: number, longitude: number): P
         if (liveSeedingEnabled !== 'true') {
             return;
         }
-        
-        // The AI flow will now determine the city from coordinates.
-        // We will use a combination of lat/lon to create a unique key for the log.
-        const cityKey = `${latitude.toFixed(2)},${longitude.toFixed(2)}`;
-        
-        const lastSeedTime = await db.getLastSeedTimeDb(cityKey);
+
+        const seedKey = ngeohash.encode(latitude, longitude, 6);
+        const lastSeedTime = await db.getLastSeedTimeDb(seedKey);
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
         
-        if (!lastSeedTime || new Date(lastSeedTime) < twoHoursAgo) {
-            console.log(`Live seeding triggered for location: ${cityKey}.`);
+        // Seed if area is new, hasn't been seeded in 2+ hours, or has low content
+        const lowContent = (await db.countRecentPostsNearbyDb(latitude, longitude, 12, 6)) < 3;
+        
+        if (!lastSeedTime || new Date(lastSeedTime) < twoHoursAgo || lowContent) {
+            console.log(`[seed] trigger ${seedKey} lat=${latitude} lon=${longitude} lowContent=${lowContent}`);
             
             // Don't await this, let it run in the background.
             seedContent({ latitude, longitude }).then(async (result) => {
               if (result.success) {
                 // Log the successful seeding using the same key.
-                await db.updateLastSeedTimeDb(cityKey);
-                console.log(`Successfully completed live seeding for ${result.cityName}.`);
+                await db.updateLastSeedTimeDb(seedKey);
+                 console.log(`[seed] success ${seedKey} city=${result.cityName} count=${result.postCount}`);
               } else {
-                console.error(`Live seeding failed for location ${cityKey}:`, result.message);
+                console.error(`[seed] failed ${seedKey}: ${result.message}`);
               }
             }).catch(err => {
-                console.error(`Unhandled error during live seeding for location ${cityKey}:`, err);
+                console.error(`[seed] error ${seedKey}:`, err);
             });
         }
     } catch (error) {
