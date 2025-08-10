@@ -340,10 +340,16 @@ export async function getPostsDb(
             const lonParamIndex = paramIndex++;
             const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${latParamIndex}, $${lonParamIndex}))`;
             
+            // Add a hard radius filter for the "nearby" feed to avoid showing distant posts.
+            const RADIUS_METERS = 20000; // 20km
+            queryParams.push(RADIUS_METERS);
+            const radiusParamIndex = paramIndex++;
+            whereClause += ` AND ${distanceCalc} <= $${radiusParamIndex}`;
+
             orderByClause = `
               CASE
-                WHEN ${distanceCalc} <= 5000 THEN 1
-                WHEN ${distanceCalc} <= 20000 THEN 2
+                WHEN ${distanceCalc} <= 5000 THEN 1   -- within 5km
+                WHEN ${distanceCalc} <= 20000 THEN 2  -- within 20km
                 ELSE 3
               END,
               p.createdat DESC
@@ -359,9 +365,11 @@ export async function getPostsDb(
     }
     
     let allPosts: Post[] = [];
+    const isSortingNearby = sortBy === 'nearby';
 
+    // Only pin announcements if NOT sorting by "nearby", or if sorting by "nearby" and the announcement is within 30km.
     if (options.offset === 0 && !isAdminView) {
-        const announcementQuery = `
+        let announcementQuery = `
           SELECT 
             ${POST_COLUMNS_WITH_JOINS},
             ${likeCheck} as "isLikedByCurrentUser",
@@ -369,10 +377,17 @@ export async function getPostsDb(
           FROM posts p
           LEFT JOIN users u ON p.authorid = u.id
           WHERE u.email = $2
-          ORDER BY p.createdat DESC
-          LIMIT 1
         `;
-        const announcementResult = await client.query(announcementQuery, [currentUserIdParam, OFFICIAL_USER_EMAIL]);
+        const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
+
+        if (isSortingNearby && options.latitude != null && options.longitude != null) {
+            announcementQuery += ` AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($3, $4)) <= 30000`; // 30km radius for announcements
+            announcementParams.push(options.latitude, options.longitude);
+        }
+        
+        announcementQuery += ` ORDER BY p.createdat DESC LIMIT 1`;
+        
+        const announcementResult = await client.query(announcementQuery, announcementParams);
         if (announcementResult.rows.length > 0) {
             allPosts = announcementResult.rows;
         }
@@ -3246,6 +3261,7 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 
 
 
