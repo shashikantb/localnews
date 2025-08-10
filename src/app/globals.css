@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -118,6 +119,13 @@
   body {
     @apply bg-background text-foreground;
     font-family: var(--font-geist-sans);
+  }
+
+  /* Neutralize browser autofill styling */
+  input:-webkit-autofill {
+    -webkit-text-fill-color: inherit !important;
+    -webkit-box-shadow: 0 0 0px 1000px transparent inset !important;
+    transition: background-color 5000s ease-in-out 0s !important;
   }
 
   /* Pulsing dot for map markers */

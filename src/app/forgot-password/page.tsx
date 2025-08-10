@@ -41,8 +41,8 @@ const ForgotPasswordPage: FC = () => {
   const otpInputRef = React.useRef<HTMLInputElement>(null);
 
   React.useEffect(() => {
-    if (step === 'reset' && otpInputRef.current) {
-      otpInputRef.current.focus();
+    if (step === 'reset') {
+      setTimeout(() => otpInputRef.current?.focus(), 0);
     }
   }, [step]);
   
@@ -61,20 +61,22 @@ const ForgotPasswordPage: FC = () => {
       const result = await requestPasswordReset(data.email);
       if (result.success) {
         setEmailToReset(data.email);
+        resetForm.reset({ otp: '', password: '' });
         setIsSubmitting(false);
         setStep('reset');
+        setTimeout(() => otpInputRef.current?.focus(), 0);
         toast({
           title: 'OTP Sent!',
           description: 'A password reset code has been sent to your email.',
         });
+        return;
       } else {
         setError(result.error || 'Failed to send reset email.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'An unexpected error occurred.');
-    } finally {
-        if (step === 'request') setIsSubmitting(false);
     }
+    setIsSubmitting(false);
   };
   
   const onResetSubmit: SubmitHandler<ResetFormInputs> = async (data) => {
@@ -154,7 +156,26 @@ const ForgotPasswordPage: FC = () => {
             </CardHeader>
             <CardContent>
               <Form {...resetForm}>
-                <form onSubmit={resetForm.handleSubmit(onResetSubmit)} className="space-y-4">
+                <form 
+                  key={`reset-${emailToReset}`}
+                  onSubmit={resetForm.handleSubmit(onResetSubmit)} 
+                  autoComplete="off"
+                  className="space-y-4"
+                >
+                  <input
+                    type="text"
+                    name="username"
+                    autoComplete="username"
+                    style={{ position:'absolute', left:'-9999px', width:0, height:0, opacity:0 }}
+                    tabIndex={-1}
+                  />
+                  <input
+                    type="password"
+                    name="new-password"
+                    autoComplete="new-password"
+                    style={{ position:'absolute', left:'-9999px', width:0, height:0, opacity:0 }}
+                    tabIndex={-1}
+                  />
                   {error && (
                     <Alert variant="destructive">
                       <ShieldAlert className="h-4 w-4" />
@@ -171,8 +192,8 @@ const ForgotPasswordPage: FC = () => {
                         <FormControl>
                           <Input
                             ref={otpInputRef}
-                            {...field}
                             id="otp"
+                            name="one-time-code"
                             type="text"
                             inputMode="numeric"
                             pattern="[0-9]*"
@@ -182,6 +203,7 @@ const ForgotPasswordPage: FC = () => {
                             maxLength={6}
                             placeholder="••••••"
                             disabled={isSubmitting}
+                            value={field.value ?? ''}
                             onChange={(e) => {
                                 const v = e.target.value.replace(/\D/g, '').slice(0, 6);
                                 field.onChange(v);
@@ -199,13 +221,13 @@ const ForgotPasswordPage: FC = () => {
                       <FormItem>
                         <FormLabel htmlFor="password">New Password</FormLabel>
                         <FormControl>
-                          <Input {...field} id="password" type="password" placeholder="New strong password" disabled={isSubmitting} />
+                          <Input {...field} id="password" type="password" autoComplete="new-password" placeholder="New strong password" disabled={isSubmitting} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  <Button type="submit" className="w-full" disabled={isSubmitting || !resetForm.formState.isValid}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                     Reset Password
                   </Button>
