@@ -76,6 +76,7 @@ const generateEmailPrompt = ai.definePrompt({
     name: 'generateOtpEmailPrompt',
     input: { schema: SendOtpInputSchema },
     output: { schema: EmailContentSchema },
+    model: 'googleai/gemini-1.5-flash',
     prompt: `
         You are an AI assistant for an app called "LocalPulse".
         Your task is to generate a professional and friendly email to send a One-Time Password (OTP) to a new user for account verification.
