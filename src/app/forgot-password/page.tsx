@@ -170,9 +170,22 @@ const ForgotPasswordPage: FC = () => {
                         <FormLabel htmlFor="otp">Reset Code</FormLabel>
                         <FormControl>
                           <Input
-                            ref={otpInputRef} {...field} id="otp" type="text"
-                            inputMode="numeric" autoComplete="one-time-code" maxLength={6}
-                            placeholder="••••••" disabled={isSubmitting}
+                            ref={otpInputRef}
+                            {...field}
+                            id="otp"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="one-time-code"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            maxLength={6}
+                            placeholder="••••••"
+                            disabled={isSubmitting}
+                            onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                field.onChange(v);
+                            }}
                           />
                         </FormControl>
                         <FormMessage />
