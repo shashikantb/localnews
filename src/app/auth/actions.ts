@@ -6,11 +6,12 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import * as jose from 'jose';
 import bcrypt from 'bcryptjs';
-import { createUserDb, getUserByEmailDb, getUserByIdDb, updateUserProfilePictureDb, updateUserNameDb, deleteUserDb, createPendingRegistration, getPendingRegistrationByOtp, deletePendingRegistration } from '@/lib/db';
+import { createUserDb, getUserByEmailDb, getUserByIdDb, updateUserProfilePictureDb, updateUserNameDb, deleteUserDb, createPendingRegistration, getPendingRegistrationByOtp, deletePendingRegistration, createPasswordResetToken, getPasswordResetToken, deletePasswordResetToken, updateUserPasswordDb } from '@/lib/db';
 import type { NewUser, User, UserStatus, PendingRegistration } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { cache } from 'react';
 import { sendOtp } from '@/ai/flows/send-otp-flow';
+import { sendPasswordResetOtp } from '@/ai/flows/send-password-reset-flow';
 import { customAlphabet } from 'nanoid';
 
 const USER_COOKIE_NAME = 'user-auth-token';
@@ -109,6 +110,7 @@ export async function verifyOtpAndCreateUser(email: string, otp: string): Promis
         passwordplaintext: '' // Not needed, we already have the hash
     };
     
+    // Pass the pre-hashed password to createUserDb
     const user = await createUserDb({ ...userData, passwordplaintext: pendingUser.passwordhash }, 'approved');
 
     if (!user) {
@@ -260,4 +262,55 @@ export async function deleteCurrentUserAccount(): Promise<{ success: boolean; er
     console.error(`Failed to delete account for user ${user.id}:`, error);
     return { success: false, error: 'An unexpected server error occurred while deleting your account.' };
   }
+}
+
+export async function requestPasswordReset(email: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const emailLower = email.toLowerCase();
+    const user = await getUserByEmailDb(emailLower);
+
+    if (!user) {
+      // Don't reveal if an email exists or not for security reasons.
+      return { success: true };
+    }
+
+    const nanoid = customAlphabet('1234567890', 6);
+    const otp = nanoid();
+
+    await createPasswordResetToken(emailLower, otp);
+
+    await sendPasswordResetOtp({
+      name: user.name,
+      email: emailLower,
+      otp: otp,
+    });
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('Password reset request error:', error);
+    // Fail silently to the user to prevent enumeration attacks, but log the error.
+    return { success: true };
+  }
+}
+
+export async function resetPassword(email: string, otp: string, newPassword: string):Promise<{ success: boolean; error?: string }> {
+    try {
+        const emailLower = email.toLowerCase();
+        const resetToken = await getPasswordResetToken(emailLower, otp);
+
+        if (!resetToken) {
+            return { success: false, error: 'Invalid or expired OTP. Please request a new one.' };
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const passwordhash = await bcrypt.hash(newPassword, salt);
+
+        await updateUserPasswordDb(emailLower, passwordhash);
+        await deletePasswordResetToken(emailLower);
+
+        return { success: true };
+    } catch (error: any) {
+        console.error('Password reset error:', error);
+        return { success: false, error: 'An unexpected error occurred. Please try again.' };
+    }
 }

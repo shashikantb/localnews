@@ -116,7 +116,12 @@ const LoginPage: FC = () => {
               {errors.email && <p className="text-sm text-destructive">{errors.email.message}</p>}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" passHref className="text-sm font-medium text-primary hover:underline">
+                  Forgot Password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
