@@ -9,6 +9,7 @@
 
 import { ai } from '@/ai/ai-instance';
 import { z } from 'zod';
+import sgMail from '@sendgrid/mail';
 
 export const SendOtpInputSchema = z.object({
   name: z.string().describe('The name of the user to address in the email.'),
@@ -23,22 +24,12 @@ const EmailContentSchema = z.object({
 });
 
 /**
- * A placeholder tool for sending an email.
- * In a real application, this function's implementation would use a service
- * like Nodemailer, SendGrid, or Mailgun to dispatch the email.
- *
- * The current implementation only logs the email to the console for demonstration.
- *
- * To make this functional:
- * 1. Choose an email sending library (e.g., `npm install nodemailer`).
- * 2. Configure the transporter with your email provider's SMTP details.
- * 3. Replace the `console.log` with the actual email sending call (e.g., `transporter.sendMail(...)`).
- * 4. Ensure you have the necessary environment variables for your email service (e.g., SMTP_HOST, SMTP_USER, SMTP_PASS).
+ * A tool for sending an email using SendGrid.
  */
 const sendEmail = ai.defineTool(
     {
         name: 'sendEmail',
-        description: 'Sends an email to a user.',
+        description: 'Sends an email to a user using the SendGrid API.',
         inputSchema: z.object({
             to: z.string().email(),
             subject: z.string(),
@@ -50,25 +41,36 @@ const sendEmail = ai.defineTool(
         }),
     },
     async (input) => {
-        console.log('--- SENDING EMAIL (SIMULATED) ---');
-        console.log(`To: ${input.to}`);
-        console.log(`Subject: ${input.subject}`);
-        console.log('Body:');
-        console.log(input.htmlBody);
-        console.log('-----------------------------------');
-        // In a real implementation, you would use a service like Nodemailer here.
-        // For example:
-        //
-        // import nodemailer from 'nodemailer';
-        // const transporter = nodemailer.createTransport({ ... });
-        // await transporter.sendMail({
-        //   from: '"LocalPulse" <no-reply@localpulse.app>',
-        //   to: input.to,
-        //   subject: input.subject,
-        //   html: input.htmlBody
-        // });
-        
-        return { success: true, message: 'Email sent successfully (simulated).' };
+        const apiKey = process.env.SENDGRID_API_KEY;
+        const fromEmail = process.env.SENDGRID_FROM_EMAIL;
+
+        if (!apiKey || !fromEmail) {
+            const errorMsg = 'SendGrid API Key or From Email is not configured in environment variables.';
+            console.error(`--- SEND EMAIL FAILED ---: ${errorMsg}`);
+            return { success: false, message: errorMsg };
+        }
+
+        sgMail.setApiKey(apiKey);
+
+        const msg = {
+          to: input.to,
+          from: fromEmail,
+          subject: input.subject,
+          html: input.htmlBody,
+        };
+
+        try {
+            await sgMail.send(msg);
+            console.log(`--- OTP Email sent to ${input.to} ---`);
+            return { success: true, message: 'Email sent successfully.' };
+        } catch (error: any) {
+            console.error('--- SENDGRID ERROR ---');
+            console.error(error);
+            if (error.response) {
+                console.error(error.response.body)
+            }
+            return { success: false, message: 'Failed to send email via SendGrid.' };
+        }
     }
 );
 
@@ -108,11 +110,15 @@ const sendOtpFlow = ai.defineFlow(
     }
 
     // 2. Use the sendEmail tool to dispatch the generated email.
-    await sendEmail({
+    const sendResult = await sendEmail({
         to: input.email,
         subject: output.subject,
         htmlBody: output.body,
     });
+
+    if (!sendResult.success) {
+      throw new Error(sendResult.message);
+    }
   }
 );
 

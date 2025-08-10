@@ -14,8 +14,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { signUp } from '@/app/auth/actions';
-import { Loader2, UserPlus, ShieldAlert, Building, ShieldCheck, User, Phone, Briefcase, CheckCircle, XCircle, Ticket } from 'lucide-react';
+import { signUp, verifyOtpAndCreateUser } from '@/app/auth/actions';
+import { Loader2, UserPlus, ShieldAlert, Building, ShieldCheck, User, Phone, Briefcase, CheckCircle, XCircle, Ticket, Mail, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -51,7 +51,12 @@ const signupSchema = z.object({
   }
 });
 
+const otpSchema = z.object({
+  otp: z.string().length(6, 'OTP must be 6 digits.'),
+});
+
 type SignupFormInputs = z.infer<typeof signupSchema>;
+type OtpFormInputs = z.infer<typeof otpSchema>;
 
 const PasswordValidationChecklist: FC<{ password?: string }> = ({ password = '' }) => {
   const checks = [
@@ -77,7 +82,8 @@ const SignupPage: FC = () => {
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSuccess, setIsSuccess] = useState(false);
+  const [step, setStep] = useState<'initial' | 'verify'>('initial');
+  const [emailToVerify, setEmailToVerify] = useState('');
 
   const refCodeFromUrl = searchParams.get('ref') || '';
 
@@ -93,22 +99,28 @@ const SignupPage: FC = () => {
       referral_code: refCodeFromUrl,
     },
   });
+  
+  const otpForm = useForm<OtpFormInputs>({
+    resolver: zodResolver(otpSchema),
+    defaultValues: { otp: '' },
+  });
 
   const selectedRole = form.watch('role');
   const selectedCategory = form.watch('business_category');
   const passwordValue = form.watch('password');
 
-  const onSubmit: SubmitHandler<SignupFormInputs> = async (data) => {
+  const onSignupSubmit: SubmitHandler<SignupFormInputs> = async (data) => {
     setIsSubmitting(true);
     setError(null);
     try {
       const result = await signUp({ ...data, passwordplaintext: data.password });
       if (result.success) {
-        setIsSuccess(true);
         toast({
-          title: 'Account Created!',
-          description: 'Your account is now pending approval from an administrator.',
+          title: 'OTP Sent!',
+          description: 'A verification code has been sent to your email address.',
         });
+        setEmailToVerify(data.email);
+        setStep('verify');
       } else {
         setError(result.error || 'Failed to create account.');
       }
@@ -120,28 +132,86 @@ const SignupPage: FC = () => {
     }
   };
 
-  if (isSuccess) {
+  const onOtpSubmit: SubmitHandler<OtpFormInputs> = async (data) => {
+    setIsSubmitting(true);
+    setError(null);
+    try {
+        const result = await verifyOtpAndCreateUser(emailToVerify, data.otp);
+        if (result.success) {
+            toast({
+                title: 'Account Verified!',
+                description: 'Welcome to LocalPulse!',
+            });
+            router.push('/');
+        } else {
+            setError(result.error || 'Failed to verify OTP.');
+        }
+    } catch (err) {
+        const errorMessage = err instanceof Error ? err.message : 'An unexpected server error occurred.';
+        setError(errorMessage);
+    } finally {
+        setIsSubmitting(false);
+    }
+  }
+
+
+  if (step === 'verify') {
     return (
-       <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
-        <Card className="w-full max-w-md shadow-2xl text-center">
-            <CardHeader>
-                <CardTitle className="text-2xl font-bold text-green-600">Registration Successful!</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <p className="text-muted-foreground">
-                    {'Your account is pending approval. You will be able to log in once an administrator reviews it.'}
-                </p>
-            </CardContent>
-            <CardFooter className="flex justify-center">
-                <Button asChild>
-                    <Link href="/login">Back to Login</Link>
+      <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
+        <Card className="w-full max-w-md shadow-2xl">
+          <CardHeader className="text-center">
+            <CardTitle className="text-3xl font-bold text-primary flex items-center justify-center">
+              <KeyRound className="mr-2 h-8 w-8" />
+              Check Your Email
+            </CardTitle>
+            <CardDescription>
+              We've sent a 6-digit verification code to <span className="font-semibold text-foreground">{emailToVerify}</span>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Form {...otpForm}>
+              <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-6">
+                 {error && (
+                  <Alert variant="destructive">
+                    <ShieldAlert className="h-4 w-4" />
+                    <AlertTitle>Verification Failed</AlertTitle>
+                    <AlertDescription>{error}</AlertDescription>
+                  </Alert>
+                )}
+                 <FormField
+                  control={otpForm.control}
+                  name="otp"
+                  render={({ field }) => (
+                    <FormItem>
+                      <Label htmlFor="otp">Verification Code</Label>
+                      <FormControl>
+                        <Input id="otp" {...field} disabled={isSubmitting} placeholder="••••••" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <Button type="submit" className="w-full" disabled={isSubmitting}>
+                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                  Verify and Create Account
                 </Button>
-            </CardFooter>
+              </form>
+            </Form>
+          </CardContent>
+           <CardFooter className="flex justify-center text-sm">
+            <p className="text-muted-foreground">
+                Didn't get a code?&nbsp;
+                <button onClick={() => setStep('initial')} className="font-semibold text-primary hover:underline">
+                    Go back
+                </button>
+            </p>
+        </CardFooter>
         </Card>
       </div>
     );
   }
-
+  
+  
   return (
     <div className="flex min-h-svh flex-col items-center justify-center bg-background p-4">
       <Card className="w-full max-w-lg shadow-2xl">
@@ -154,7 +224,7 @@ const SignupPage: FC = () => {
         </CardHeader>
         <CardContent>
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={form.handleSubmit(onSignupSubmit)} className="space-y-4">
               {error && (
                 <Alert variant="destructive">
                   <ShieldAlert className="h-4 w-4" />

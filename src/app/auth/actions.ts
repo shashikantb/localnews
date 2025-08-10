@@ -5,11 +5,12 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import * as jose from 'jose';
 import bcrypt from 'bcryptjs';
-import { createUserDb, getUserByEmailDb, getUserByIdDb, updateUserProfilePictureDb, updateUserNameDb, deleteUserDb } from '@/lib/db';
-import type { NewUser, User, UserStatus } from '@/lib/db-types';
+import { createUserDb, getUserByEmailDb, getUserByIdDb, updateUserProfilePictureDb, updateUserNameDb, deleteUserDb, createPendingRegistration, getPendingRegistrationByOtp, deletePendingRegistration } from '@/lib/db';
+import type { NewUser, User, UserStatus, PendingRegistration } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { cache } from 'react';
-
+import { sendOtp } from '@/ai/flows/send-otp-flow';
+import { customAlphabet } from 'nanoid';
 
 const USER_COOKIE_NAME = 'user-auth-token';
 
@@ -60,23 +61,73 @@ export async function signUp(newUser: NewUser): Promise<{ success: boolean; erro
     if (existingUser) {
       return { success: false, error: 'An account with this email already exists.' };
     }
+    
+    // Hash password
+    const salt = await bcrypt.genSalt(10);
+    const passwordhash = await bcrypt.hash(newUser.passwordplaintext, salt);
 
-    // All users are approved by default now.
-    const status: UserStatus = 'approved';
+    // Generate OTP
+    const nanoid = customAlphabet('1234567890', 6);
+    const otp = nanoid();
 
-    const user = await createUserDb({ ...newUser, email: emailLower }, status);
-    if (user) {
-      return { success: true };
-    } else {
-      return { success: false, error: 'Failed to create user account.' };
-    }
+    // Store pending registration
+    await createPendingRegistration({ ...newUser, email: emailLower, passwordhash }, otp);
+
+    // Send OTP email
+    await sendOtp({
+      name: newUser.name,
+      email: emailLower,
+      otp: otp,
+    });
+
+    return { success: true };
+
   } catch (error: any) {
     console.error('Sign up error:', error);
     return { success: false, error: error.message || 'An unknown error occurred during sign up.' };
   }
 }
 
-export async function login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+export async function verifyOtpAndCreateUser(email: string, otp: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const pendingUser = await getPendingRegistrationByOtp(email, otp);
+
+    if (!pendingUser) {
+      return { success: false, error: 'Invalid or expired OTP. Please try again.' };
+    }
+
+    const userData: NewUser = {
+        name: pendingUser.name,
+        email: pendingUser.email,
+        role: pendingUser.role,
+        countryCode: '', // Not needed for final creation
+        mobilenumber: pendingUser.mobilenumber || '', // Not needed for final creation
+        business_category: pendingUser.business_category,
+        business_other_category: pendingUser.business_other_category,
+        referral_code: pendingUser.referral_code,
+        passwordplaintext: '' // Not needed, we already have the hash
+    };
+    
+    const user = await createUserDb({ ...userData, passwordplaintext: pendingUser.passwordhash }, 'approved');
+
+    if (!user) {
+        throw new Error("Failed to create user account after verification.");
+    }
+    
+    await deletePendingRegistration(email);
+
+    // Log the user in immediately
+    await login(email, '', true, pendingUser.passwordhash);
+
+    return { success: true };
+  } catch (error: any) {
+    console.error('OTP verification error:', error);
+    return { success: false, error: error.message || 'An unexpected server error occurred.' };
+  }
+}
+
+
+export async function login(email: string, password?: string, isVerified = false, passwordHash?: string): Promise<{ success: boolean; error?: string }> {
   try {
     const emailLower = email.toLowerCase();
     const user = await getUserByEmailDb(emailLower);
@@ -85,14 +136,13 @@ export async function login(email: string, password: string): Promise<{ success:
       return { success: false, error: 'Invalid email or password.' };
     }
     
-    // Only 'rejected' status prevents login.
-    // 'pending' is no longer used for new signups.
-    // 'pending_verification' for businesses can still log in.
     if (user.status === 'rejected') {
         return { success: false, error: 'Your account has been rejected.' };
     }
 
-    const isPasswordValid = await bcrypt.compare(password, user.passwordhash);
+    // If coming from OTP verification, we trust the hash. Otherwise, compare passwords.
+    const isPasswordValid = isVerified ? (user.passwordhash === passwordHash) : await bcrypt.compare(password!, user.passwordhash);
+
     if (!isPasswordValid) {
       return { success: false, error: 'Invalid email or password.' };
     }
@@ -103,8 +153,6 @@ export async function login(email: string, password: string): Promise<{ success:
     const expires = new Date(Date.now() + maxAgeInSeconds * 1000);
     
     const isProduction = process.env.NODE_ENV === 'production';
-    // This allows login on HTTP during development or behind a misconfigured reverse proxy.
-    // It's a security fallback and should ideally not be used in a well-configured production environment.
     const allowInsecure = process.env.ALLOW_INSECURE_LOGIN_FOR_HTTP === 'true';
 
     cookies().set(USER_COOKIE_NAME, sessionToken, {

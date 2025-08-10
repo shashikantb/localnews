@@ -48,6 +48,14 @@ FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ...}'
 # Get your key from https://serpapi.com/
 SERPAPI_API_KEY=your_serpapi_api_key
 
+# --- SendGrid API Key (MANDATORY for OTP Emails) ---
+# This is required to send transactional emails for user registration.
+# Get your key from https://sendgrid.com/
+SENDGRID_API_KEY=your_sendgrid_api_key
+# This should be an email address you have verified as a "Single Sender" in SendGrid.
+SENDGRID_FROM_EMAIL=your_verified_sender@example.com
+
+
 # --- Admin Credentials (change these for production) ---
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=password123
