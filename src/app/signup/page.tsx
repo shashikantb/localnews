@@ -17,7 +17,7 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { signUp, verifyOtpAndCreateUser } from '@/app/auth/actions';
 import { Loader2, UserPlus, ShieldAlert, Building, ShieldCheck, User, Phone, Briefcase, CheckCircle, XCircle, Ticket, Mail, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormMessage, FormLabel } from '@/components/ui/form';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BUSINESS_CATEGORIES } from '@/lib/db-types';
 import { ScrollArea } from '@/components/ui/scroll-area';
