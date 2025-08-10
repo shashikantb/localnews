@@ -1,4 +1,5 @@
 
+
 'use server';
 
 import { cookies } from 'next/headers';
@@ -167,7 +168,7 @@ export async function login(email: string, password?: string, isVerified = false
     return { success: true };
   } catch (error: any) {
     console.error('Login error:', error);
-    return { success: false, error: error.message || 'An unknown server error occurred.' };
+    return { success: false, error: error.message || 'An unknown error occurred.' };
   }
 }
 

@@ -1,8 +1,9 @@
 
+
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { localSearch } from '@/lib/local-search';
+import { localHelper } from '@/ai/flows/local--helper-flow';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -78,11 +79,11 @@ export default function HelperPage() {
     setIsLoading(true);
 
     try {
-      const response = await localSearch(
-        input,
-        location.latitude,
-        location.longitude,
-      );
+      const response = await localHelper({
+        query: input,
+        latitude: location.latitude,
+        longitude: location.longitude,
+      });
 
       const assistantMessage: Message = { role: 'assistant', content: response };
       setMessages((prev) => [...prev, assistantMessage]);

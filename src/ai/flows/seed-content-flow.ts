@@ -4,13 +4,11 @@
  * @fileOverview An AI flow for seeding the database with realistic, fictional content.
  *
  * - seedContent - The main function that handles generating and posting content for a location.
- * - SeedContentInput - The input type for the seedContent function.
- * - SeedContentOutput - The return type for the seedContent function.
  */
 
 import { getAi } from '@/utils/firebaseAdmin';
 import { addPostDb } from '@/lib/db';
-import type { DbNewPost } from '@/lib/db-types';
+import type { DbNewPost, SeedContentInput, SeedContentFlowOutput } from '@/lib/db-types';
 import { z } from 'zod';
 import { getGcsClient, getGcsBucketName } from '@/lib/gcs';
 import { getJson } from 'google-search-results-nodejs';
@@ -21,7 +19,6 @@ const SeedContentInputSchema = z.object({
   latitude: z.number().describe('The latitude of the location.'),
   longitude: z.number().describe('The longitude of the location.'),
 });
-export type SeedContentInput = z.infer<typeof SeedContentInputSchema>;
 
 const SeedContentOutputSchema = z.object({
   city: z.string().describe('The city identified from the coordinates.'),
@@ -37,14 +34,6 @@ const SeedContentOutputSchema = z.object({
     })
   ),
 });
-
-export type SeedContentFlowOutput = {
-    success: boolean;
-    message: string;
-    postCount: number;
-    cityName: string;
-};
-
 
 // Tool for the AI to search the web for real news
 const searchTheWeb = ai.defineTool(

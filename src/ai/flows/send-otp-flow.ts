@@ -4,12 +4,12 @@
  * @fileOverview An AI flow for sending a registration OTP email.
  *
  * - sendOtp - The main function that handles generating and sending the OTP email.
- * - SendOtpInput - The input type for the sendOtp function.
  */
 
 import { getAi } from '@/utils/firebaseAdmin';
 import { z } from 'zod';
 import sgMail from '@sendgrid/mail';
+import type { SendOtpInput } from '@/lib/db-types';
 
 const ai = getAi();
 
@@ -18,7 +18,6 @@ export const SendOtpInputSchema = z.object({
   email: z.string().email().describe('The email address to send the OTP to.'),
   otp: z.string().length(6).describe('The 6-digit one-time password.'),
 });
-export type SendOtpInput = z.infer<typeof SendOtpInputSchema>;
 
 const EmailContentSchema = z.object({
     subject: z.string().describe("The subject line of the email."),

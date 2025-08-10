@@ -1626,6 +1626,3 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
 }
 
     
-
-
-

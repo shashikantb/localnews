@@ -4,13 +4,11 @@
  * @fileOverview A local helper AI agent.
  *
  * - localHelper - A function that handles responding to user queries about their local area.
- * - LocalHelperInput - The input type for the localHelper function.
- * - LocalHelperOutput - The return type for the localHelper function.
  */
 
 import { getAi } from '@/utils/firebaseAdmin';
 import { getNearbyBusinessesDb, searchNearbyPostsDb } from '@/lib/db';
-import type { BusinessUser, Post } from '@/lib/db-types';
+import type { BusinessUser, Post, LocalHelperInput, LocalHelperOutput } from '@/lib/db-types';
 import { z } from 'zod';
 
 const ai = getAi();
@@ -20,9 +18,6 @@ const LocalHelperInputSchema = z.object({
   latitude: z.number().describe('The latitude of the user.'),
   longitude: z.number().describe('The longitude of the user.'),
 });
-export type LocalHelperInput = z.infer<typeof LocalHelperInputSchema>;
-
-export type LocalHelperOutput = string;
 
 // Tool for the AI to find nearby businesses
 const findNearbyBusinessesTool = ai.defineTool(

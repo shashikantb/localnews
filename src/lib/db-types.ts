@@ -420,3 +420,29 @@ export interface PendingRegistration extends Omit<NewUser, 'passwordplaintext'> 
     otp_expires_at: string;
     created_at: string;
 }
+
+// AI Flow Types
+export type LocalHelperInput = {
+    query: string;
+    latitude: number;
+    longitude: number;
+};
+export type LocalHelperOutput = string;
+
+export type SeedContentInput = {
+    latitude: number;
+    longitude: number;
+};
+
+export type SeedContentFlowOutput = {
+    success: boolean;
+    message: string;
+    postCount: number;
+    cityName: string;
+};
+
+export type SendOtpInput = {
+    name: string;
+    email: string;
+    otp: string;
+};

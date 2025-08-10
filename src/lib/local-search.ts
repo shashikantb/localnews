@@ -1,8 +1,10 @@
 
+
 'use server';
 
-import { getNearbyBusinessesDb, searchNearbyPostsDb, BUSINESS_CATEGORIES } from './db';
-import type { BusinessUser, Post } from './db-types';
+import { getNearbyBusinessesDb, searchNearbyPostsDb } from '@/lib/db';
+import { BUSINESS_CATEGORIES } from '@/lib/db-types';
+import type { BusinessUser, Post } from '@/lib/db-types';
 
 // A mapping from common search terms to official business categories
 const categorySynonyms: { [key: string]: string | null } = {
