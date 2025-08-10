@@ -231,8 +231,6 @@ This will clear the cache for the page and resolve the mismatch.
 ## Developer Notes
 
 Remember, the XML structure you generate is the only mechanism for applying changes to the user's code. Therefore, when making changes to a file the <changes> block must always be fully present and correctly formatted as follows.
-
-```xml
 <changes>
   <description>[Provide a concise summary of the overall changes being made]</description>
   <change>
