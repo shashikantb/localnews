@@ -2,7 +2,7 @@
 'use client';
 
 import type { FC } from 'react';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm, type SubmitHandler } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -84,6 +84,13 @@ const SignupPage: FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [step, setStep] = useState<'initial' | 'verify'>('initial');
   const [emailToVerify, setEmailToVerify] = useState('');
+  const otpInputRef = React.useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (step === 'verify') {
+      setTimeout(() => otpInputRef.current?.focus(), 0);
+    }
+  }, [step]);
 
   const refCodeFromUrl = searchParams.get('ref') || '';
 
@@ -115,13 +122,14 @@ const SignupPage: FC = () => {
     try {
       const result = await signUp({ ...data, passwordplaintext: data.password });
       if (result.success) {
+        setEmailToVerify(data.email);
+        otpForm.reset({ otp: '' });
+        setIsSubmitting(false); // Turn off submitting before changing step
+        setStep('verify');
         toast({
           title: 'OTP Sent!',
           description: 'A verification code has been sent to your email address.',
         });
-        setEmailToVerify(data.email);
-        setIsSubmitting(false); // Turn off submitting before changing step
-        setStep('verify');
         return; // Prevent finally block from running
       } else {
         setError(result.error || 'Failed to create account.');
@@ -171,51 +179,66 @@ const SignupPage: FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Form {...otpForm}>
-              <form onSubmit={otpForm.handleSubmit(onOtpSubmit)} className="space-y-6">
-                 {error && (
-                  <Alert variant="destructive">
-                    <ShieldAlert className="h-4 w-4" />
-                    <AlertTitle>Verification Failed</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-                 <FormField
-                  control={otpForm.control}
-                  name="otp"
-                  render={({ field }) => (
-                    <FormItem>
-                      <Label htmlFor="otp">Verification Code</Label>
-                      <FormControl>
-                        <Input
-                          id="otp"
-                          type="text"
-                          inputMode="numeric"
-                          pattern="[0-9]*"
-                          autoComplete="one-time-code"
-                          autoCorrect="off"
-                          autoCapitalize="off"
-                          maxLength={6}
-                          placeholder="••••••"
-                          disabled={isSubmitting}
-                          {...field}
-                          onChange={(e) => {
-                            // allow only digits, max 6
-                            const v = e.target.value.replace(/\D/g, '').slice(0, 6);
-                            field.onChange(v);
-                          }}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
+            {step === 'verify' && (
+              <Form {...otpForm}>
+                <form
+                    key="otp-form"
+                    onSubmit={otpForm.handleSubmit(onOtpSubmit)}
+                    className="space-y-6"
+                    autoComplete="off"
+                >
+                  {error && (
+                    <Alert variant="destructive">
+                        <ShieldAlert className="h-4 w-4" />
+                        <AlertTitle>Verification Failed</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
                   )}
-                />
-                <Button type="submit" className="w-full" disabled={isSubmitting}>
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                  Verify and Create Account
-                </Button>
-              </form>
-            </Form>
+                  {/* Decoy input to absorb autofill */}
+                  <input
+                    type="text"
+                    name="dummy-name"
+                    autoComplete="new-password"
+                    style={{ position: 'absolute', left: '-9999px', height: 0, width: 0, opacity: 0 }}
+                    tabIndex={-1}
+                  />
+                  <FormField
+                    control={otpForm.control}
+                    name="otp"
+                    render={({ field }) => (
+                        <FormItem>
+                        <Label htmlFor="otp">Verification Code</Label>
+                        <FormControl>
+                            <Input
+                            ref={otpInputRef}
+                            id="otp"
+                            type="text"
+                            inputMode="numeric"
+                            pattern="[0-9]*"
+                            autoComplete="one-time-code"
+                            autoCorrect="off"
+                            autoCapitalize="off"
+                            maxLength={6}
+                            placeholder="••••••"
+                            disabled={isSubmitting}
+                            {...field}
+                            onChange={(e) => {
+                                const v = e.target.value.replace(/\D/g, '').slice(0, 6);
+                                field.onChange(v);
+                            }}
+                            />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                  <Button type="submit" className="w-full" disabled={isSubmitting}>
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Verify and Create Account
+                  </Button>
+                </form>
+              </Form>
+            )}
           </CardContent>
            <CardFooter className="flex justify-center text-sm">
             <p className="text-muted-foreground">
