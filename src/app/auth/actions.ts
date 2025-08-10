@@ -100,9 +100,9 @@ export async function verifyOtpAndCreateUser(email: string, otp: string): Promis
     const userData: NewUser = {
         name: pendingUser.name,
         email: pendingUser.email,
-        role: pendingUser.role,
+        role: pendingUser.role as any, // Cast because the type is slightly different
         countryCode: '', // Not needed for final creation
-        mobilenumber: pendingUser.mobilenumber || '', // Not needed for final creation
+        mobilenumber: pendingUser.mobilenumber || '',
         business_category: pendingUser.business_category,
         business_other_category: pendingUser.business_other_category,
         referral_code: pendingUser.referral_code,

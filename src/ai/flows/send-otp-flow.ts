@@ -10,14 +10,10 @@ import { getAi } from '@/utils/firebaseAdmin';
 import { z } from 'zod';
 import sgMail from '@sendgrid/mail';
 import type { SendOtpInput } from '@/lib/db-types';
+import { SendOtpInputSchema } from '@/lib/db-types';
+
 
 const ai = getAi();
-
-export const SendOtpInputSchema = z.object({
-  name: z.string().describe('The name of the user to address in the email.'),
-  email: z.string().email().describe('The email address to send the OTP to.'),
-  otp: z.string().length(6).describe('The 6-digit one-time password.'),
-});
 
 const EmailContentSchema = z.object({
     subject: z.string().describe("The subject line of the email."),

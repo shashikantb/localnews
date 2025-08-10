@@ -1,4 +1,5 @@
 
+import { z } from 'zod';
 
 export type UserRole = 'Business' | 'Gorakshak' | 'Gorakshak Admin' | 'Admin' | 'Public(जनता)';
 
@@ -441,8 +442,10 @@ export type SeedContentFlowOutput = {
     cityName: string;
 };
 
-export type SendOtpInput = {
-    name: string;
-    email: string;
-    otp: string;
-};
+export const SendOtpInputSchema = z.object({
+  name: z.string().describe('The name of the user to address in the email.'),
+  email: z.string().email().describe('The email address to send the OTP to.'),
+  otp: z.string().length(6).describe('The 6-digit one-time password.'),
+});
+
+export type SendOtpInput = z.infer<typeof SendOtpInputSchema>;
