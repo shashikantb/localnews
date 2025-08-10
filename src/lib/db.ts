@@ -370,6 +370,7 @@ export async function getPostsDb(
     // Only prepend announcement if it's the first page and NOT sorting by nearby (unless it's actually nearby)
     if (options.offset === 0 && !isAdminView) {
         if (!sortingNearby || (sortingNearby && options.latitude != null && options.longitude != null)) {
+            const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
             let announcementQuery = `
               SELECT 
                 ${POST_COLUMNS_WITH_JOINS},
@@ -379,7 +380,6 @@ export async function getPostsDb(
               LEFT JOIN users u ON p.authorid = u.id
               WHERE u.email = $2
             `;
-            const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
             
             // If sorting by nearby, only include announcement if it's within 30km
             if (sortingNearby && options.latitude != null && options.longitude != null) {
@@ -3022,6 +3022,25 @@ export async function getMandalsDb(userId?: number | null): Promise<GanpatiManda
     }
 }
 
+export async function getTopMandalDb(): Promise<GanpatiMandal | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            SELECT * FROM ganpati_mandals
+            ORDER BY likecount DESC
+            LIMIT 1;
+        `;
+        const result = await client.query(query);
+        return result.rows[0] || null;
+    } finally {
+        client.release();
+    }
+}
+
 export async function getMandalByIdDb(mandalId: number, userId?: number | null): Promise<GanpatiMandal | null> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
@@ -3283,6 +3302,7 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 
 
 

@@ -1,4 +1,3 @@
-`
 'use client';
 
 import type { FC } from 'react';
@@ -225,7 +224,7 @@ const ForgotPasswordPage: FC = () => {
                         </FormControl>
                         <FormMessage />
                       </FormItem>
-`                    )}
+                    )}
                   />
                   <Button type="submit" className="w-full" disabled={isSubmitting || !resetForm.formState.isValid}>
                     {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}

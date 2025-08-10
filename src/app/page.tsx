@@ -1,4 +1,5 @@
 
+
 import type { FC } from 'react';
 import { Suspense } from 'react';
 import Link from 'next/link';
@@ -14,6 +15,7 @@ import { Map, Sparkles, Trophy } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import TopPerformersList from '@/components/top-performers-list';
 import TopPerformerMarquee from '@/components/top-performer-marquee';
+import TopMandalMarquee from '@/components/top-mandal-marquee';
 
 async function PostComposerWithSession() {
   const { user } = await getSession();
@@ -85,9 +87,14 @@ const HomePage: FC = () => {
            </div>
         </div>
         
-        <Suspense fallback={<div className="h-10" />}>
-            <TopPerformerMarquee />
-        </Suspense>
+        <div className="space-y-2">
+          <Suspense fallback={<div className="h-10" />}>
+              <TopPerformerMarquee />
+          </Suspense>
+          <Suspense fallback={<div className="h-10" />}>
+            <TopMandalMarquee />
+          </Suspense>
+        </div>
 
         <Suspense fallback={<PostFeedSkeleton />}>
           <PostFeedWithInitialData />

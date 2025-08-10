@@ -1558,6 +1558,15 @@ export async function getMandalsForFeed(userId?: number | null): Promise<Ganpati
     }
 }
 
+export async function getTopMandal(): Promise<GanpatiMandal | null> {
+    try {
+        return await db.getTopMandalDb();
+    } catch (error) {
+        console.error("Server action error fetching top mandal:", error);
+        return null;
+    }
+}
+
 export async function getMandalMediaPosts(mandalId: number): Promise<Post[]> {
   try {
     return await db.getMandalMediaPostsDb(mandalId);
