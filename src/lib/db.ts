@@ -308,10 +308,15 @@ export async function getPostsDb(
   const client = await dbPool.connect();
   try {
     let orderByClause: string;
+    let whereClause = `
+      p.is_family_post = false 
+      AND (p.authorid IS NULL OR p.authorid != (SELECT id FROM users WHERE email = '${OFFICIAL_USER_EMAIL}'))
+      AND (p.expires_at IS NULL OR p.expires_at > NOW())
+      AND (p.max_viewers IS NULL OR p.viewcount < p.max_viewers)
+    `;
     const queryParams: (string | number | null)[] = [];
     let paramIndex = 1;
 
-    // Explicitly cast the user ID parameter to handle nulls gracefully.
     const currentUserIdParam = options.currentUserId || null;
     queryParams.push(currentUserIdParam);
     const userIdParamIndex = paramIndex++;
@@ -334,12 +339,15 @@ export async function getPostsDb(
             const latParamIndex = paramIndex++;
             const lonParamIndex = paramIndex++;
             const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${latParamIndex}, $${lonParamIndex}))`;
+            
+            // Add distance filter to WHERE clause
+            whereClause += ` AND ${distanceCalc} <= 50000`; // 50km radius limit
+
             orderByClause = `
               CASE
                 WHEN ${distanceCalc} <= 5000 THEN 1
                 WHEN ${distanceCalc} <= 20000 THEN 2
-                WHEN ${distanceCalc} <= 50000 THEN 3
-                ELSE 4
+                ELSE 3
               END,
               p.createdat DESC
             `;
@@ -355,7 +363,6 @@ export async function getPostsDb(
     
     let allPosts: Post[] = [];
 
-    // Step 1: Fetch the latest announcement if it's the first page
     if (options.offset === 0 && !isAdminView) {
         const announcementQuery = `
           SELECT 
@@ -364,7 +371,7 @@ export async function getPostsDb(
             ${followCheck} as "isAuthorFollowedByCurrentUser"
           FROM posts p
           LEFT JOIN users u ON p.authorid = u.id
-          WHERE u.email = $2 -- Find user by special email
+          WHERE u.email = $2
           ORDER BY p.createdat DESC
           LIMIT 1
         `;
@@ -373,8 +380,6 @@ export async function getPostsDb(
             allPosts = announcementResult.rows;
         }
     }
-
-    const officialUserSubquery = `SELECT id FROM users WHERE email = '${OFFICIAL_USER_EMAIL}'`;
 
     queryParams.push(options.limit, options.offset);
     const limitParamIndex = queryParams.length - 1;
@@ -387,14 +392,11 @@ export async function getPostsDb(
         ${followCheck} as "isAuthorFollowedByCurrentUser"
       FROM posts p
       LEFT JOIN users u ON p.authorid = u.id
-      WHERE p.is_family_post = false 
-        AND (p.authorid IS NULL OR p.authorid != (${officialUserSubquery}))
-        AND (p.expires_at IS NULL OR p.expires_at > NOW())
-        AND (p.max_viewers IS NULL OR p.viewcount < p.max_viewers)
+      WHERE ${whereClause}
       ORDER BY ${orderByClause}
       LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
     `;
-
+    
     const postsResult = await client.query(postsQuery, queryParams);
     
     const announcementId = allPosts.length > 0 ? allPosts[0].id : null;
@@ -1175,7 +1177,7 @@ export async function getPostsByUserIdDb(userId: number, sessionUserId?: number 
   try {
     const currentUserId = sessionUserId || null;
     const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $2::int)`;
-    const followCheck = `p.authorid IS NOT NULL AND EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $2::int)`;
+    const followCheck = `EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $2::int)`;
 
     const query = `
       SELECT 
@@ -3247,5 +3249,6 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 
 
