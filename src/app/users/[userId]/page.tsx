@@ -58,7 +58,7 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
     familyStatusResult
   ] = await Promise.all([
     getUserWithFollowInfo(userId),
-    getPostsByUserId(userId),
+    getPostsByUserId(userId, sessionUser?.id), // Pass sessionUser.id here
     isOwnProfile ? getPendingFamilyRequests() : Promise.resolve([]),
     getFamilyRelationshipStatus(sessionUser, userId)
   ]);

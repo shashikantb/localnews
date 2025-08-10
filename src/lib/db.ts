@@ -1009,7 +1009,7 @@ export async function createUserDb(newUser: NewUser, status: UserStatus): Promis
       await client.query('BEGIN');
 
       let passwordhash: string;
-      // Check if the provided password is already a hash
+      // Check if the provided password is a bcrypt hash. It won't hash again if so.
       if (newUser.passwordplaintext.startsWith('$2a$') || newUser.passwordplaintext.startsWith('$2b$')) {
         passwordhash = newUser.passwordplaintext;
       } else {
@@ -1166,15 +1166,16 @@ export async function updateUserProfilePictureDb(userId: number, imageUrl: strin
 }
 
 
-export async function getPostsByUserIdDb(userId: number): Promise<Post[]> {
+export async function getPostsByUserIdDb(userId: number, sessionUserId?: number | null): Promise<Post[]> {
   await ensureDbInitialized();
   const dbPool = getDbPool();
   if (!dbPool) return [];
 
   const client = await dbPool.connect();
   try {
-    const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1::int)`;
-    const followCheck = `EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $1::int)`;
+    const currentUserId = sessionUserId || null;
+    const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $2::int)`;
+    const followCheck = `p.authorid IS NOT NULL AND EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $2::int)`;
 
     const query = `
       SELECT 
@@ -1186,7 +1187,7 @@ export async function getPostsByUserIdDb(userId: number): Promise<Post[]> {
       WHERE p.authorid = $1
       ORDER BY p.createdat DESC;
     `;
-    const result: QueryResult<Post> = await client.query(query, [userId]);
+    const result: QueryResult<Post> = await client.query(query, [userId, currentUserId]);
     return result.rows;
   } finally {
     client.release();
@@ -3246,4 +3247,5 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 

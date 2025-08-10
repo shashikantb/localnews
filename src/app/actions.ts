@@ -648,10 +648,10 @@ export async function getUser(userId: number): Promise<User | null> {
     }
 }
 
-export async function getPostsByUserId(userId: number): Promise<Post[]> {
+export async function getPostsByUserId(userId: number, sessionUserId?: number | null): Promise<Post[]> {
   try {
     const { user: sessionUser } = await getSession();
-    const posts = await db.getPostsByUserIdDb(userId);
+    const posts = await db.getPostsByUserIdDb(userId, sessionUser?.id);
     return enrichPosts(posts, sessionUser);
   } catch (error) {
     console.error(`Server action error fetching posts for user ${userId}:`, error);
