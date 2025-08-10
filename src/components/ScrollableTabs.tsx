@@ -3,6 +3,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { cn } from "@/lib/utils";
 
 type Tab = { key: string; label: string; badge?: number };
 
@@ -62,24 +63,24 @@ export default function ScrollableTabs({
   };
 
   return (
-    <div className={`relative ${className}`}>
-      {/* Edge fades */}
-      <div className="pointer-events-none absolute left-0 top-0 h-full w-6 bg-gradient-to-r from-background to-transparent" />
-      <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-background to-transparent" />
+    <div className={cn("relative", className)}>
+      {/* Edge fades that respect theme */}
+      <div className="pointer-events-none absolute left-0 top-0 h-full w-6 bg-gradient-to-r from-[hsl(var(--background))] to-transparent" />
+      <div className="pointer-events-none absolute right-0 top-0 h-full w-6 bg-gradient-to-l from-[hsl(var(--background))] to-transparent" />
 
       {/* Scroll buttons (auto-hide when not needed) */}
       {canLeft && (
         <button
           aria-label="Scroll left"
           onClick={() => scrollBy(-160)}
-          className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full border bg-white/80 dark:bg-black/80 p-1 shadow-sm backdrop-blur-md z-10"
+          className="absolute left-0 top-1/2 -translate-y-1/2 rounded-full border bg-background/80 p-1 shadow-sm backdrop-blur-md z-10"
         >‹</button>
       )}
       {canRight && (
         <button
           aria-label="Scroll right"
           onClick={() => scrollBy(160)}
-          className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border bg-white/80 dark:bg-black/80 p-1 shadow-sm backdrop-blur-md z-10"
+          className="absolute right-0 top-1/2 -translate-y-1/2 rounded-full border bg-background/80 p-1 shadow-sm backdrop-blur-md z-10"
         >›</button>
       )}
 
@@ -97,18 +98,18 @@ export default function ScrollableTabs({
               role="tab"
               aria-selected={isActive}
               onClick={() => select(t.key)}
-              className={[
+              className={cn(
                 "relative mr-2 mb-2 inline-flex snap-start items-center gap-2 rounded-full px-4 py-2 text-sm",
-                "whitespace-nowrap border",
+                "whitespace-nowrap border transition-colors duration-200",
                 isActive
-                  ? "border-primary bg-primary text-primary-foreground"
+                  ? "border-primary bg-primary text-primary-foreground font-semibold shadow-md"
                   : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
-              ].join(" ")}
+              )}
               style={{ minHeight: 40 }} // 44px tappable incl. padding
             >
               <span>{t.label}</span>
               {typeof t.badge === "number" && t.badge > 0 && (
-                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
+                <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
                   {t.badge > 9 ? '9+' : t.badge}
                 </span>
               )}
