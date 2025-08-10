@@ -4,6 +4,7 @@
 
 import React, { type FC } from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import type { Post, User, SortOption, BusinessUser } from '@/lib/db-types';
 import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, updateUserLocation, getUnreadFamilyPostCount, markFamilyFeedAsRead, triggerLiveSeeding } from '@/app/actions';
 import { PostCard } from '@/components/post-card';
@@ -23,7 +24,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import ScrollableTabs from '@/components/ScrollableTabs'; // Using the new component
+import EqualWidthTabs from '@/components/EqualWidthTabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -145,6 +146,8 @@ interface PostFeedClientProps {
 
 const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) => {
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const activeTab = (searchParams.get('tab') as FeedType) || 'nearby';
   
   const [feeds, setFeeds] = useState<{ [key in 'nearby' | 'family']: FeedState }>({
     nearby: { ...initialFeedState, posts: initialPosts, isLoading: initialPosts.length === 0, hasMore: initialPosts.length === POSTS_PER_PAGE },
@@ -152,7 +155,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   });
   const [businessFeed, setBusinessFeed] = useState<BusinessFeedState>(initialBusinessFeedState);
 
-  const [activeTab, setActiveTab] = useState<FeedType>('nearby');
   const [sortBy, setSortBy] = useState<SortOption>('nearby');
   
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
@@ -274,10 +276,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location]);
 
-  const handleTabChange = (value: string) => {
-    const newTab = value as FeedType;
-    setActiveTab(newTab);
-    
+  const handleTabChange = useCallback((newTab: FeedType) => {
     if (newTab === 'family') {
       if (unreadFamilyPostCount > 0) {
         markFamilyFeedAsRead();
@@ -291,14 +290,18 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             fetchBusinesses(1, businessFeed.category);
         }
     } else if (newTab === 'festival') {
-        // Festival tab content is now handled by MandalList component, which fetches its own data
+        // MandalList component fetches its own data
     }
      else { // nearby
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
             fetchPosts('nearby', 1, sortBy, location);
         }
     }
-  };
+  }, [unreadFamilyPostCount, feeds.family.posts.length, feeds.family.isLoading, fetchPosts, sortBy, location, businessFeed.businesses.length, businessFeed.isLoading, fetchBusinesses, businessFeed.category, feeds.nearby.posts.length, feeds.nearby.isLoading]);
+
+  useEffect(() => {
+    handleTabChange(activeTab);
+  }, [activeTab, handleTabChange]);
 
   const handleNotificationRegistration = async () => {
     if (notificationPermissionStatus === 'granted') {
@@ -536,11 +539,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       </AlertDialog>
 
       <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <ScrollableTabs
+            <EqualWidthTabs
                 tabs={TABS}
-                defaultKey="nearby"
-                onChange={handleTabChange}
-                className="flex-grow"
+                param="tab"
+                activeKey={activeTab}
             />
             <div className="flex items-center gap-2">
               {activeTab === 'business' ? (
