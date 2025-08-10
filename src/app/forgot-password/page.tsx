@@ -15,6 +15,7 @@ import { requestPasswordReset, resetPassword } from '@/app/auth/actions';
 import { Loader2, KeyRound, ShieldAlert, Mail, Lock } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 
 // Step 1: Request OTP
@@ -127,7 +128,7 @@ const ForgotPasswordPage: FC = () => {
                     name="email"
                     render={({ field }) => (
                       <FormItem>
-                        <Label htmlFor="email">Email Address</Label>
+                        <FormLabel htmlFor="email">Email Address</FormLabel>
                         <FormControl>
                             <Input {...field} id="email" type="email" placeholder="you@example.com" disabled={isSubmitting} />
                         </FormControl>
@@ -166,7 +167,7 @@ const ForgotPasswordPage: FC = () => {
                     name="otp"
                     render={({ field }) => (
                       <FormItem>
-                        <Label htmlFor="otp">Reset Code</Label>
+                        <FormLabel htmlFor="otp">Reset Code</FormLabel>
                         <FormControl>
                           <Input
                             ref={otpInputRef} {...field} id="otp" type="text"
@@ -183,7 +184,7 @@ const ForgotPasswordPage: FC = () => {
                     name="password"
                     render={({ field }) => (
                       <FormItem>
-                        <Label htmlFor="password">New Password</Label>
+                        <FormLabel htmlFor="password">New Password</FormLabel>
                         <FormControl>
                           <Input {...field} id="password" type="password" placeholder="New strong password" disabled={isSubmitting} />
                         </FormControl>
