@@ -13,30 +13,43 @@ import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import { seedContent } from '@/ai/flows/seed-content-flow';
 
 
-async function geocodeCoordinates(latitude: number, longitude: number): Promise<string | null> {
-  // This is a simple reverse geocode lookup based on known city coordinates.
-  // In a real app, this would use a Geocoding API.
-  // This function is being kept for now for potential other uses but is no longer
-  // used by the live seeding feature.
-  const cities: { [key: string]: { lat: number; lon: number; radius: number } } = {
-    Mumbai: { lat: 19.076, lon: 72.8777, radius: 30 },
-    Pune: { lat: 18.5204, lon: 73.8567, radius: 25 },
-    Nashik: { lat: 20.0112, lon: 73.7909, radius: 20 },
-    Dhule: { lat: 20.9042, lon: 74.7749, radius: 15 },
-    Shirpur: { lat: 21.3486, lon: 74.8797, radius: 10 },
-    Dondaicha: { lat: 21.3197, lon: 74.5765, radius: 10 },
-  };
+function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number) {
+  const R = 6371; // Radius of Earth in kilometers
+  const toRad = (x: number) => (x * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
 
-  for (const city in cities) {
-    const cityData = cities[city];
-    const distance = db.earthDistance(latitude, longitude, cityData.lat, cityData.lon);
-    if (distance <= cityData.radius * 1000) {
-      return city;
+function resolveCityFromCoords(lat: number, lon: number): string {
+  const CITIES = [
+    { name: "Pune",   lat: 18.5204, lon: 73.8567 },
+    { name: "PCMC",   lat: 18.6298, lon: 73.7997 }, // Pimpri-Chinchwad
+    { name: "Mumbai", lat: 19.0760, lon: 72.8777 },
+    { name: "Thane",  lat: 19.2183, lon: 72.9781 },
+    { name: "Nashik", lat: 19.9975, lon: 73.7898 },
+    { name: 'Dhule', lat: 20.9042, lon: 74.7749 },
+    { name: 'Shirpur', lat: 21.3486, lon: 74.8797 },
+    { name: 'Dondaicha', lat: 21.3197, lon: 74.5765 },
+  ];
+  
+  let best = { name: "Unknown City", d: Infinity };
+  for (const c of CITIES) {
+    const d = haversineKm(lat, lon, c.lat, c.lon);
+    if (d < best.d) {
+      best = { name: c.name, d };
     }
   }
-
-  return "Unknown City";
+  // Only accept if within 40 km of the nearest city centroid
+  return best.d <= 40 ? best.name : "Unknown City";
 }
+
 
 async function enrichPosts(posts: Post[], user: User | null): Promise<Post[]> {
     if (!posts || posts.length === 0) {
@@ -395,7 +408,7 @@ export async function addPost(newPostData: ClientNewPost): Promise<{ post?: Post
       }
     }
 
-    const cityName = await geocodeCoordinates(newPostData.latitude, newPostData.longitude);
+    const cityName = resolveCityFromCoords(newPostData.latitude, newPostData.longitude);
 
     const postDataForDb: DbNewPost = {
       content: content, // Use potentially modified content

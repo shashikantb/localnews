@@ -324,7 +324,7 @@ export async function getPostsDb(
     const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $${userIdParamIndex}::int)`;
     const followCheck = `p.authorid IS NOT NULL AND EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $${userIdParamIndex}::int)`;
 
-    const sortBy = options.sortBy || 'nearby';
+    const sortBy = options.sortBy || 'newest';
 
     switch(sortBy) {
       case 'likes':
@@ -365,9 +365,8 @@ export async function getPostsDb(
     }
     
     let allPosts: Post[] = [];
-    const isSortingNearby = sortBy === 'nearby';
-
-    // Only pin announcements if NOT sorting by "nearby", or if sorting by "nearby" and the announcement is within 30km.
+    
+    // Only prepend announcement if sorting allows and it's the first page
     if (options.offset === 0 && !isAdminView) {
         let announcementQuery = `
           SELECT 
@@ -380,8 +379,9 @@ export async function getPostsDb(
         `;
         const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
 
-        if (isSortingNearby && options.latitude != null && options.longitude != null) {
-            announcementQuery += ` AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($3, $4)) <= 30000`; // 30km radius for announcements
+        // If sorting by nearby, only include announcement if it's within 30km
+        if (sortBy === 'nearby' && options.latitude != null && options.longitude != null) {
+            announcementQuery += ` AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($3, $4)) <= 30000`;
             announcementParams.push(options.latitude, options.longitude);
         }
         
@@ -392,6 +392,7 @@ export async function getPostsDb(
             allPosts = announcementResult.rows;
         }
     }
+
 
     queryParams.push(options.limit, options.offset);
     const limitParamIndex = queryParams.length - 1;
@@ -3261,6 +3262,7 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+
 
 
 
