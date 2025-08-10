@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { toggleFollow } from '@/app/actions';
 import { Loader2, UserPlus, UserCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 interface FollowButtonProps {
   targetUserId: number;
@@ -16,16 +17,27 @@ interface FollowButtonProps {
 const FollowButton: FC<FollowButtonProps> = ({ targetUserId, initialIsFollowing }) => {
   const [isFollowing, setIsFollowing] = useState(initialIsFollowing);
   const [isPending, startTransition] = useTransition();
+  const { toast } = useToast();
 
   const handleFollowClick = () => {
     startTransition(async () => {
-      const newFollowState = !isFollowing;
-      setIsFollowing(newFollowState); // Optimistic update
+      // Optimistically update the UI for a responsive feel
+      setIsFollowing(current => !current);
 
       const result = await toggleFollow(targetUserId);
-      if (!result.success) {
-        setIsFollowing(!newFollowState); // Revert on error
+
+      if (result.success && typeof result.isFollowing === 'boolean') {
+        // Update the state with the authoritative value from the server
+        setIsFollowing(result.isFollowing);
+      } else {
+        // If the action failed, revert the optimistic update and show an error
+        setIsFollowing(current => !current); 
         console.error("Failed to update follow status:", result.error);
+        toast({
+          variant: 'destructive',
+          title: 'Action Failed',
+          description: result.error || 'Could not update follow status.',
+        });
       }
     });
   };
