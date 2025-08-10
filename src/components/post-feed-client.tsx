@@ -23,7 +23,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import ScrollableTabs from '@/components/ScrollableTabs'; // Using the new component
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -499,6 +499,13 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     );
   };
 
+  const TABS = [
+      { key: "nearby", label: "Nearby" },
+      { key: "festival", label: "Festival" },
+      ...(sessionUser ? [{ key: "family", label: "Family", badge: unreadFamilyPostCount }] : []),
+      { key: "business", label: "Business" },
+  ];
+
   return (
     <div {...swipeHandlers}>
        <AlertDialog open={showTroubleshootingDialog} onOpenChange={setShowTroubleshootingDialog}>
@@ -528,27 +535,13 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         </AlertDialogContent>
       </AlertDialog>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <TabsList>
-                <TabsTrigger value="nearby" className="flex items-center gap-2"><Rss className="w-4 h-4"/> Nearby</TabsTrigger>
-                <TabsTrigger value="festival" className="flex items-center gap-2"><PartyPopper className="w-4 h-4"/> Festival</TabsTrigger>
-                {sessionUser ? (
-                  <>
-                    <TabsTrigger value="family" className="flex items-center gap-2 relative">
-                        <Users className="w-4 h-4"/> Family
-                        {unreadFamilyPostCount > 0 && (
-                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
-                                {unreadFamilyPostCount > 9 ? '9+' : unreadFamilyPostCount}
-                            </span>
-                        )}
-                    </TabsTrigger>
-                    <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>
-                  </>
-                ): (
-                    <TabsTrigger value="business" className="flex items-center gap-2"><Briefcase className="w-4 h-4"/> Business</TabsTrigger>
-                )}
-            </TabsList>
+      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
+            <ScrollableTabs
+                tabs={TABS}
+                defaultKey="nearby"
+                onChange={handleTabChange}
+                className="flex-grow"
+            />
             <div className="flex items-center gap-2">
               {activeTab === 'business' ? (
                 <DropdownMenu>
@@ -608,16 +601,12 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
               </Button>
             </div>
         </div>
-
-        <TabsContent value="nearby">
-           {renderFeedContent()}
-        </TabsContent>
-        <TabsContent value="festival">{renderFeedContent()}</TabsContent>
-        {sessionUser && <TabsContent value="family">{renderFeedContent()}</TabsContent>}
-        <TabsContent value="business">{renderFeedContent()}</TabsContent>
-      </Tabs>
+        <div className="mt-4">
+          {renderFeedContent()}
+        </div>
     </div>
   );
 };
 
 export default PostFeedClient;
+

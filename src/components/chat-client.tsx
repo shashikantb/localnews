@@ -315,49 +315,9 @@ export default function ChatClient({ initialMessages, conversationDetails, sessi
             )}
         </header>
 
-        {/* Message Input Form */}
-        <div className="p-4 border-b relative">
-            {showMentionSuggestions && mentionResults.length > 0 && (
-                <div className="absolute bottom-full left-4 mb-1 w-3/4 max-w-sm bg-background border rounded-lg shadow-lg z-10">
-                    <ScrollArea className="max-h-40">
-                        {mentionResults.map(user => (
-                            <button
-                                key={user.id}
-                                onClick={() => handleSelectMention(user.name)}
-                                className="flex items-center gap-2 p-2 w-full text-left hover:bg-muted"
-                            >
-                                <Avatar className="h-7 w-7"><AvatarImage src={user.profilepictureurl || undefined}/><AvatarFallback>{user.name.charAt(0)}</AvatarFallback></Avatar>
-                                <span className="text-sm font-medium">{user.name}</span>
-                            </button>
-                        ))}
-                    </ScrollArea>
-                </div>
-            )}
-            <form onSubmit={handleSendMessage} className="flex items-center gap-3">
-            <Textarea
-                value={newMessage}
-                onChange={handleInputChange}
-                placeholder="Type a message... (use @ to mention)"
-                className="flex-1 resize-none bg-card border"
-                rows={1}
-                disabled={isSending}
-                onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSendMessage(e);
-                }
-                }}
-            />
-            <Button type="submit" size="icon" disabled={!newMessage.trim() || isSending}>
-                {isSending ? <Loader2 className="animate-spin" /> : <Send />}
-                <span className="sr-only">Send</span>
-            </Button>
-            </form>
-        </div>
-        
         {/* Message List Area */}
-        <ScrollArea className="flex-grow p-4">
-            <div className="flex flex-col-reverse">
+        <div className="flex-grow p-4 overflow-y-auto flex flex-col-reverse">
+            <div>
                 {messages.map((message) => {
                     const isSender = message.sender_id === sessionUser.id;
                     const senderDetails = conversationDetails.participants.find(p => p.id === message.sender_id);
@@ -447,7 +407,47 @@ export default function ChatClient({ initialMessages, conversationDetails, sessi
                     );
                 })}
             </div>
-        </ScrollArea>
+        </div>
+
+        {/* Message Input Form */}
+        <div className="p-4 border-t relative">
+            {showMentionSuggestions && mentionResults.length > 0 && (
+                <div className="absolute bottom-full left-4 mb-1 w-3/4 max-w-sm bg-background border rounded-lg shadow-lg z-10">
+                    <ScrollArea className="max-h-40">
+                        {mentionResults.map(user => (
+                            <button
+                                key={user.id}
+                                onClick={() => handleSelectMention(user.name)}
+                                className="flex items-center gap-2 p-2 w-full text-left hover:bg-muted"
+                            >
+                                <Avatar className="h-7 w-7"><AvatarImage src={user.profilepictureurl || undefined}/><AvatarFallback>{user.name.charAt(0)}</AvatarFallback></Avatar>
+                                <span className="text-sm font-medium">{user.name}</span>
+                            </button>
+                        ))}
+                    </ScrollArea>
+                </div>
+            )}
+            <form onSubmit={handleSendMessage} className="flex items-center gap-3">
+            <Textarea
+                value={newMessage}
+                onChange={handleInputChange}
+                placeholder="Type a message... (use @ to mention)"
+                className="flex-1 resize-none bg-card border"
+                rows={1}
+                disabled={isSending}
+                onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage(e);
+                }
+                }}
+            />
+            <Button type="submit" size="icon" disabled={!newMessage.trim() || isSending}>
+                {isSending ? <Loader2 className="animate-spin" /> : <Send />}
+                <span className="sr-only">Send</span>
+            </Button>
+            </form>
+        </div>
     </div>
   );
 }
