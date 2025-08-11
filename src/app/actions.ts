@@ -17,16 +17,21 @@ import { z } from 'zod';
 const ai = getAi();
 
 async function resolveCityFromCoords(lat: number, lon: number): Promise<string> {
-    try {
-        const { text: city } = await ai.generate({
-            prompt: `Based on the coordinates latitude: ${lat} and longitude: ${lon}, what is the most specific, commonly known name of the city, major suburb, or administrative area? Respond with only the city name and nothing else.`,
-            model: 'googleai/gemini-1.5-flash',
-        });
-        return city.trim();
-    } catch(err) {
-        console.error("AI city resolution failed, falling back to unknown.", err);
-        return "Unknown City";
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+  try {
+    const res = await fetch(url, { headers: { 'User-Agent': 'LocalPulse/1.0 (contact@localpulse.space)' }});
+    if (!res.ok) {
+        throw new Error(`Nominatim API failed with status ${res.status}`);
     }
+    const data = await res.json();
+    const a = data?.address ?? {};
+    return (
+      a.city || a.town || a.municipality || a.village || a.suburb || a.city_district || a.county || a.state_district || a.state || 'Unknown City'
+    );
+  } catch (error) {
+    console.error("Reverse geocoding failed:", error);
+    return "Unknown City"; // Fallback on error
+  }
 }
 
 
@@ -1473,8 +1478,6 @@ export async function markFamilyFeedAsRead() {
 
 // --- Live Seeding Action ---
 export async function triggerLiveSeeding(latitude: number, longitude: number): Promise<void> {
-    // This is a "fire-and-forget" action from the client's perspective.
-    // It runs in the background on the server.
     try {
         const liveSeedingEnabled = await db.getAppSettingDb('live_seeding_enabled');
         if (liveSeedingEnabled !== 'true') {
@@ -1485,27 +1488,22 @@ export async function triggerLiveSeeding(latitude: number, longitude: number): P
         const lastSeedTime = await db.getLastSeedTimeDb(seedKey);
         const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
         
-        // Seed if area is new, hasn't been seeded in 2+ hours, or has low content
         const lowContent = (await db.countRecentPostsNearbyDb(latitude, longitude, 12, 6)) < 3;
         
         if (!lastSeedTime || new Date(lastSeedTime) < twoHoursAgo || lowContent) {
             console.log(`[seed] trigger ${seedKey} lat=${latitude} lon=${longitude} lowContent=${lowContent}`);
             
-            // Don't await this, let it run in the background.
-            seedContent({ latitude, longitude }).then(async (result) => {
-              if (result.success) {
-                // Log the successful seeding using the same key.
+            const result = await seedContent({ latitude, longitude });
+            
+            if (result.success) {
                 await db.updateLastSeedTimeDb(seedKey);
-                 console.log(`[seed] success ${seedKey} city=${result.cityName} count=${result.postCount}`);
-              } else {
+                console.log(`[seed] success ${seedKey} city=${result.cityName} count=${result.postCount}`);
+                revalidatePath('/'); // Revalidate after successful seeding
+            } else {
                 console.error(`[seed] failed ${seedKey}: ${result.message}`);
-              }
-            }).catch(err => {
-                console.error(`[seed] error ${seedKey}:`, err);
-            });
+            }
         }
     } catch (error) {
-        // We catch errors here to prevent them from propagating to the client.
         console.error('Error in triggerLiveSeeding action:', error);
     }
 }
