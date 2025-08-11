@@ -3,11 +3,11 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { getMandalsForFeed, toggleMandalLike, getMandalMediaPosts, sendAartiNotification } from '@/app/actions';
+import { getMandalsForFeed, toggleMandalLike, getMandalMediaPosts, sendAartiNotification, registerDeviceToken } from '@/app/actions';
 import type { GanpatiMandal, User, Post } from '@/lib/db-types';
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter, Edit, Bell } from 'lucide-react';
+import { PartyPopper, MapPin, ThumbsUp, Loader2, Filter, Edit, Bell, AlertTriangle } from 'lucide-react';
 import { Skeleton } from './ui/skeleton';
 import { NoPostsContent } from './post-feed-client';
 import { useToast } from '@/hooks/use-toast';
@@ -18,6 +18,8 @@ import MandalMediaViewer from './mandal-media-viewer';
 import RegisterMandalDialog from './register-mandal-dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from './ui/alert-dialog';
 import { useRouter } from 'next/navigation';
+import { getMessaging, getToken } from 'firebase/messaging';
+import { getApp, getApps, initializeApp } from 'firebase/app';
 
 
 const SendAartiNotificationButton: React.FC<{ mandal: GanpatiMandal }> = ({ mandal }) => {
@@ -67,6 +69,7 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
     const [mediaPosts, setMediaPosts] = useState<Post[]>([]);
     const [isLoadingMedia, setIsLoadingMedia] = useState(true);
     const [isLiking, setIsLiking] = useState(false);
+    const [showTroubleshootingDialog, setShowTroubleshootingDialog] = useState(false);
     const { toast } = useToast();
     const router = useRouter();
     
@@ -83,16 +86,8 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
 
     const isOwner = sessionUser?.id === mandal.admin_user_id;
 
-    const handleLike = async (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!sessionUser) {
-            toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to like a mandal. Redirecting...' });
-            router.push('/login');
-            return;
-        }
+    const proceedWithLike = async () => {
         setIsLiking(true);
-
         const newIsLiked = !mandal.isLikedByCurrentUser;
         const newLikeCount = mandal.isLikedByCurrentUser ? mandal.likecount - 1 : mandal.likecount + 1;
         setMandal(prev => ({ ...prev, isLikedByCurrentUser: newIsLiked, likecount: newLikeCount }));
@@ -107,48 +102,144 @@ const MandalCard: React.FC<{ mandal: GanpatiMandal; sessionUser: User | null; on
         setIsLiking(false);
     };
 
+    const handleNotificationRegistration = async (): Promise<boolean> => {
+        if (typeof window === 'undefined' || !('Notification' in window)) {
+            toast({ variant: 'destructive', title: "Unsupported", description: "Notifications are not supported by your browser."});
+            return false;
+        }
+
+        if (Notification.permission === 'granted') {
+          return true; // Already granted
+        }
+
+        if (Notification.permission === 'denied') {
+           setShowTroubleshootingDialog(true);
+           return false;
+        }
+        
+        setIsLiking(true); // Show loading state on button
+        const firebaseConfig = {
+          apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+          authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+          projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+          storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+          messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+          appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+        };
+        const vapidKey = process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY;
+
+        try {
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') {
+            throw new Error("Notification permission was not granted.");
+          }
+
+          if (!vapidKey) throw new Error("Web notification key is not configured.");
+
+          const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+          const messaging = getMessaging(app);
+          const token = await getToken(messaging, { vapidKey });
+
+          if (!token) throw new Error("Could not get a notification token.");
+
+          const result = await registerDeviceToken(token);
+          if (result.success) {
+            toast({ title: "Success!", description: "Notifications enabled. You can now like the mandal."});
+            return true;
+          } else {
+            throw new Error(result.error || "Failed to register token with server.");
+          }
+        } catch (error: any) {
+          toast({ variant: 'destructive', title: "Registration Failed", description: error.message });
+          setShowTroubleshootingDialog(true);
+          return false;
+        } finally {
+            setIsLiking(false);
+        }
+    };
+
+
+    const handleLike = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (isLiking) return;
+
+        if (!sessionUser) {
+            toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to like a mandal. Redirecting...' });
+            router.push('/login');
+            return;
+        }
+        
+        const canProceed = await handleNotificationRegistration();
+        if (canProceed) {
+            await proceedWithLike();
+        }
+    };
+
     return (
-        <Card className="hover:shadow-lg transition-shadow h-full w-full flex flex-col">
-            <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-primary">
-                    <PartyPopper className="w-5 h-5" />
-                    {mandal.name}
-                </CardTitle>
-                <CardDescription className="flex items-center gap-1.5 pt-1">
-                    <MapPin className="w-4 h-4" />
-                    {mandal.city}
-                </CardDescription>
-            </CardHeader>
-             <CardContent className="p-0">
-                {isLoadingMedia ? (
-                    <div className="aspect-video w-full flex items-center justify-center bg-muted">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                    </div>
-                ) : (
-                    <MandalMediaViewer posts={mediaPosts} />
-                )}
-            </CardContent>
-            <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between flex-wrap gap-2">
-                <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    className="flex-1 justify-start h-9"
-                    onClick={handleLike}
-                    disabled={isLiking}
-                >
-                    {isLiking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ThumbsUp className={cn("mr-2 h-4 w-4", mandal.isLikedByCurrentUser && "fill-current text-blue-500")} />}
-                    {mandal.likecount} Likes
-                </Button>
-                {isOwner && (
-                    <div className="flex items-center gap-2">
-                        <SendAartiNotificationButton mandal={mandal} />
-                        <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
-                            <Button variant="secondary" size="sm" className="h-9">Manage</Button>
-                        </MandalManagementDialog>
-                    </div>
-                )}
-            </CardFooter>
-        </Card>
+        <>
+            <AlertDialog open={showTroubleshootingDialog} onOpenChange={setShowTroubleshootingDialog}>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center">
+                      <AlertTriangle className="w-5 h-5 mr-2 text-destructive" />
+                      Enable Background Notifications
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      <div className="space-y-3 text-left pt-2 text-foreground/80">
+                        <p>To like content, you must first enable notifications. This allows us to send you important community updates.</p>
+                        <p>If you've blocked notifications, please enable them in your browser settings for this site.</p>
+                      </div>
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>I'll check later</AlertDialogCancel>
+                    <AlertDialogAction onClick={() => setShowTroubleshootingDialog(false)}>Got it</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            <Card className="hover:shadow-lg transition-shadow h-full w-full flex flex-col">
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-primary">
+                        <PartyPopper className="w-5 h-5" />
+                        {mandal.name}
+                    </CardTitle>
+                    <CardDescription className="flex items-center gap-1.5 pt-1">
+                        <MapPin className="w-4 h-4" />
+                        {mandal.city}
+                    </CardDescription>
+                </CardHeader>
+                 <CardContent className="p-0">
+                    {isLoadingMedia ? (
+                        <div className="aspect-video w-full flex items-center justify-center bg-muted">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                    ) : (
+                        <MandalMediaViewer posts={mediaPosts} />
+                    )}
+                </CardContent>
+                <CardFooter className="p-3 border-t bg-muted/50 flex items-center justify-between flex-wrap gap-2">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="flex-1 justify-start h-9"
+                        onClick={handleLike}
+                        disabled={isLiking}
+                    >
+                        {isLiking ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <ThumbsUp className={cn("mr-2 h-4 w-4", mandal.isLikedByCurrentUser && "fill-current text-blue-500")} />}
+                        {mandal.likecount} Likes
+                    </Button>
+                    {isOwner && (
+                        <div className="flex items-center gap-2">
+                            <SendAartiNotificationButton mandal={mandal} />
+                            <MandalManagementDialog mandal={mandal} onUpdate={onUpdate}>
+                                <Button variant="secondary" size="sm" className="h-9">Manage</Button>
+                            </MandalManagementDialog>
+                        </div>
+                    )}
+                </CardFooter>
+            </Card>
+        </>
     );
 };
 
