@@ -129,19 +129,32 @@ const generateContentPrompt = ai.definePrompt({
     output: { schema: SeedContentOutputSchema },
     model: 'googleai/gemini-1.5-flash',
     tools: [searchTheWeb],
-    prompt: `You are an AI for a social media app called LocalPulse. Your task is to act as a local news curator.
-    
-    1.  **The city for the coordinates is very likely "{{{city_hint}}}". Use exactly this name unless you are certain it is wrong.**
-    2.  Determine the primary local language for that location. For India, use the state language (e.g., Marathi for Maharashtra, Kannada for Karnataka). For other countries, use their primary language (e.g., German for Germany).
-    3.  Use the 'searchTheWeb' tool to find 2-3 of the most recent and relevant news updates for that city. Use a search query like "latest news in {{{city_hint}}}".
-    4.  **IMPORTANT**: Ignore any news related to political campaigns, election ads, or political advertising. Focus on local events, infrastructure, traffic, or general community news.
-    5.  For each piece of news you find, rewrite it in the determined **LOCAL LANGUAGE** as a short, realistic, and engaging local news update or "pulse" for the app.
-    6.  Keep each pulse under 280 characters.
-    7.  For each rewritten pulse, provide a simple 1-2 word "photo_hint" in **ENGLISH** describing a suitable image (e.g., "traffic jam", "food festival"). Omit the photo_hint if no photo is suitable.
-    8.  The tone should be informative but casual, like a real person sharing an update.
-    9.  DO NOT use hashtags.
+    prompt: `You are an AI for a social media app called LocalPulse. Your role is to act as both:
+1) A local news curator.
+2) A historic photo storyteller.
 
-    Generate the content for the location provided.`,
+**PART A — Local News Curation**
+1. The city for the coordinates is very likely "{{{city_hint}}}". Use exactly this name unless you are certain it is wrong.
+2. Determine the primary local language for that location. For India, use the state language (e.g., Marathi for Maharashtra, Kannada for Karnataka). For other countries, use their primary language (e.g., German for Germany).
+3. Use the 'searchTheWeb' tool to find 2-3 of the most recent and relevant news updates for that city. Use a search query like "latest news in {{{city_hint}}}".
+4. **IMPORTANT**: Ignore any news related to political campaigns, election ads, or political advertising. Focus on local events, infrastructure, traffic, weather, culture, or general community updates.
+5. For each piece of news you find, rewrite it in the determined **LOCAL LANGUAGE** as a short, realistic, and engaging local news update or "pulse" for the app.
+6. Keep each pulse under 280 characters.
+7. For each rewritten pulse, provide a simple 1-2 word "photo_hint" in **ENGLISH** describing a suitable image (e.g., "traffic jam", "food festival"). Omit the photo_hint if no image is needed.
+8. The tone should be informative but casual, like a real person sharing an update.
+9. DO NOT use hashtags.
+
+**PART B — Historic Throwback (India Only)**
+10. If the location is in India, also create ONE additional special pulse in the same local language describing a "throwback" photo of the **chowk or main square nearest to the given coordinates ({{latitude}}, {{longitude}})** as it might have looked around **15 August 1947** (Indian Independence). 
+11. Assume realistic vintage details for that specific chowk’s surroundings: period architecture, signage, clothing, vehicles, and atmosphere typical for 1947 India. 
+12. Keep the description under 280 characters and clearly indicate it is an AI recreation.
+13. For this historic pulse, set the "photo_hint" to something like "1947 {{city_hint}} chowk" in ENGLISH.
+
+
+**Output format:**
+Return an array of objects with:
+- content: (string) — the rewritten pulse text.
+- photo_hint: (optional string) — a 1-2 word English description for image generation.`,
 });
 
 
