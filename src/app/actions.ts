@@ -16,21 +16,85 @@ import { z } from 'zod';
 
 const ai = getAi();
 
+type NominatimAddr = {
+  neighbourhood?: string;
+  suburb?: string;
+  hamlet?: string;
+  village?: string;
+  town?: string;
+  city_district?: string; // e.g., Pimpri-Chinchwad
+  municipality?: string;
+  city?: string;          // e.g., Pune
+  county?: string;        // often used as District in India
+  state_district?: string;// also used as District
+  state?: string;         // Maharashtra
+  country?: string;
+};
+
+function pickLabel(a: NominatimAddr): string {
+  // Prefer the most local place first
+  const locality =
+    a.neighbourhood ||
+    a.suburb ||
+    a.hamlet ||
+    a.village ||
+    a.town;
+
+  // City-scale: prefer PCMC (city_district) over generic city when present
+  const cityLevel =
+    a.city_district ||
+    a.municipality ||
+    a.city ||
+    a.town;
+
+  // District fallback (India: district appears in state_district/county)
+  const district = a.state_district || a.county;
+
+  if (locality && cityLevel) return `${locality}, ${cityLevel}`;
+  if (locality && district)  return `${locality}, ${district}`;
+  if (cityLevel)             return cityLevel;
+  if (district)              return district;
+  return a.state || a.country || "Unknown City";
+}
+
 async function resolveCityFromCoords(lat: number, lon: number): Promise<string> {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`;
+  const params = new URLSearchParams({
+    format: "jsonv2",
+    lat: String(lat),
+    lon: String(lon),
+    addressdetails: "1",
+    namedetails: "1",
+    extratags: "1",
+    zoom: "18",
+    "accept-language": "en"
+  });
+  const url = `https://nominatim.openstreetmap.org/reverse?${params.toString()}`;
   try {
-    const res = await fetch(url, { headers: { 'User-Agent': 'LocalPulse/1.0 (contact@localpulse.space)' }});
-    if (!res.ok) {
-        throw new Error(`Nominatim API failed with status ${res.status}`);
+    const res = await fetch(url, {
+      headers: {
+        // Per Nominatim policy: real UA + contact
+        "User-Agent": "LocalPulse/1.0 (+contact@localpulse.space)"
+      }
+    });
+    if (!res.ok) throw new Error(`Nominatim API failed with status ${res.status}`);
+    const data = await res.json() as { address?: NominatimAddr };
+    const base = pickLabel(data.address ?? {});
+
+    // Pune-area polish: if in Pune district and locality is a PCMC area,
+    // ensure we suffix Pimpri-Chinchwad (prevents "Pune" or worse "Mumbai").
+    const inPuneDistrict =
+      (data.address?.state_district === "Pune") || (data.address?.county === "Pune");
+    if (
+      inPuneDistrict &&
+      /Moshi|Chikhali|Bhosari|Nigdi|Akurdi|Talwade|Ravet|Wakad|Pimpri|Chinchwad/i.test(base) &&
+      !/Pimpri[- ]?Chinchwad/i.test(base)
+    ) {
+      return `${base}, Pimpri-Chinchwad`;
     }
-    const data = await res.json();
-    const a = data?.address ?? {};
-    return (
-      a.city || a.town || a.municipality || a.village || a.suburb || a.city_district || a.county || a.state_district || a.state || 'Unknown City'
-    );
+    return base;
   } catch (error) {
     console.error("Reverse geocoding failed:", error);
-    return "Unknown City"; // Fallback on error
+    return "Unknown City";
   }
 }
 
