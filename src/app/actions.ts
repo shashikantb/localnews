@@ -17,7 +17,7 @@ import { z } from 'zod';
 const ai = getAi();
 
 async function resolveCityFromCoords(lat: number, lon: number): Promise<string> {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`;
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'LocalPulse/1.0 (contact@localpulse.space)' }});
     if (!res.ok) {
