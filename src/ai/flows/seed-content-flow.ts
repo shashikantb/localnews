@@ -20,6 +20,7 @@ const SeedContentInputSchema = z.object({
   latitude: z.number().describe('The latitude of the location.'),
   longitude: z.number().describe('The longitude of the location.'),
   city_hint: z.string().optional().describe('An optional city name hint from a reverse geocoder.'),
+  today_iso: z.string().optional().describe('The current date in ISO format, e.g., 2025-08-15.'),
 });
 
 const SeedContentOutputSchema = z.object({
@@ -30,11 +31,18 @@ const SeedContentOutputSchema = z.object({
         .string()
         .optional()
         .describe(
-          'A simple 1-2 word description in ENGLISH for a photo if this post would benefit from one. E.g., "traffic jam" or "food festival". Omit if no photo is needed.'
+          'A simple 1-3 word description in ENGLISH for a photo if this post would benefit from one. E.g., "traffic jam" or "food festival". Omit if no photo is needed.'
         ),
+      category: z.enum(['viral', 'useful']).describe('The category of the post.'),
+      source_title: z.string().describe('The short source name for verification.'),
+      source_time: z.string().describe("The source timestamp, e.g., ISO or 'today HH:mm'."),
+      source_url: z.string().url().describe('The source URL for verification.'),
+      locality_radius_km: z.number().describe('The radius in km used to find the news.'),
+      confidence: z.number().min(0).max(100).describe('Your confidence in the correctness of the information.'),
     })
   ),
 });
+
 
 // Tool for the AI to search the web for real news
 const searchTheWeb = ai.defineTool(
@@ -61,6 +69,7 @@ const searchTheWeb = ai.defineTool(
             engine: 'google',
             q: input.query,
             api_key: process.env.SERPAPI_API_KEY,
+            tbs: 'qdr:w', // Limit search to the past week for relevance
         });
 
         const results = (json.organic_results || []).slice(0, 5).map(res => ({
@@ -105,7 +114,7 @@ async function uploadImageToGcs(base64Data: string, city: string): Promise<strin
 }
 
 async function reverseGeocode(lat: number, lon: number): Promise<string> {
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=10&addressdetails=1`;
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}&zoom=14&addressdetails=1`;
   try {
     const res = await fetch(url, { headers: { 'User-Agent': 'LocalPulse/1.0 (contact@localpulse.space)' }});
     if (!res.ok) {
@@ -114,7 +123,7 @@ async function reverseGeocode(lat: number, lon: number): Promise<string> {
     const data = await res.json();
     const a = data?.address ?? {};
     return (
-      a.city || a.town || a.municipality || a.village || a.suburb || a.city_district || a.county || a.state_district || a.state || 'Unknown'
+      a.city || a.town || a.municipality || a.village || a.suburb || a.city_district || a.county || a.state_district || a.state || 'Unknown City'
     );
   } catch (error) {
     console.error("Reverse geocoding failed:", error);
@@ -129,37 +138,68 @@ const generateContentPrompt = ai.definePrompt({
     output: { schema: SeedContentOutputSchema },
     model: 'googleai/gemini-1.5-flash',
     tools: [searchTheWeb],
-    prompt: `You are an AI for a social media app called LocalPulse. Your role is to act as:
-1) A local news curator who selects content with high viral potential.
-2) A historic photo storyteller.
+    prompt: `You are an AI for a hyperlocal social app called LocalPulse. Your job:
+1) Curate fresh, high-signal local updates (mix of viral + useful).
+2) Create one nostalgic throwback for the nearest main square/chowk.
 
-**PART A — Local News Curation (Viral Focus)**
-1. The city for the coordinates is very likely "{{{city_hint}}}". Use exactly this name unless you are certain it is wrong.
-2. Determine the primary local language for that location. For India, use the state language (e.g., Marathi for Maharashtra, Kannada for Karnataka). For other countries, use their primary language (e.g., German for Germany).
-3. Use the 'searchTheWeb' tool to find 2-3 of the most recent and **likely-to-trend** news updates for that city. 
-4. A “likely-to-trend” story is one that is:
-   - Unique or surprising
-   - Emotionally engaging (happy, inspiring, funny, or shocking — but safe)
-   - Relatable to most locals
-   - Visually appealing or easy to imagine
-   - Timely (just happened or about to happen)
-5. Focus on local events, festivals, human-interest stories, unusual occurrences, new attractions, record-breaking events, cultural pride moments, or urgent community alerts.
-6. Ignore political campaigns, election ads, or political propaganda.
-7. Rewrite each story in the determined **LOCAL LANGUAGE** as a short, engaging update under 280 characters, making it sound like a post a friend would share.
-8. Make the tone catchy and emotional enough to spark shares/comments.
-9. For each story, give a 1-2 word **ENGLISH** "photo_hint" for image generation. Omit if not needed.
-10. DO NOT use hashtags.
+INPUTS:
+- latitude: {{latitude}}
+- longitude: {{longitude}}
+- city_hint: "{{{city_hint}}}"
+- today_iso: {{today_iso}}   // e.g., 2025-08-15
 
-**PART B — Historic Throwback (India Only)**
-11. If the location is in India, also create ONE additional special pulse in the same local language describing a "throwback" photo of the **chowk or main square nearest to the given coordinates ({{latitude}}, {{longitude}})** as it might have looked around **15 August 1947** (Indian Independence).
-12. Assume realistic vintage details for that specific chowk’s surroundings: period architecture, signage, clothing, vehicles, and atmosphere typical for 1947 India.
-13. Make it nostalgic and emotionally moving, under 280 characters, and clearly indicate it is an AI recreation.
-14. Set the "photo_hint" for this to something like "1947 {{city_hint}} chowk" in ENGLISH.
+LANGUAGE:
+- Determine the primary local language for the location. In India, use the state's main language (e.g., Marathi for Maharashtra, Kannada for Karnataka). For other countries, use the country’s primary language.
+- If a major bilingual norm exists, write the post in the local language but keep proper nouns in Latin script when common.
+- If confidence in language < 70%, default to English.
 
-**Output format:**
-Return an array of objects with:
-- content: (string) — the rewritten pulse text.
-- photo_hint: (optional string) — a 1-2 word English description for image generation.`,
+PART A — Local News Curation (Viral + Useful)
+1) Treat the location as "{{{city_hint}}}" unless you are certain it is wrong. Prefer items within a 30 km radius of ({{latitude}}, {{longitude}}). If fewer than 2 items are found, expand to district/region; if still sparse, expand to the nearest major city.
+2) Use the searchTheWeb tool to find RECENT items (prefer last 72 hours; allow up to 7 days if high-impact).
+3) Collect 4–6 candidates across these buckets (aim for at least one from each A & B):
+   A. VIRAL/DELIGHT: unique, surprising, heartwarming, visual (festivals, unusual sightings, new attractions, records).
+   B. USEFUL/BENEFICIAL: urgent alerts, road closures, water/power updates, health advisories, job fairs, public service drives, education deadlines, civic announcements, public transport changes, local deals that benefit most residents.
+4) EXCLUDE: political ads/propaganda, hate/violence, unverified rumors, explicit content.
+5) For each candidate, compute a score (0–5) for:
+   - Trend: uniqueness + emotional pull + visual potential
+   - Benefit: practical utility for locals
+   - Recency: how new/time-sensitive it is
+   - Locality: proximity/relevance to the coordinates
+   Keep (a) the top 2–3 overall by total score, and (b) ensure at least ONE is from the USEFUL/BENEFICIAL bucket.
+6) Rewrite each selected story in the LOCAL LANGUAGE as a friendly, shareable update ≤ 280 characters.
+   - Make it vivid but accurate; no clickbait, no exaggeration.
+   - Include a concrete “when/where” if available.
+   - Avoid hashtags and @mentions.
+7) Add a concise ENGLISH photo_hint (1–3 words) only if a visual is obvious (e.g., “Spring festival”, “Metro extension map”). Omit if not helpful.
+8) Add lightweight attribution fields so editors can verify quickly.
+
+PART B — Nostalgic Throwback (All Countries)
+9) Create ONE additional special pulse in the same local language describing a nostalgic “throwback” photo of the nearest chowk, main square, or well-known central spot to the given coordinates ({{latitude}}, {{longitude}}) as it might have looked around **10–20 years ago** (based on the current date).
+10) Assume realistic period details for that spot’s surroundings: architecture, signage styles, vehicles common in that era, clothing trends, street furniture, lighting, and general atmosphere typical for that time.
+11) Make it warm, familiar, and emotionally relatable — something that sparks comments like “I remember this!”.
+12) Keep it under 280 characters and clearly indicate it is an AI recreation from the past.
+13) Set the "photo_hint" for this to "{{year_range}} {{city_hint}} square" (or “chowk” if in India) in ENGLISH, where \`year_range\` is the chosen nostalgic period (e.g., "2008 Paris square", "2010 Moshi chowk").
+
+SAFETY & ACCURACY
+- Prefer official or reputable local sources for alerts and advisories.
+- If a claim seems uncertain, either drop it or clearly mark “report says/likely”.
+- When possible, include date/time in the post text.
+- Do not include URLs in the content text.
+
+OUTPUT FORMAT
+Return an array of objects, each with:
+{
+  "content": "<post in local language ≤ 280 chars>",
+  "photo_hint": "<EN 1–3 words or omit>",
+  "category": "viral" | "useful",
+  "source_title": "<short source name>",
+  "source_time": "<ISO or 'today HH:mm'>",
+  "source_url": "<link>",
+  "locality_radius_km": <number>,       // e.g., 7.5
+  "confidence": 0–100                    // your confidence in correctness
+}
+
+Ensure at least 2 and at most 4 items for Part A, plus exactly 1 “throwback” item (category = "viral").`,
 });
 
 
@@ -176,10 +216,11 @@ const seedContentFlow = ai.defineFlow(
       return { success: false, message: 'Could not determine a valid city from coordinates.', postCount: 0, cityName: 'Unknown' };
     }
     
-    // 2. Generate the content from the AI, providing the city name as a strong hint.
+    // 2. Generate the content from the AI, providing the city name and date as a strong hint.
     const { output } = await generateContentPrompt({
         ...input,
         city_hint: cityName,
+        today_iso: new Date().toISOString().split('T')[0],
     });
     
     if (!output || !output.posts || output.posts.length === 0) {
@@ -249,10 +290,26 @@ export async function seedCityContent(city: string): Promise<SeedContentFlowOutp
         throw new Error(`City name must be provided for manual content seeding.`);
     }
     
-    console.warn(`Manual seeding for "${city}" is using placeholder coordinates. This may not be accurate. Live seeding is recommended.`);
-    const placeholderCoords = { latitude: 51.5072, longitude: -0.1276 }; // London placeholder, less likely to be used
-    return await seedContentFlow({ latitude: placeholderCoords.latitude, longitude: placeholderCoords.longitude });
+    // Use Nominatim to get coordinates for the manually entered city name
+    const geocodeUrl = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)}&format=json&limit=1`;
+    try {
+        const geoRes = await fetch(geocodeUrl, { headers: { 'User-Agent': 'LocalPulse/1.0 (contact@localpulse.space)' } });
+        if (!geoRes.ok) throw new Error(`Nominatim geocoding failed with status ${geoRes.status}`);
+        
+        const geoData = await geoRes.json();
+        if (geoData.length === 0) {
+            return { success: false, message: `Could not find coordinates for "${city}".`, postCount: 0, cityName: city };
+        }
+        
+        const { lat, lon } = geoData[0];
+        return await seedContentFlow({ latitude: parseFloat(lat), longitude: parseFloat(lon) });
+
+    } catch(error: any) {
+        console.error(`Error during manual seeding for city "${city}":`, error);
+        return { success: false, message: error.message, postCount: 0, cityName: city };
+    }
 }
+
 
 // This is the new primary function for automatic seeding.
 export async function seedContent(input: SeedContentInput): Promise<SeedContentFlowOutput> {
