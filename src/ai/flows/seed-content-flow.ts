@@ -139,8 +139,9 @@ const generateContentPrompt = ai.definePrompt({
     model: 'googleai/gemini-1.5-flash',
     tools: [searchTheWeb],
     prompt: `You are an AI for a hyperlocal social app called LocalPulse. Your job:
-1) Curate fresh, high-signal local updates (mix of viral + useful).
-2) Create one nostalgic throwback for the nearest main square/chowk.
+1) Create one nostalgic throwback for the nearest main square/chowk.
+2) Curate fresh, high-signal local updates (mix of viral + useful).
+
 
 INPUTS:
 - latitude: {{latitude}}
@@ -153,32 +154,26 @@ LANGUAGE:
 - If a major bilingual norm exists, write the post in the local language but keep proper nouns in Latin script when common.
 - If confidence in language < 70%, default to English.
 
-PART A — Local News Curation (Viral + Useful)
+PART A — Nostalgic Throwback (All Countries)
+1) Create ONE special pulse in the same local language describing a nostalgic “throwback” photo of the nearest chowk, main square, or well-known central spot to the given coordinates ({{latitude}}, {{longitude}}) as it might have looked around **10–20 years ago** (based on the current date).
+2) Assume realistic period details for that spot’s surroundings: architecture, signage styles, vehicles common in that era, clothing trends, street furniture, lighting, and general atmosphere typical for that time.
+3) Make it warm, familiar, and emotionally relatable — something that sparks comments like “I remember this!”.
+4) Keep it under 280 characters and clearly indicate it is an AI recreation from the past.
+5) Set the "photo_hint" for this to "{{year_range}} {{city_hint}} square" (or “chowk” if in India) in ENGLISH, where \`year_range\` is the chosen nostalgic period (e.g., "2008 Paris square", "2010 Moshi chowk").
+
+PART B — Local News Curation (Viral + Useful)
 1) Treat the location as "{{{city_hint}}}" unless you are certain it is wrong. Prefer items within a 30 km radius of ({{latitude}}, {{longitude}}). If fewer than 2 items are found, expand to district/region; if still sparse, expand to the nearest major city.
 2) Use the searchTheWeb tool to find RECENT items (prefer last 72 hours; allow up to 7 days if high-impact).
-3) Collect 4–6 candidates across these buckets (aim for at least one from each A & B):
+3) Collect 2 candidates across these buckets (aim for at least one from each A & B):
    A. VIRAL/DELIGHT: unique, surprising, heartwarming, visual (festivals, unusual sightings, new attractions, records).
    B. USEFUL/BENEFICIAL: urgent alerts, road closures, water/power updates, health advisories, job fairs, public service drives, education deadlines, civic announcements, public transport changes, local deals that benefit most residents.
 4) EXCLUDE: political ads/propaganda, hate/violence, unverified rumors, explicit content.
-5) For each candidate, compute a score (0–5) for:
-   - Trend: uniqueness + emotional pull + visual potential
-   - Benefit: practical utility for locals
-   - Recency: how new/time-sensitive it is
-   - Locality: proximity/relevance to the coordinates
-   Keep (a) the top 2–3 overall by total score, and (b) ensure at least ONE is from the USEFUL/BENEFICIAL bucket.
-6) Rewrite each selected story in the LOCAL LANGUAGE as a friendly, shareable update ≤ 280 characters.
+5) Rewrite each selected story in the LOCAL LANGUAGE as a friendly, shareable update ≤ 280 characters.
    - Make it vivid but accurate; no clickbait, no exaggeration.
    - Include a concrete “when/where” if available.
    - Avoid hashtags and @mentions.
-7) Add a concise ENGLISH photo_hint (1–3 words) only if a visual is obvious (e.g., “Spring festival”, “Metro extension map”). Omit if not helpful.
-8) Add lightweight attribution fields so editors can verify quickly.
-
-PART B — Nostalgic Throwback (All Countries)
-9) Create ONE additional special pulse in the same local language describing a nostalgic “throwback” photo of the nearest chowk, main square, or well-known central spot to the given coordinates ({{latitude}}, {{longitude}}) as it might have looked around **10–20 years ago** (based on the current date).
-10) Assume realistic period details for that spot’s surroundings: architecture, signage styles, vehicles common in that era, clothing trends, street furniture, lighting, and general atmosphere typical for that time.
-11) Make it warm, familiar, and emotionally relatable — something that sparks comments like “I remember this!”.
-12) Keep it under 280 characters and clearly indicate it is an AI recreation from the past.
-13) Set the "photo_hint" for this to "{{year_range}} {{city_hint}} square" (or “chowk” if in India) in ENGLISH, where \`year_range\` is the chosen nostalgic period (e.g., "2008 Paris square", "2010 Moshi chowk").
+6) Add a concise ENGLISH photo_hint (1–3 words) only if a visual is obvious (e.g., “Spring festival”, “Metro extension map”). Omit if not helpful.
+7) Add lightweight attribution fields so editors can verify quickly.
 
 SAFETY & ACCURACY
 - Prefer official or reputable local sources for alerts and advisories.
@@ -199,7 +194,7 @@ Return an array of objects, each with:
   "confidence": 0–100                    // your confidence in correctness
 }
 
-Ensure at least 2 and at most 4 items for Part A, plus exactly 1 “throwback” item (category = "viral").`,
+Ensure exactly 1 'throwback' item (Part A) and exactly 2 news items (Part B).`,
 });
 
 
