@@ -2387,6 +2387,7 @@ export async function getNearbyBusinessesDb(options: {
   latitude: number;
   longitude: number;
   category?: string;
+  radiusKm?: number;
 }): Promise<BusinessUser[]> {
   await ensureDbInitialized();
   const dbPool = getDbPool();
@@ -2394,8 +2395,8 @@ export async function getNearbyBusinessesDb(options: {
 
   const client = await dbPool.connect();
   try {
-    const { limit, offset, latitude, longitude, category } = options;
-    const queryParams: any[] = [latitude, longitude, 30000, limit, offset]; // 30km radius
+    const { limit, offset, latitude, longitude, category, radiusKm = 30 } = options;
+    const queryParams: any[] = [latitude, longitude, radiusKm * 1000, limit, offset];
 
     let categoryFilter = '';
     if (category) {

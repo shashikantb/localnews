@@ -104,7 +104,7 @@ function NotificationButtonContent({
   }
 }
 
-export function NoPostsContent({ feedType }: { feedType: FeedType }) {
+export function NoPostsContent({ feedType, radiusKm, onRadiusChange }: { feedType: FeedType; radiusKm?: number; onRadiusChange?: (radius: number) => void; }) {
   const messages = {
     nearby: {
       title: 'The air is quiet here...',
@@ -116,7 +116,7 @@ export function NoPostsContent({ feedType }: { feedType: FeedType }) {
     },
     business: {
       title: 'No Businesses Found',
-      description: 'No businesses found in your area for the selected category. Try a different filter!'
+      description: radiusKm ? `We looked within ${radiusKm} km. Want to try a wider radius?` : 'No businesses found in your area for the selected category. Try a different filter!'
     },
     festival: {
         title: 'The Festivities Await!',
@@ -131,15 +131,26 @@ export function NoPostsContent({ feedType }: { feedType: FeedType }) {
         {feedType === 'business' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : feedType === 'festival' ? <PartyPopper className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
         <p className="text-2xl text-muted-foreground font-semibold">{currentMessage.title}</p>
         <p className="text-md text-muted-foreground/80 mt-2">{currentMessage.description}</p>
-        <div className="mt-6">
-          <a
-            href="#"
-            onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-            className="inline-flex items-center rounded-md border px-3 py-2 text-sm bg-background hover:bg-muted"
-          >
-            Share your first Pulse
-          </a>
-        </div>
+        {feedType === 'business' && onRadiusChange && (
+            <div className="flex gap-2 mt-4">
+              {[10, 15, 25].map(r => (
+                <Button key={r} variant="outline" size="sm" onClick={() => onRadiusChange(r)}>
+                  {r} km
+                </Button>
+              ))}
+            </div>
+        )}
+        {feedType !== 'business' && (
+            <div className="mt-6">
+            <a
+                href="#"
+                onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+                className="inline-flex items-center rounded-md border px-3 py-2 text-sm bg-background hover:bg-muted"
+            >
+                Share your first Pulse
+            </a>
+            </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -165,6 +176,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const [businessFeed, setBusinessFeed] = useState<BusinessFeedState>(initialBusinessFeedState);
 
   const [sortBy, setSortBy] = useState<SortOption>('nearby');
+  const [radiusKm, setRadiusKm] = useState(5);
   
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -175,6 +187,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   
   const liveSeedingTriggered = useRef(false);
+  const businessInitialLoad = useRef(false);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -233,7 +247,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     setLocationPromptVisible(false);
     setBusinessFeed(prev => ({ ...prev, isLoading: true }));
     try {
-      const newBusinesses = await getNearbyBusinesses({ page, limit: POSTS_PER_PAGE, latitude: location.latitude, longitude: location.longitude, category });
+      const newBusinesses = await getNearbyBusinesses({ page, limit: POSTS_PER_PAGE, latitude: location.latitude, longitude: location.longitude, category, radiusKm });
       setBusinessFeed(prev => {
         const allBusinesses = page === 1 ? newBusinesses : [...prev.businesses, ...newBusinesses.filter(b => !prev.businesses.some(eb => eb.id === b.id))];
         return {
@@ -249,7 +263,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       console.error('Error fetching businesses:', error);
       setBusinessFeed(prev => ({ ...prev, isLoading: false }));
     }
-  }, [location]);
+  }, [location, radiusKm]);
 
   const requestLocation = useCallback(() => {
       if (isFetchingLocation) return;
@@ -288,10 +302,11 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   }, [requestLocation]);
 
   useEffect(() => {
-    if (location && activeTab === 'business') {
-        fetchBusinesses(1, businessFeed.category);
+    if (activeTab === 'business' && location && !businessInitialLoad.current) {
+      businessInitialLoad.current = true;
+      fetchBusinesses(1, businessFeed.category);
     }
-  }, [location, businessFeed.category]); // Removed fetchBusinesses to avoid dependency cycle
+  }, [activeTab, location, fetchBusinesses, businessFeed.category]);
 
   
   const handleTabChange = useCallback((newTab: FeedType) => {
@@ -471,6 +486,11 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if(category === businessFeed.category) return;
     fetchBusinesses(1, category);
   };
+  
+  const handleRadiusChange = (newRadius: number) => {
+    setRadiusKm(newRadius);
+    fetchBusinesses(1, businessFeed.category);
+  }
 
   const renderFeedContent = () => {
     if (activeTab === 'festival') {
@@ -504,9 +524,9 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                       <BusinessCard key={business.id} business={business} userLocation={location} />
                   ))
               ) : (
-                  <NoPostsContent feedType='business' />
+                  <NoPostsContent feedType='business' radiusKm={radiusKm} onRadiusChange={(r) => { setRadiusKm(r); fetchBusinesses(1, businessFeed.category); }} />
               )}
-              <div ref={loaderRef} className="h-1 w-full" />
+              {businessFeed.hasMore && <div ref={loaderRef} className="h-1 w-full" />}
               {businessFeed.isLoading && businessFeed.businesses.length > 0 && (
                   <div className="flex justify-center items-center py-6">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -530,7 +550,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         ) : (
           <NoPostsContent feedType={activeTab} />
         )}
-        <div ref={loaderRef} className="h-1 w-full" />
+        {feed.hasMore && <div ref={loaderRef} className="h-1 w-full" />}
         {feed.isLoading && feed.posts.length > 0 && (
           <div className="flex justify-center items-center py-6">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -583,6 +603,22 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 activeKey={activeTab}
             />
             <div className="flex items-center gap-2">
+              {activeTab === 'business' && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm" className="h-9 shadow-sm">
+                      <Filter className="w-4 h-4 mr-2" />
+                      <span>{radiusKm} km</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuLabel>Search Radius</DropdownMenuLabel>
+                    <DropdownMenuRadioGroup value={String(radiusKm)} onValueChange={(v) => handleRadiusChange(Number(v))}>
+                      {[5, 10, 15, 30].map(r => <DropdownMenuRadioItem key={r} value={String(r)}>{r} km</DropdownMenuRadioItem>)}
+                    </DropdownMenuRadioGroup>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
               {activeTab === 'business' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
