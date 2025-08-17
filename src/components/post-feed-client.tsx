@@ -10,7 +10,7 @@ import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, upd
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper } from 'lucide-react';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -171,6 +171,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const [notificationPermissionStatus, setNotificationPermissionStatus] = useState<'default' | 'loading' | 'granted' | 'denied'>('default');
   const [showTroubleshootingDialog, setShowTroubleshootingDialog] = useState(false);
   const [unreadFamilyPostCount, setUnreadFamilyPostCount] = useState(0);
+  const [locationPromptVisible, setLocationPromptVisible] = useState(false);
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   
   const liveSeedingTriggered = useRef(false);
 
@@ -224,14 +226,14 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   }, []);
 
   const fetchBusinesses = useCallback(async (page: number, category?: string) => {
+    if (!location) {
+        setLocationPromptVisible(true);
+        return;
+    }
+    setLocationPromptVisible(false);
     setBusinessFeed(prev => ({ ...prev, isLoading: true }));
     try {
-      if (!location) {
-        // Don't fetch if location is not available
-        setBusinessFeed(prev => ({ ...prev, isLoading: false, hasMore: false }));
-        return;
-      }
-      const newBusinesses = await getNearbyBusinesses({ page, limit: POSTS_PER_PAGE, latitude: location?.latitude, longitude: location?.longitude, category });
+      const newBusinesses = await getNearbyBusinesses({ page, limit: POSTS_PER_PAGE, latitude: location.latitude, longitude: location.longitude, category });
       setBusinessFeed(prev => {
         const allBusinesses = page === 1 ? newBusinesses : [...prev.businesses, ...newBusinesses.filter(b => !prev.businesses.some(eb => eb.id === b.id))];
         return {
@@ -249,42 +251,49 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
   }, [location]);
 
-  // Initial location fetch
-  useEffect(() => {
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-          setLocation(newLocation);
-          
-          if (!liveSeedingTriggered.current) {
-            triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
-            liveSeedingTriggered.current = true;
-          }
+  const requestLocation = useCallback(() => {
+      if (isFetchingLocation) return;
+      setIsFetchingLocation(true);
+      if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+              (position) => {
+                  const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+                  setLocation(newLocation);
+                  setLocationPromptVisible(false);
+                  setIsFetchingLocation(false);
+                  
+                  if (!liveSeedingTriggered.current) {
+                      triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
+                      liveSeedingTriggered.current = true;
+                  }
 
-          if (sessionUser) {
-            updateUserLocation(newLocation.latitude, newLocation.longitude).catch(err => console.warn("Silent location update failed:", err));
-          }
-        },
-        () => {
-          console.warn("Could not get user location. Feed will show newest posts globally.");
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
+                  if (sessionUser) {
+                      updateUserLocation(newLocation.latitude, newLocation.longitude).catch(err => console.warn("Silent location update failed:", err));
+                  }
+              },
+              (err) => {
+                  console.warn("Could not get user location:", err.message);
+                  toast({ variant: 'destructive', title: 'Location Error', description: 'Could not access your location. Please check your browser settings.' });
+                  setLocationPromptVisible(true); // Keep prompt visible
+                  setIsFetchingLocation(false);
+              },
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+          );
+      }
+  }, [isFetchingLocation, sessionUser, toast]);
+
+  // Initial location check (doesn't prompt, just checks)
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
+
+  useEffect(() => {
+    if (location && activeTab === 'business') {
+        fetchBusinesses(1, businessFeed.category);
     }
-  }, [sessionUser]);
+  }, [location, businessFeed.category]); // Removed fetchBusinesses to avoid dependency cycle
+
   
-  // This effect will run ONCE when the location is first detected.
-  // It ensures the "Nearby" feed is immediately refreshed with location-sorted data,
-  // overriding the initial server-rendered posts.
-  useEffect(() => {
-    if (location && activeTab === 'nearby') {
-        console.log("Location detected, fetching nearby posts.");
-        fetchPosts('nearby', 1, sortBy, location);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
-
   const handleTabChange = useCallback((newTab: FeedType) => {
     if (newTab === 'family') {
       if (unreadFamilyPostCount > 0) {
@@ -295,13 +304,17 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchPosts('family', 1, sortBy, location);
       }
     } else if (newTab === 'business') {
-        if (businessFeed.businesses.length === 0 && !businessFeed.isLoading) {
+        if (!location) {
+            setLocationPromptVisible(true);
+            setBusinessFeed(initialBusinessFeedState);
+        } else if (businessFeed.businesses.length === 0 && !businessFeed.isLoading) {
             fetchBusinesses(1, businessFeed.category);
         }
     } else if (newTab === 'festival') {
+        setLocationPromptVisible(false);
         // MandalList component fetches its own data
-    }
-     else { // nearby
+    } else { // nearby
+        setLocationPromptVisible(false);
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
             fetchPosts('nearby', 1, sortBy, location);
         }
@@ -465,26 +478,42 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
 
     if (activeTab === 'business') {
-        if ((businessFeed.isLoading && businessFeed.businesses.length === 0) || isRefreshing) {
-            return <PostFeedSkeleton />;
-        }
-        return (
-            <div className="space-y-6">
-                {businessFeed.businesses.length > 0 ? (
-                    businessFeed.businesses.map((business, index) => (
-                        <BusinessCard key={business.id} business={business} userLocation={location} />
-                    ))
-                ) : (
-                    <NoPostsContent feedType='business' />
-                )}
-                <div ref={loaderRef} className="h-1 w-full" />
-                {businessFeed.isLoading && businessFeed.businesses.length > 0 && (
-                    <div className="flex justify-center items-center py-6">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                )}
-            </div>
-        );
+      if (locationPromptVisible) {
+          return (
+              <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
+                  <CardContent className="flex flex-col items-center">
+                      <LocateFixed className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />
+                      <p className="text-2xl text-muted-foreground font-semibold">Location Needed</p>
+                      <p className="text-md text-muted-foreground/80 mt-2 max-w-sm">To find businesses near you, we need access to your location.</p>
+                      <Button onClick={requestLocation} disabled={isFetchingLocation} className="mt-6">
+                          {isFetchingLocation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
+                          {isFetchingLocation ? 'Finding You...' : 'Grant Location Access'}
+                      </Button>
+                  </CardContent>
+              </Card>
+          );
+      }
+
+      if ((businessFeed.isLoading && businessFeed.businesses.length === 0) || isRefreshing) {
+          return <PostFeedSkeleton />;
+      }
+      return (
+          <div className="space-y-6">
+              {businessFeed.businesses.length > 0 ? (
+                  businessFeed.businesses.map((business, index) => (
+                      <BusinessCard key={business.id} business={business} userLocation={location} />
+                  ))
+              ) : (
+                  <NoPostsContent feedType='business' />
+              )}
+              <div ref={loaderRef} className="h-1 w-full" />
+              {businessFeed.isLoading && businessFeed.businesses.length > 0 && (
+                  <div className="flex justify-center items-center py-6">
+                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+              )}
+          </div>
+      );
     }
     
     const feed = feeds[activeTab];

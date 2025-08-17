@@ -144,7 +144,7 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE TABLE IF NOT EXISTS poll_options (id SERIAL PRIMARY KEY, poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE, option_text TEXT NOT NULL, vote_count INTEGER DEFAULT 0);`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS poll_votes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE, option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE, PRIMARY KEY (user_id, poll_id));`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS app_settings (setting_key VARCHAR(255) PRIMARY KEY, setting_value TEXT);`);
-    await initClient.query(`CREATE TABLE IF NOT EXISTS city_seed_log (city_name VARCHAR(255) PRIMARY KEY, last_seeded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
+    await initClient.query(`CREATE TABLE IF NOT EXISTS city_seed_log (geohash_key VARCHAR(12) PRIMARY KEY, last_seeded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
     
     // Table for OTP
     await initClient.query(`
@@ -2395,7 +2395,7 @@ export async function getNearbyBusinessesDb(options: {
   const client = await dbPool.connect();
   try {
     const { limit, offset, latitude, longitude, category } = options;
-    const queryParams: any[] = [latitude, longitude, 20000, limit, offset]; // 20km radius
+    const queryParams: any[] = [latitude, longitude, 30000, limit, offset]; // 30km radius
 
     let categoryFilter = '';
     if (category) {
@@ -2925,32 +2925,32 @@ export async function setAppSettingDb(key: string, value: string): Promise<void>
     }
 }
 
-export async function getLastSeedTimeDb(cityName: string): Promise<string | null> {
+export async function getLastSeedTimeDb(geohashKey: string): Promise<string | null> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) return null;
     const client = await dbPool.connect();
     try {
-        const result = await client.query('SELECT last_seeded_at FROM city_seed_log WHERE city_name = $1', [cityName]);
+        const result = await client.query('SELECT last_seeded_at FROM city_seed_log WHERE geohash_key = $1', [geohashKey]);
         return result.rows[0]?.last_seeded_at || null;
     } finally {
         client.release();
     }
 }
 
-export async function updateLastSeedTimeDb(cityName: string): Promise<void> {
+export async function updateLastSeedTimeDb(geohashKey: string): Promise<void> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) throw new Error("Database not configured.");
     const client = await dbPool.connect();
     try {
         const query = `
-            INSERT INTO city_seed_log (city_name, last_seeded_at)
+            INSERT INTO city_seed_log (geohash_key, last_seeded_at)
             VALUES ($1, NOW())
-            ON CONFLICT (city_name) DO UPDATE
+            ON CONFLICT (geohash_key) DO UPDATE
             SET last_seeded_at = NOW();
         `;
-        await client.query(query, [cityName]);
+        await client.query(query, [geohashKey]);
     } finally {
         client.release();
     }
@@ -3302,11 +3302,3 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
-
-
-
-
-
-
-
-
