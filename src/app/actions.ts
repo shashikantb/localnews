@@ -3,7 +3,7 @@
 'use server';
 
 import * as db from '@/lib/db';
-import type { ConversationDetails, GanpatiMandal, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal } from '@/lib/db-types';
+import type { ConversationDetails, GanpatiMandal, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal, FindExternalBusinessesOutput, FindExternalBusinessesInput, ExternalBusiness } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
@@ -11,6 +11,7 @@ import { cookies } from 'next/headers';
 import admin, { getAi } from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import { seedContent } from '@/ai/flows/seed-content-flow';
+import { findExternalBusinesses as findExternalBusinessesFlow } from '@/ai/flows/find-external-businesses-flow';
 import ngeohash from "ngeohash";
 import { z } from 'zod';
 
@@ -1392,7 +1393,7 @@ export async function getSignedUploadUrl(fileName: string, fileType: string): Pr
   }
 }
 
-export async function getNearbyBusinesses(options: { page: number; limit: number; latitude: number; longitude: number; category?: string;}): Promise<BusinessUser[]> {
+export async function getNearbyBusinesses(options: { page: number; limit: number; latitude: number; longitude: number; category?: string; radiusKm?: number;}): Promise<BusinessUser[]> {
     try {
         return await db.getNearbyBusinessesDb({
             ...options,
@@ -1404,6 +1405,19 @@ export async function getNearbyBusinesses(options: { page: number; limit: number
         return [];
     }
 }
+
+export async function findExternalBusinesses(input: FindExternalBusinessesInput): Promise<FindExternalBusinessesOutput> {
+    try {
+        if (!process.env.SERPAPI_API_KEY) {
+            throw new Error('SERPAPI_API_KEY is not configured for external business search.');
+        }
+        return await findExternalBusinessesFlow(input);
+    } catch(error: any) {
+        console.error("Error in findExternalBusinesses server action:", error);
+        return { businesses: [] };
+    }
+}
+
 
 export async function getBusinessesForMap(bounds: { ne: { lat: number, lng: number }, sw: { lat: number, lng: number } }): Promise<BusinessUser[]> {
     try {

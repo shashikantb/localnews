@@ -449,3 +449,18 @@ export const SendOtpInputSchema = z.object({
 });
 
 export type SendOtpInput = z.infer<typeof SendOtpInputSchema>;
+
+// For External Business Search
+export type ExternalBusiness = {
+    name: string;
+    phone?: string;
+    address?: string;
+};
+export type FindExternalBusinessesInput = {
+    category: string;
+    latitude: number;
+    longitude: number;
+};
+export type FindExternalBusinessesOutput = {
+    businesses: ExternalBusiness[];
+};

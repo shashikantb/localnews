@@ -5,8 +5,8 @@
 import React, { type FC } from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import type { Post, User, SortOption, BusinessUser } from '@/lib/db-types';
-import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, updateUserLocation, getUnreadFamilyPostCount, markFamilyFeedAsRead, triggerLiveSeeding } from '@/app/actions';
+import type { Post, User, SortOption, BusinessUser, ExternalBusiness } from '@/lib/db-types';
+import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, updateUserLocation, getUnreadFamilyPostCount, markFamilyFeedAsRead, triggerLiveSeeding, findExternalBusinesses } from '@/app/actions';
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent } from '@/components/ui/card';
@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { BUSINESS_CATEGORIES } from '@/lib/db-types';
 import BusinessCard from './business-card';
+import ExternalBusinessCard from './external-business-card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { getMessaging, getToken } from 'firebase/messaging';
@@ -66,9 +67,11 @@ type FeedState = {
 
 type BusinessFeedState = {
     businesses: BusinessUser[];
+    externalBusinesses: ExternalBusiness[];
     page: number;
     hasMore: boolean;
     isLoading: boolean;
+    isLoadingAI: boolean;
     category?: string;
 };
 
@@ -81,9 +84,12 @@ const initialFeedState: FeedState = {
 
 const initialBusinessFeedState: BusinessFeedState = {
     businesses: [],
+    externalBusinesses: [],
     page: 1,
     hasMore: true,
     isLoading: false,
+    isLoadingAI: false,
+    category: undefined,
 };
 
 function NotificationButtonContent({
@@ -245,25 +251,37 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         return;
     }
     setLocationPromptVisible(false);
-    setBusinessFeed(prev => ({ ...prev, isLoading: true }));
+    setBusinessFeed(prev => ({ ...prev, isLoading: true, externalBusinesses: [] }));
     try {
       const newBusinesses = await getNearbyBusinesses({ page, limit: POSTS_PER_PAGE, latitude: location.latitude, longitude: location.longitude, category, radiusKm });
-      setBusinessFeed(prev => {
-        const allBusinesses = page === 1 ? newBusinesses : [...prev.businesses, ...newBusinesses.filter(b => !prev.businesses.some(eb => eb.id === b.id))];
-        return {
-          ...prev,
-          businesses: allBusinesses,
-          page: page,
-          hasMore: newBusinesses.length === POSTS_PER_PAGE,
-          isLoading: false,
-          category,
-        };
-      });
+      
+      const allBusinesses = page === 1 ? newBusinesses : [...businessFeed.businesses, ...newBusinesses.filter(b => !businessFeed.businesses.some(eb => eb.id === b.id))];
+      
+      setBusinessFeed(prev => ({
+        ...prev,
+        businesses: allBusinesses,
+        page: page,
+        hasMore: newBusinesses.length === POSTS_PER_PAGE,
+        isLoading: false,
+        category,
+      }));
+
+      // If DB search returns no results, trigger AI search
+      if (allBusinesses.length === 0 && page === 1 && category) {
+          setBusinessFeed(prev => ({ ...prev, isLoadingAI: true }));
+          const aiResult = await findExternalBusinesses({
+              category: category,
+              latitude: location.latitude,
+              longitude: location.longitude,
+          });
+          setBusinessFeed(prev => ({...prev, externalBusinesses: aiResult.businesses, isLoadingAI: false }));
+      }
+
     } catch (error) {
       console.error('Error fetching businesses:', error);
       setBusinessFeed(prev => ({ ...prev, isLoading: false }));
     }
-  }, [location, radiusKm]);
+  }, [location, radiusKm, businessFeed.businesses]);
 
   const requestLocation = useCallback(() => {
       if (isFetchingLocation) return;
@@ -519,11 +537,15 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       }
       return (
           <div className="space-y-6">
-              {businessFeed.businesses.length > 0 ? (
-                  businessFeed.businesses.map((business, index) => (
-                      <BusinessCard key={business.id} business={business} userLocation={location} />
-                  ))
-              ) : (
+              {businessFeed.businesses.map((business) => (
+                  <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} />
+              ))}
+              {businessFeed.isLoadingAI && <PostFeedSkeleton />}
+              {businessFeed.externalBusinesses.map((business, index) => (
+                  <ExternalBusinessCard key={`ai-${index}`} business={business} />
+              ))}
+
+              {businessFeed.businesses.length === 0 && businessFeed.externalBusinesses.length === 0 && !businessFeed.isLoadingAI && (
                   <NoPostsContent feedType='business' radiusKm={radiusKm} onRadiusChange={(r) => { setRadiusKm(r); fetchBusinesses(1, businessFeed.category); }} />
               )}
               {businessFeed.hasMore && <div ref={loaderRef} className="h-1 w-full" />}
