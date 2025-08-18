@@ -144,7 +144,11 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE TABLE IF NOT EXISTS poll_options (id SERIAL PRIMARY KEY, poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE, option_text TEXT NOT NULL, vote_count INTEGER DEFAULT 0);`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS poll_votes (user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE, poll_id INTEGER NOT NULL REFERENCES polls(id) ON DELETE CASCADE, option_id INTEGER NOT NULL REFERENCES poll_options(id) ON DELETE CASCADE, PRIMARY KEY (user_id, poll_id));`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS app_settings (setting_key VARCHAR(255) PRIMARY KEY, setting_value TEXT);`);
+    
+    // Drop the old city_seed_log table if it exists to ensure the schema is updated correctly.
+    await initClient.query(`DROP TABLE IF EXISTS city_seed_log;`);
     await initClient.query(`CREATE TABLE IF NOT EXISTS city_seed_log (geohash_key VARCHAR(12) PRIMARY KEY, last_seeded_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP);`);
+    console.log("Table 'city_seed_log' checked/re-created.");
     
     // Table for OTP
     await initClient.query(`
