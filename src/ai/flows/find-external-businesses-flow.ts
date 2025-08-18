@@ -102,5 +102,11 @@ const findExternalBusinessesFlow = ai.defineFlow(
 export async function findExternalBusinesses(
   input: FindExternalBusinessesInput
 ): Promise<FindExternalBusinessesOutput> {
-  return findExternalBusinessesFlow(input);
+  try {
+      return await findExternalBusinessesFlow(input);
+  } catch (error) {
+      console.error("Error in findExternalBusinessesFlow, returning empty array.", error);
+      // Ensure we always return a valid object, even on catastrophic failure
+      return { businesses: [] };
+  }
 }

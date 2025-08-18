@@ -266,7 +266,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         category,
       }));
 
-      // If DB search returns no results, trigger AI search
+      // If DB search returns no results and a category is selected, trigger AI search
       if (allBusinesses.length === 0 && page === 1 && category) {
           setBusinessFeed(prev => ({ ...prev, isLoadingAI: true }));
           const aiResult = await findExternalBusinesses({
@@ -516,46 +516,52 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
 
     if (activeTab === 'business') {
-      if (locationPromptVisible) {
-          return (
-              <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
-                  <CardContent className="flex flex-col items-center">
-                      <LocateFixed className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />
-                      <p className="text-2xl text-muted-foreground font-semibold">Location Needed</p>
-                      <p className="text-md text-muted-foreground/80 mt-2 max-w-sm">To find businesses near you, we need access to your location.</p>
-                      <Button onClick={requestLocation} disabled={isFetchingLocation} className="mt-6">
-                          {isFetchingLocation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
-                          {isFetchingLocation ? 'Finding You...' : 'Grant Location Access'}
-                      </Button>
-                  </CardContent>
-              </Card>
-          );
-      }
+        if (locationPromptVisible) {
+            return (
+                <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
+                    <CardContent className="flex flex-col items-center">
+                        <LocateFixed className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />
+                        <p className="text-2xl text-muted-foreground font-semibold">Location Needed</p>
+                        <p className="text-md text-muted-foreground/80 mt-2 max-w-sm">To find businesses near you, we need access to your location.</p>
+                        <Button onClick={requestLocation} disabled={isFetchingLocation} className="mt-6">
+                            {isFetchingLocation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
+                            {isFetchingLocation ? 'Finding You...' : 'Grant Location Access'}
+                        </Button>
+                    </CardContent>
+                </Card>
+            );
+        }
+        
+        const showDbLoading = businessFeed.isLoading && businessFeed.page === 1;
+        const showAiLoading = businessFeed.isLoadingAI;
+        const showLoadingSkeleton = showDbLoading || showAiLoading;
 
-      if ((businessFeed.isLoading && businessFeed.businesses.length === 0) || isRefreshing) {
-          return <PostFeedSkeleton />;
-      }
-      return (
-          <div className="space-y-6">
-              {businessFeed.businesses.map((business) => (
-                  <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} />
-              ))}
-              {businessFeed.isLoadingAI && <PostFeedSkeleton />}
-              {businessFeed.externalBusinesses.map((business, index) => (
-                  <ExternalBusinessCard key={`ai-${index}`} business={business} />
-              ))}
+        if (showLoadingSkeleton) {
+            return <PostFeedSkeleton />;
+        }
+        
+        return (
+            <div className="space-y-6">
+                {businessFeed.businesses.map((business) => (
+                    <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} />
+                ))}
+                {businessFeed.externalBusinesses.map((business, index) => (
+                    <ExternalBusinessCard key={`ai-${index}`} business={business} />
+                ))}
 
-              {businessFeed.businesses.length === 0 && businessFeed.externalBusinesses.length === 0 && !businessFeed.isLoadingAI && (
-                  <NoPostsContent feedType='business' radiusKm={radiusKm} onRadiusChange={(r) => { setRadiusKm(r); fetchBusinesses(1, businessFeed.category); }} />
-              )}
-              {businessFeed.hasMore && <div ref={loaderRef} className="h-1 w-full" />}
-              {businessFeed.isLoading && businessFeed.businesses.length > 0 && (
-                  <div className="flex justify-center items-center py-6">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                  </div>
-              )}
-          </div>
-      );
+                {businessFeed.businesses.length === 0 && businessFeed.externalBusinesses.length === 0 && !businessFeed.isLoadingAI && (
+                    <NoPostsContent feedType='business' radiusKm={radiusKm} onRadiusChange={(r) => { setRadiusKm(r); fetchBusinesses(1, businessFeed.category); }} />
+                )}
+                
+                {businessFeed.hasMore && <div ref={loaderRef} className="h-1 w-full" />}
+                
+                {businessFeed.isLoading && businessFeed.page > 1 && (
+                    <div className="flex justify-center items-center py-6">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    </div>
+                )}
+            </div>
+        );
     }
     
     const feed = feeds[activeTab];
