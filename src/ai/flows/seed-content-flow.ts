@@ -11,7 +11,6 @@ import { addPostDb } from '@/lib/db';
 import type { DbNewPost, SeedContentInput, SeedContentFlowOutput } from '@/lib/db-types';
 import { z } from 'zod';
 import { getGcsClient, getGcsBucketName } from '@/lib/gcs';
-import { getJson } from 'google-search-results-nodejs';
 import { revalidatePath } from 'next/cache';
 
 const ai = getAi();
@@ -30,14 +29,13 @@ const SeedContentOutputSchema = z.object({
       photo_hint: z
         .string()
         .optional()
-        .nullable()
         .describe(
           'A simple 1-3 word description in ENGLISH for a photo if this post would benefit from one. E.g., "traffic jam" or "food festival". Omit if no photo is needed.'
         ),
       category: z.enum(['viral', 'useful']).describe('The category of the post.'),
       source_title: z.string().describe('The short source name for verification.'),
       source_time: z.string().describe("The source timestamp, e.g., ISO or 'today HH:mm'."),
-      source_url: z.string().url().nullable().describe('The source URL for verification.'),
+      source_url: z.string().url().or(z.literal("")).describe('The source URL for verification.'),
       locality_radius_km: z.number().describe('The radius in km used to find the news.'),
       confidence: z.number().min(0).max(100).describe('Your confidence in the correctness of the information.'),
     })
@@ -65,9 +63,9 @@ const searchTheWeb = ai.defineTool(
         if (!process.env.SERPAPI_API_KEY) {
             throw new Error('SERPAPI_API_KEY environment variable is not set. Cannot perform web search.');
         }
-
-        const search = new (await import('google-search-results-nodejs')).GoogleSearch(process.env.SERPAPI_API_KEY);
         
+        const search = new (await import('google-search-results-nodejs')).GoogleSearch(process.env.SERPAPI_API_KEY);
+
         const params = {
             engine: 'google',
             q: input.query,
@@ -169,8 +167,8 @@ PART A — Nostalgic Throwback (All Countries)
 
 PART B — Local News Curation (Viral + Useful)
 1) Treat the location as "{{{city_hint}}}" unless you are certain it is wrong. Prefer items within a 30 km radius of ({{latitude}}, {{longitude}}). If fewer than 2 items are found, expand to district/region; if still sparse, expand to the nearest major city.
-2) Use the searchTheWeb tool to find RECENT items (prefer last 72 hours; allow up to 7 days if high-impact).
-3) Collect 2 candidates across these buckets (aim for at least one from each A & B):
+2) Use the searchTheWeb tool to find 2 RECENT items (prefer last 72 hours; allow up to 7 days if high-impact).
+3) Ensure at least ONE is from the USEFUL/BENEFICIAL bucket:
    A. VIRAL/DELIGHT: unique, surprising, heartwarming, visual (festivals, unusual sightings, new attractions, records).
    B. USEFUL/BENEFICIAL: urgent alerts, road closures, water/power updates, health advisories, job fairs, public service drives, education deadlines, civic announcements, public transport changes, local deals that benefit most residents.
 4) EXCLUDE: political ads/propaganda, hate/violence, unverified rumors, explicit content.
@@ -316,5 +314,3 @@ export async function seedCityContent(city: string): Promise<SeedContentFlowOutp
 export async function seedContent(input: SeedContentInput): Promise<SeedContentFlowOutput> {
     return await seedContentFlow(input);
 }
-
-    

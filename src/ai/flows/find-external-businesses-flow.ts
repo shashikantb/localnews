@@ -7,7 +7,6 @@
  */
 
 import { getAi } from '@/utils/firebaseAdmin';
-import { getJson } from 'google-search-results-nodejs';
 import { z } from 'zod';
 import type { FindExternalBusinessesInput, FindExternalBusinessesOutput } from '@/lib/db-types';
 
@@ -86,7 +85,7 @@ const findExternalBusinessesFlow = ai.defineFlow(
     outputSchema: FindExternalBusinessesOutputSchema,
   },
   async (input) => {
-    const { businesses } = await ai.generate({
+    const result = await ai.generate({
       prompt: `You are a helpful local business finder. Find businesses matching the category "${input.category}" near the user's location. Return a list of businesses with their name, and phone number and address if available.`,
       tools: [searchGoogleForBusinesses],
       model: 'googleai/gemini-1.5-flash',
@@ -95,7 +94,7 @@ const findExternalBusinessesFlow = ai.defineFlow(
       },
     });
 
-    return businesses || { businesses: [] };
+    return result.output || { businesses: [] };
   }
 );
 
