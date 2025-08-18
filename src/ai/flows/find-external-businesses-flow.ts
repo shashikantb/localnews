@@ -56,14 +56,19 @@ const searchGoogleForBusinesses = ai.defineTool(
       throw new Error('SERPAPI_API_KEY environment variable is not set. Cannot perform web search.');
     }
 
-    const json = await getJson({
-      engine: 'google_local',
-      q: input.query,
-      ll: `@${input.latitude},${input.longitude},15z`, // Use lat/lon for location
-      api_key: process.env.SERPAPI_API_KEY,
+    const search = new (await import('google-search-results-nodejs')).GoogleSearch(process.env.SERPAPI_API_KEY);
+
+    const params = {
+        engine: 'google_local',
+        q: input.query,
+        ll: `@${input.latitude},${input.longitude},15z`,
+    };
+
+    const json = await new Promise<any>((resolve) => {
+        search.json(params, resolve);
     });
 
-    const results = (json.local_results || []).slice(0, 10).map((res) => ({
+    const results = (json.local_results || []).slice(0, 10).map((res: any) => ({
       title: res.title,
       address: res.address,
       phone: res.phone,

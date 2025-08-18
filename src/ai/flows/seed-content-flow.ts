@@ -66,14 +66,19 @@ const searchTheWeb = ai.defineTool(
             throw new Error('SERPAPI_API_KEY environment variable is not set. Cannot perform web search.');
         }
 
-        const json = await getJson({
+        const search = new (await import('google-search-results-nodejs')).GoogleSearch(process.env.SERPAPI_API_KEY);
+        
+        const params = {
             engine: 'google',
             q: input.query,
-            api_key: process.env.SERPAPI_API_KEY,
             tbs: 'qdr:w', // Limit search to the past week for relevance
+        };
+
+        const json = await new Promise<any>((resolve) => {
+            search.json(params, resolve);
         });
 
-        const results = (json.organic_results || []).slice(0, 5).map(res => ({
+        const results = (json.organic_results || []).slice(0, 5).map((res: any) => ({
             title: res.title,
             link: res.link,
             snippet: res.snippet,
