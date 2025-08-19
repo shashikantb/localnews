@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 
 export type UserRole = 'Business' | 'Gorakshak' | 'Gorakshak Admin' | 'Admin' | 'Public(जनता)';
@@ -452,6 +453,18 @@ export interface BusinessResource {
 }
 
 export type NewBusinessResource = Omit<BusinessResource, 'id' | 'user_id'>;
+
+export interface Appointment {
+    id: number;
+    customer_id: number;
+    business_id: number;
+    service_id: number;
+    resource_id: number;
+    start_time: string;
+    end_time: string;
+    status: 'confirmed' | 'completed' | 'cancelled';
+    created_at: string;
+}
 
 
 // AI Flow Types

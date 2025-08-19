@@ -1,18 +1,20 @@
 
 import type { FC } from 'react';
 import Link from 'next/link';
-import type { BusinessUser } from '@/lib/db-types';
+import type { BusinessUser, User } from '@/lib/db-types';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Phone, MapPin, Briefcase, BadgeCheck, CalendarPlus } from 'lucide-react';
+import BookingDialog from './booking-dialog';
 
 interface BusinessCardProps {
   business: BusinessUser;
+  sessionUser: User | null;
   userLocation: { latitude: number; longitude: number } | null;
 }
 
-const BusinessCard: FC<BusinessCardProps> = ({ business, userLocation }) => {
+const BusinessCard: FC<BusinessCardProps> = ({ business, sessionUser, userLocation }) => {
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
@@ -61,10 +63,12 @@ const BusinessCard: FC<BusinessCardProps> = ({ business, userLocation }) => {
                 </Button>
             </a>
           )}
-          <Button className="w-full sm:w-auto flex-1" disabled>
-            <CalendarPlus className="mr-2 h-4 w-4" />
-            Book Appointment
-          </Button>
+          <BookingDialog business={business} sessionUser={sessionUser}>
+            <Button className="w-full sm:w-auto flex-1">
+                <CalendarPlus className="mr-2 h-4 w-4" />
+                Book Appointment
+            </Button>
+          </BookingDialog>
       </CardFooter>
     </Card>
   );

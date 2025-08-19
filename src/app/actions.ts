@@ -3,7 +3,7 @@
 'use server';
 
 import * as db from '@/lib/db';
-import type { ConversationDetails, GanpatiMandal, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal, FindExternalBusinessesOutput, FindExternalBusinessesInput, ExternalBusiness } from '@/lib/db-types';
+import type { Appointment, ConversationDetails, GanpatiMandal, Poll, Post, NewPost as ClientNewPost, Comment, NewComment, DbNewPost, VisitorCounts, User, UserFollowStats, FollowUser, UserWithStatuses, NewStatus, FamilyMember, FamilyMemberLocation, PendingFamilyRequest, Conversation, Message, ConversationParticipant, SortOption, BusinessUser, GorakshakReportUser, PointTransaction, UserForNotification, MessageReaction, NewGanpatiMandal, FindExternalBusinessesOutput, FindExternalBusinessesInput, ExternalBusiness } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
@@ -1685,5 +1685,20 @@ export async function sendAartiNotification(mandalId: number): Promise<{ success
     } catch (error: any) {
         console.error('Error sending Aarti notification:', error);
         return { success: false, error: 'An unexpected server error occurred.' };
+    }
+}
+
+export async function createAppointment(appointment: Omit<Appointment, 'id' | 'status' | 'created_at' | 'customer_id'>): Promise<{ success: boolean; error?: string; appointment?: Appointment }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'Authentication required.' };
+    }
+    
+    try {
+        const newAppointment = await db.createAppointmentDb({ ...appointment, customer_id: user.id });
+        return { success: true, appointment: newAppointment };
+    } catch (error: any) {
+        console.error("Error creating appointment:", error);
+        return { success: false, error: error.message };
     }
 }

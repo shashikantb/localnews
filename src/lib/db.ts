@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource } from '@/lib/db-types';
+import type { Appointment, ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 
@@ -213,6 +213,22 @@ async function initializeDatabase(client: Pool | Client) {
     `);
     console.log("Table 'business_resources' checked/created.");
 
+    // Table for Appointments
+    await initClient.query(`
+        CREATE TABLE IF NOT EXISTS appointments (
+            id SERIAL PRIMARY KEY,
+            customer_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            business_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            service_id INTEGER NOT NULL REFERENCES business_services(id) ON DELETE CASCADE,
+            resource_id INTEGER NOT NULL REFERENCES business_resources(id) ON DELETE CASCADE,
+            start_time TIMESTAMPTZ NOT NULL,
+            end_time TIMESTAMPTZ NOT NULL,
+            status VARCHAR(50) NOT NULL DEFAULT 'confirmed', -- e.g., confirmed, completed, cancelled
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+    console.log("Table 'appointments' checked/created.");
+
 
     console.log("All tables checked/created.");
 
@@ -224,6 +240,8 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_services_user_id_idx ON business_services (user_id);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_hours_user_id_idx ON business_hours (user_id);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_resources_user_id_idx ON business_resources (user_id);`);
+    await initClient.query(`CREATE INDEX IF NOT EXISTS appointments_business_time_idx ON appointments (business_id, start_time);`);
+    await initClient.query(`CREATE INDEX IF NOT EXISTS appointments_resource_time_idx ON appointments (resource_id, start_time);`);
 
 
     console.log("Indexes checked/created.");
@@ -3527,4 +3545,38 @@ export async function deleteBusinessResourceDb(resourceId: number, userId: numbe
   } finally {
     client.release();
   }
+}
+
+// --- Appointment Functions ---
+export async function getAppointmentsForBusinessDb(businessId: number, date: string): Promise<Appointment[]> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return [];
+    const client = await dbPool.connect();
+    try {
+        const query = 'SELECT * FROM appointments WHERE business_id = $1 AND start_time::date = $2::date';
+        const result = await client.query(query, [businessId, date]);
+        return result.rows;
+    } finally {
+        client.release();
+    }
+}
+
+export async function createAppointmentDb(appointment: Omit<Appointment, 'id' | 'status' | 'created_at'>): Promise<Appointment> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            INSERT INTO appointments (customer_id, business_id, service_id, resource_id, start_time, end_time)
+            VALUES ($1, $2, $3, $4, $5, $6)
+            RETURNING *;
+        `;
+        const values = [appointment.customer_id, appointment.business_id, appointment.service_id, appointment.resource_id, appointment.start_time, appointment.end_time];
+        const result = await client.query(query, values);
+        return result.rows[0];
+    } finally {
+        client.release();
+    }
 }
