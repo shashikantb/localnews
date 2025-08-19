@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour } from '@/lib/db-types';
+import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 
@@ -203,6 +203,16 @@ async function initializeDatabase(client: Pool | Client) {
     `);
     console.log("Table 'business_hours' checked/created.");
 
+    // Table for Business Resources
+    await initClient.query(`
+        CREATE TABLE IF NOT EXISTS business_resources (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            name VARCHAR(100) NOT NULL
+        );
+    `);
+    console.log("Table 'business_resources' checked/created.");
+
 
     console.log("All tables checked/created.");
 
@@ -213,6 +223,7 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE INDEX IF NOT EXISTS device_tokens_user_id_idx ON device_tokens (user_id);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_services_user_id_idx ON business_services (user_id);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_hours_user_id_idx ON business_hours (user_id);`);
+    await initClient.query(`CREATE INDEX IF NOT EXISTS business_resources_user_id_idx ON business_resources (user_id);`);
 
 
     console.log("Indexes checked/created.");
@@ -3451,4 +3462,69 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
     } finally {
         client.release();
     }
+}
+
+// --- Business Resource Functions ---
+export async function getBusinessResourcesDb(userId: number): Promise<BusinessResource[]> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) return [];
+  const client = await dbPool.connect();
+  try {
+    const query = 'SELECT * FROM business_resources WHERE user_id = $1 ORDER BY name';
+    const result = await client.query(query, [userId]);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+export async function addBusinessResourceDb(userId: number, resource: NewBusinessResource): Promise<BusinessResource> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+  try {
+    const query = `
+      INSERT INTO business_resources (user_id, name)
+      VALUES ($1, $2)
+      RETURNING *;
+    `;
+    const result = await client.query(query, [userId, resource.name]);
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateBusinessResourceDb(resourceId: number, userId: number, resource: NewBusinessResource): Promise<BusinessResource | null> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+  try {
+    const query = `
+      UPDATE business_resources
+      SET name = $1
+      WHERE id = $2 AND user_id = $3
+      RETURNING *;
+    `;
+    const result = await client.query(query, [resource.name, resourceId, userId]);
+    return result.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteBusinessResourceDb(resourceId: number, userId: number): Promise<void> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+  try {
+    const query = 'DELETE FROM business_resources WHERE id = $1 AND user_id = $2';
+    await client.query(query, [resourceId, userId]);
+  } finally {
+    client.release();
+  }
 }

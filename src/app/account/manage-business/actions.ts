@@ -3,8 +3,12 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/app/auth/actions';
-import { addBusinessServiceDb, getBusinessServicesDb, updateBusinessServiceDb, deleteBusinessServiceDb, getBusinessHoursDb, updateBusinessHoursDb } from '@/lib/db';
-import type { NewBusinessService, BusinessHour } from '@/lib/db-types';
+import { 
+    addBusinessServiceDb, getBusinessServicesDb, updateBusinessServiceDb, deleteBusinessServiceDb, 
+    getBusinessHoursDb, updateBusinessHoursDb,
+    getBusinessResourcesDb, addBusinessResourceDb, updateBusinessResourceDb, deleteBusinessResourceDb
+} from '@/lib/db';
+import type { NewBusinessService, BusinessHour, NewBusinessResource } from '@/lib/db-types';
 
 export async function getBusinessServices() {
     const { user } = await getSession();
@@ -75,6 +79,60 @@ export async function updateBusinessHours(hours: Omit<BusinessHour, 'id' | 'user
     }
     try {
         await updateBusinessHoursDb(user.id, hours);
+        revalidatePath('/account/manage-business');
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+// --- Resource Actions ---
+export async function getBusinessResources() {
+    const { user } = await getSession();
+    if (!user) {
+        return [];
+    }
+    return getBusinessResourcesDb(user.id);
+}
+
+export async function addBusinessResource(resource: NewBusinessResource) {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'Authentication required' };
+    }
+    try {
+        await addBusinessResourceDb(user.id, resource);
+        revalidatePath('/account/manage-business');
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function updateBusinessResource(resourceId: number, resource: NewBusinessResource) {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'Authentication required' };
+    }
+    try {
+        const updated = await updateBusinessResourceDb(resourceId, user.id, resource);
+        if (!updated) {
+            return { success: false, error: 'Resource not found or permission denied.' };
+        }
+        revalidatePath('/account/manage-business');
+        return { success: true };
+    } catch (e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+export async function deleteBusinessResource(resourceId: number) {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'Authentication required' };
+    }
+    try {
+        await deleteBusinessResourceDb(resourceId, user.id);
         revalidatePath('/account/manage-business');
         return { success: true };
     } catch (e: any) {

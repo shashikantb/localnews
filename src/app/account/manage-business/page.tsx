@@ -1,13 +1,14 @@
 
 import { getSession } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
-import { getBusinessServicesDb, getBusinessHoursDb } from '@/lib/db';
+import { getBusinessServicesDb, getBusinessHoursDb, getBusinessResourcesDb } from '@/lib/db';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { ArrowLeft, Wrench, Clock } from 'lucide-react';
+import { ArrowLeft, Wrench, Clock, Armchair } from 'lucide-react';
 import ManageServicesClient from './manage-services-client';
 import ManageScheduleClient from './manage-schedule-client';
+import ManageResourcesClient from './manage-resources-client';
 
 export const dynamic = 'force-dynamic';
 
@@ -19,9 +20,10 @@ export default async function ManageBusinessPage() {
     }
 
     // Fetch initial data in parallel
-    const [initialServices, initialHours] = await Promise.all([
+    const [initialServices, initialHours, initialResources] = await Promise.all([
         getBusinessServicesDb(user.id),
-        getBusinessHoursDb(user.id)
+        getBusinessHoursDb(user.id),
+        getBusinessResourcesDb(user.id)
     ]);
 
     return (
@@ -61,11 +63,17 @@ export default async function ManageBusinessPage() {
                     </CardContent>
                 </Card>
 
-                 <Card className="shadow-lg border-border/60 opacity-50">
+                 <Card className="shadow-lg border-border/60">
                     <CardHeader>
-                        <CardTitle>Resources</CardTitle>
-                        <CardDescription>Coming Soon: Manage your bookable resources (e.g., salon chairs).</CardDescription>
+                        <CardTitle className="flex items-center">
+                            <Armchair className="w-6 h-6 mr-3 text-primary" />
+                            Resources
+                        </CardTitle>
+                        <CardDescription>Manage your bookable resources (e.g., salon chairs, washing bays).</CardDescription>
                     </CardHeader>
+                     <CardContent>
+                        <ManageResourcesClient initialResources={initialResources} />
+                    </CardContent>
                 </Card>
             </div>
         </div>

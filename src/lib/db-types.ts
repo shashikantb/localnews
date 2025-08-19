@@ -445,6 +445,14 @@ export interface BusinessHour {
     is_closed: boolean;
 }
 
+export interface BusinessResource {
+    id: number;
+    user_id: number;
+    name: string;
+}
+
+export type NewBusinessResource = Omit<BusinessResource, 'id' | 'user_id'>;
+
 
 // AI Flow Types
 export type LocalHelperInput = {
