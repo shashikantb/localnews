@@ -11,3 +11,5 @@ export async function GET(_: Request, { params }: { params: { businessId: string
     return NextResponse.json({ error: "Failed to fetch resources" }, { status: 500 });
   }
 }
+
+    
