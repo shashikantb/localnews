@@ -3463,13 +3463,15 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
 
         if (hours.length > 0) {
             // Prepare and insert the new schedule
-            const values = hours.map(h => `(${userId}, ${h.day_of_week}, ${h.is_closed ? 'NULL' : `'${h.start_time}'`}, ${h.is_closed ? 'NULL' : `'${h.end_time}'`}, ${h.is_closed})`).join(',');
-            
             const insertQuery = `
                 INSERT INTO business_hours (user_id, day_of_week, start_time, end_time, is_closed)
-                VALUES ${values};
+                VALUES ($1, $2, $3, $4, $5);
             `;
-            await client.query(insertQuery);
+            for(const h of hours) {
+                const startTime = h.is_closed ? null : h.start_time;
+                const endTime = h.is_closed ? null : h.end_time;
+                await client.query(insertQuery, [userId, h.day_of_week, startTime, endTime, h.is_closed]);
+            }
         }
 
         await client.query('COMMIT');
