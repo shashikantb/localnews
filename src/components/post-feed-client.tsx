@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { type FC } from 'react';
@@ -271,12 +272,17 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       // If DB search returns no results and a category is selected, trigger AI search
       if (allBusinesses.length === 0 && page === 1 && category) {
           setBusinessFeed(prev => ({ ...prev, isLoadingAI: true }));
-          const aiResult = await findExternalBusinesses({
-              category: category,
-              latitude: location.latitude,
-              longitude: location.longitude,
-          });
-          setBusinessFeed(prev => ({...prev, externalBusinesses: aiResult.businesses, isLoadingAI: false }));
+          try {
+              const aiResult = await findExternalBusinesses({
+                  category: category,
+                  latitude: location.latitude,
+                  longitude: location.longitude,
+              });
+              setBusinessFeed(prev => ({...prev, externalBusinesses: aiResult.businesses, isLoadingAI: false }));
+          } catch(aiError) {
+              console.error("AI business search failed:", aiError);
+              setBusinessFeed(prev => ({...prev, isLoadingAI: false }));
+          }
       }
 
     } catch (error) {
@@ -322,11 +328,9 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   }, [requestLocation]);
   
   useEffect(() => {
-    if (activeTab === 'services' && location && !businessInitialLoad.current) {
-        if (selectedService) {
-            businessInitialLoad.current = true;
-            fetchBusinesses(1, selectedService);
-        }
+    if (activeTab === 'services' && location && !businessInitialLoad.current && selectedService) {
+        businessInitialLoad.current = true;
+        fetchBusinesses(1, selectedService);
     }
   }, [activeTab, location, fetchBusinesses, selectedService]);
 
@@ -733,3 +737,4 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 };
 
 export default PostFeedClient;
+
