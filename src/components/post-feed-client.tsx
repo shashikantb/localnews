@@ -273,49 +273,57 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
   }, [location, radiusKm]);
 
-  const requestLocation = useCallback(() => {
+  const requestLocation = useCallback((highAccuracy = false) => {
+      if (!navigator.geolocation) {
+          toast({ variant: 'destructive', title: 'Location Error', description: 'Geolocation is not supported by your browser.' });
+          return;
+      }
+
       if (isFetchingLocation) return;
       setIsFetchingLocation(true);
-      if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-              (position) => {
-                  const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
-                  setLocation(newLocation);
-                  setLocationPromptVisible(false);
-                  setIsFetchingLocation(false);
-                  
-                  if (!liveSeedingTriggered.current) {
-                      triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
-                      liveSeedingTriggered.current = true;
-                  }
 
-                  if (sessionUser) {
-                      updateUserLocation(newLocation.latitude, newLocation.longitude).catch(err => console.warn("Silent location update failed:", err));
-                  }
-              },
-              (err) => {
-                  console.warn("Could not get user location:", err.message);
-                  toast({ variant: 'destructive', title: 'Location Error', description: 'Could not access your location. Please check your browser settings.' });
-                  setLocationPromptVisible(true); // Keep prompt visible
-                  setIsFetchingLocation(false);
-              },
-              { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-          );
-      }
-  }, [isFetchingLocation, sessionUser, toast]);
+      const options: PositionOptions = {
+          enableHighAccuracy: highAccuracy,
+          timeout: highAccuracy ? 10000 : 5000,
+          maximumAge: highAccuracy ? 0 : 60000, // Allow cached low-accuracy location
+      };
 
-  // Initial location check (doesn't prompt, just checks)
+      navigator.geolocation.getCurrentPosition(
+          (position) => {
+              const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
+              setLocation(newLocation);
+              setLocationPromptVisible(false);
+              setIsFetchingLocation(false);
+              
+              if (!liveSeedingTriggered.current) {
+                  triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
+                  liveSeedingTriggered.current = true;
+              }
+
+              if (sessionUser) {
+                  updateUserLocation(newLocation.latitude, newLocation.longitude).catch(err => console.warn("Silent location update failed:", err));
+              }
+              // If this was the first location and we need to fetch businesses, do it now.
+              if (activeTab === 'services' && selectedService && businessFeed.businesses.length === 0) {
+                  fetchBusinesses(1, selectedService);
+              }
+          },
+          (err) => {
+              console.warn("Could not get user location:", err.message);
+              toast({ variant: 'destructive', title: 'Location Error', description: 'Could not access your location. Please check your browser settings.' });
+              setLocationPromptVisible(true);
+              setIsFetchingLocation(false);
+          },
+          options
+      );
+  }, [isFetchingLocation, sessionUser, toast, activeTab, selectedService, businessFeed.businesses.length, fetchBusinesses]);
+  
+  // Initial location check (non-blocking)
   useEffect(() => {
-    requestLocation();
+    // Try to get a non-high-accuracy location first for speed
+    requestLocation(false);
   }, [requestLocation]);
   
-  useEffect(() => {
-    if (activeTab === 'services' && location && !businessInitialLoad.current && selectedService) {
-        businessInitialLoad.current = true;
-        fetchBusinesses(1, selectedService);
-    }
-  }, [activeTab, location, fetchBusinesses, selectedService]);
-
   
   const handleTabChange = useCallback((newTab: FeedType) => {
     if (newTab === 'family') {
@@ -327,16 +335,14 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchPosts('family', 1, sortBy, location);
       }
     } else if (newTab === 'services') {
-        // Reset the service selection when the main tab is clicked
         setSelectedService(null);
-        setBusinessFeed(initialBusinessFeedState); // Clear old results
+        setBusinessFeed(initialBusinessFeedState); 
         if (!location) {
             setLocationPromptVisible(true);
         }
     } else if (newTab === 'festival') {
         setLocationPromptVisible(false);
-        // MandalList component fetches its own data
-    } else { // nearby
+    } else { 
         setLocationPromptVisible(false);
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
             fetchPosts('nearby', 1, sortBy, location);
@@ -530,7 +536,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                         <LocateFixed className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />
                         <p className="text-2xl text-muted-foreground font-semibold">Location Needed</p>
                         <p className="text-md text-muted-foreground/80 mt-2 max-w-sm">To find businesses near you, we need access to your location.</p>
-                        <Button onClick={requestLocation} disabled={isFetchingLocation} className="mt-6">
+                        <Button onClick={() => requestLocation(true)} disabled={isFetchingLocation} className="mt-6">
                             {isFetchingLocation ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <LocateFixed className="mr-2 h-4 w-4" />}
                             {isFetchingLocation ? 'Finding You...' : 'Grant Location Access'}
                         </Button>
@@ -556,7 +562,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 </div>
 
                 {businessFeed.businesses.map((business) => (
-                    <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} />
+                    <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} sessionUser={sessionUser}/>
                 ))}
 
                 {!businessFeed.isLoading && businessFeed.businesses.length === 0 && (
@@ -713,4 +719,3 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 };
 
 export default PostFeedClient;
-
