@@ -135,14 +135,13 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
         continue;
       }
 
-      // Resource overlap check (defensive against bad rows)
       const needed = 1;
       const availableResources = resources.filter(resource => {
           const isBooked = appointments.some(appt => {
               if (appt.resource_id !== resource.id) return false;
               const aStart = toValidDate(appt?.start_time);
               const aEnd   = toValidDate(appt?.end_time);
-              if (!aStart || !aEnd) return false; // ignore bad rows instead of crashing
+              if (!aStart || !aEnd) return false;
               try {
                 return areIntervalsOverlapping(
                     { start: cur, end: slotEnd },
