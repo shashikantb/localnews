@@ -146,7 +146,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
                 return areIntervalsOverlapping(
                     { start: cur, end: slotEnd },
                     { start: aStart,  end: aEnd },
-                    { inclusive: false }
+                    { inclusive: true }
                 );
               } catch {
                 return false;
@@ -187,7 +187,8 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
             if (!aStart || !aEnd) return false;
             return areIntervalsOverlapping(
                 { start: startTime, end: endTime },
-                { start: aStart, end: aEnd }
+                { start: aStart, end: aEnd },
+                { inclusive: true }
             )
         })
     );
