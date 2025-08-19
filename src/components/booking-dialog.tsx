@@ -129,19 +129,19 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       const slotEnd = addMinutes(cur, serviceDuration);
       if (slotEnd > end) break;
 
-      // Past-time filter only for today
       if (isToday(selectedDate) && isPast(slotEnd)) {
         cur = addMinutes(cur, 15);
         continue;
       }
-
-      const needed = 1;
-      const availableResources = resources.filter(resource => {
-          const isBooked = appointments.some(appt => {
+      
+      const availableResourcesForSlot = resources.filter(resource => {
+          const isResourceBooked = appointments.some(appt => {
               if (appt.resource_id !== resource.id) return false;
+              
               const aStart = toValidDate(appt?.start_time);
               const aEnd   = toValidDate(appt?.end_time);
               if (!aStart || !aEnd) return false;
+
               try {
                 return areIntervalsOverlapping(
                     { start: cur, end: slotEnd },
@@ -149,13 +149,13 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
                     { inclusive: true }
                 );
               } catch {
-                return false;
+                return true; 
               }
           });
-          return !isBooked;
+          return !isResourceBooked;
       });
 
-      if (availableResources.length >= needed) {
+      if (availableResourcesForSlot.length > 0) {
         out.push(format(cur, 'HH:mm'));
       }
       cur = addMinutes(cur, 15);

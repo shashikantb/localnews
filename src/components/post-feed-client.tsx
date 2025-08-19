@@ -277,15 +277,16 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if (!navigator.geolocation || isFetchingLocation) return;
     
     setIsFetchingLocation(true);
-    setLocationPromptVisible(false); // Hide prompt while trying
+    setLocationPromptVisible(false);
     
-    toast({ title: "Getting your location...", description: "This may take a moment." });
+    const { dismiss } = toast({ title: "Getting your location...", description: "This may take a moment." });
 
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
         setLocation(newLocation);
         setIsFetchingLocation(false);
+        dismiss();
         toast({ title: "Location Found!", description: "Loading content for your area." });
 
         if (!liveSeedingTriggered.current) {
@@ -296,27 +297,24 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         if (sessionUser) {
           updateUserLocation(newLocation.latitude, newLocation.longitude).catch(err => console.warn("Silent location update failed:", err));
         }
-
-        // Fetch initial data based on the active tab now that we have location
-        if (activeTab === 'services' && selectedService) {
-            fetchBusinesses(1, selectedService);
-        } else if (activeTab === 'nearby') {
-            fetchPosts('nearby', 1, sortBy, newLocation);
-        }
+        
+        fetchPosts('nearby', 1, sortBy, newLocation);
       },
       (err) => {
         console.warn("Could not get user location:", err.message);
+        dismiss();
         toast({ variant: 'destructive', title: 'Location Error', description: 'Could not access your location. Please check your browser settings.' });
         setLocationPromptVisible(true);
         setIsFetchingLocation(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     );
-  }, [isFetchingLocation, sessionUser, toast, activeTab, selectedService, fetchBusinesses, fetchPosts, sortBy]);
+  }, [isFetchingLocation, sessionUser, toast, fetchPosts, sortBy]);
   
   useEffect(() => {
     requestLocation();
-  }, [requestLocation]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   
   const handleTabChange = useCallback((newTab: FeedType) => {
     if (newTab === 'family') {
@@ -346,7 +344,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   // This effect now only runs when the active tab changes from the URL
   useEffect(() => {
     handleTabChange(activeTab);
-  }, [activeTab]);
+  }, [activeTab, handleTabChange]);
 
   const handleNotificationRegistration = async () => {
     if (notificationPermissionStatus === 'granted') {
