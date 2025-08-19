@@ -11,7 +11,6 @@ import { cookies } from 'next/headers';
 import admin, { getAi } from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import { seedContent } from '@/ai/flows/seed-content-flow';
-import { findExternalBusinesses as findExternalBusinessesFlow } from '@/ai/flows/find-external-businesses-flow';
 import ngeohash from "ngeohash";
 import { z } from 'zod';
 
@@ -1405,19 +1404,6 @@ export async function getNearbyBusinesses(options: { page: number; limit: number
         return [];
     }
 }
-
-export async function findExternalBusinesses(input: FindExternalBusinessesInput): Promise<FindExternalBusinessesOutput> {
-    try {
-        if (!process.env.SERPAPI_API_KEY) {
-            throw new Error('SERPAPI_API_KEY is not configured for external business search.');
-        }
-        return await findExternalBusinessesFlow(input);
-    } catch(error: any) {
-        console.error("Error in findExternalBusinesses server action:", error);
-        return { businesses: [] };
-    }
-}
-
 
 export async function getBusinessesForMap(bounds: { ne: { lat: number, lng: number }, sw: { lat: number, lng: number } }): Promise<BusinessUser[]> {
     try {
