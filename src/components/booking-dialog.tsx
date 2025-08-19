@@ -3,13 +3,6 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { User, BusinessService, BusinessHour, BusinessResource, Appointment } from '@/lib/db-types';
-import {
-  getBusinessServices,
-  getBusinessHours,
-  getBusinessResources,
-  getAppointmentsForBusiness,
-  createAppointment,
-} from '@/app/account/manage-business/actions';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -36,6 +29,12 @@ interface BookingDialogProps {
 
 const steps = ['Select Service', 'Select Date & Time', 'Confirm Booking'];
 
+async function api<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, { ...init, cache: 'no-store' });
+  if (!res.ok) throw new Error(await res.text());
+  return res.json() as Promise<T>;
+}
+
 export default function BookingDialog({ business, sessionUser, children }: BookingDialogProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
@@ -56,20 +55,21 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   const fetchBusinessData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [fetchedServices, fetchedHours, fetchedResources] = await Promise.all([
-        getBusinessServices(business.id),
-        getBusinessHours(business.id),
-        getBusinessResources(business.id),
+      const [s, h, r] = await Promise.all([
+        api<{services:any[]}>(`/api/booking/services/${business.id}`),
+        api<{hours:any[]}>(`/api/booking/hours/${business.id}`),
+        api<{resources:any[]}>(`/api/booking/resources/${business.id}`),
       ]);
-      setServices(fetchedServices);
-      setHours(fetchedHours);
-      setResources(fetchedResources);
-    } catch (error) {
-      console.error('Failed to fetch business data:', error);
-      toast({ variant: 'destructive', title: 'Error', description: 'Could not load business details.' });
+      setServices(s.services);
+      setHours(h.hours);
+      setResources(r.resources);
+    } catch (e) {
+      console.error(e);
+      toast({ variant:"destructive", title:"Failed to load booking data" });
       setIsOpen(false);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, [business.id, toast]);
 
   useEffect(() => {
@@ -85,9 +85,10 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   }, [isOpen, fetchBusinessData]);
 
   useEffect(() => {
-    if (selectedDate) {
-      getAppointmentsForBusiness(business.id, format(selectedDate, 'yyyy-MM-dd')).then(setAppointments);
-    }
+    if (!selectedDate) return;
+    api<{appointments:any[]}>(`/api/booking/appointments?businessId=${business.id}&date=${format(selectedDate,'yyyy-MM-dd')}`)
+      .then(d => setAppointments(d.appointments))
+      .catch(() => setAppointments([]));
   }, [selectedDate, business.id]);
 
   const timeSlots = useMemo(() => {
@@ -172,19 +173,26 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
         return;
     }
 
-    const result = await createAppointment({
-        business_id: business.id,
-        service_id: selectedService.id,
-        resource_id: availableResource.id,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString()
-    });
+    const result = await api<{success:boolean; error?:string; appointment?:any}>(
+      `/api/booking/appointments`,
+      {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({
+          business_id: business.id,
+          service_id: selectedService.id,
+          resource_id: availableResource.id,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+        })
+      }
+    );
 
     if (result.success) {
         toast({ title: "Appointment Booked!", description: `Your appointment with ${business.name} is confirmed.`});
         setIsOpen(false);
     } else {
-        toast({ variant: "destructive", title: "Booking Failed", description: result.error});
+        toast({ variant: "destructive", title: "Booking Failed", description: result.error || "Please try another slot."});
     }
     setIsSubmitting(false);
   };
