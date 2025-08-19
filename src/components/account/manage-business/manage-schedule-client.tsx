@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2, Save } from 'lucide-react';
 import type { BusinessHour } from '@/lib/db-types';
 import { useToast } from '@/hooks/use-toast';
-import { updateBusinessHours } from './actions';
+import { updateBusinessHours } from '@/app/account/manage-business/actions';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -73,6 +73,7 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
   const form = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
     defaultValues: getDefaultValues(),
+    mode: 'onChange',
   });
 
   const { fields } = useFieldArray({
