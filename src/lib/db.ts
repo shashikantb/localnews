@@ -1,5 +1,4 @@
 
-
 import { Pool, Client, type QueryResult } from 'pg';
 import type { Appointment, ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
