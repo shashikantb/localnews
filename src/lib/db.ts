@@ -3462,7 +3462,6 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
         await client.query('DELETE FROM business_hours WHERE user_id = $1', [userId]);
 
         if (hours.length > 0) {
-            // Prepare and insert the new schedule
             const insertQuery = `
                 INSERT INTO business_hours (user_id, day_of_week, start_time, end_time, is_closed)
                 VALUES ($1, $2, $3, $4, $5);
