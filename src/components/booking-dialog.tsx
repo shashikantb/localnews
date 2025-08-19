@@ -42,6 +42,13 @@ const safeDuration = (n: unknown, fallback = 30) => {
   return Number.isFinite(num) && num > 0 ? num : fallback;
 };
 
+const dowMatches = (dbDow: number, jsDow: number) => {
+  if (dbDow >= 0 && dbDow <= 6) return dbDow === jsDow; // 0..6 Sun..Sat
+  if (dbDow === 7) return jsDow === 0;                  // Sun=7 style (though my DB uses 0-6, this is safe)
+  return (dbDow - 1) === jsDow;                         // 1..7 Mon..Sun style
+};
+
+
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, cache: 'no-store' });
   if (!res.ok) throw new Error(await res.text());
@@ -107,9 +114,9 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   const timeSlots = useMemo(() => {
     if (!selectedDate || !selectedService || !Array.isArray(hours)) return [];
 
-    const dayOfWeek = getDay(selectedDate);
-    const dayHours = hours.find(h => h?.day_of_week === dayOfWeek);
-
+    const jsDow = getDay(selectedDate);
+    const dayHours = hours.find(h => dowMatches(Number(h?.day_of_week), jsDow));
+    
     if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) return [];
 
     const serviceDuration = safeDuration((selectedService as any).duration_minutes, 30);
