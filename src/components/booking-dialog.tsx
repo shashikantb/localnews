@@ -177,7 +177,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     
     const [hour, minute] = selectedTime.split(':').map(Number);
     const startTime = setMinutes(setHours(selectedDate, hour), minute);
-    const endTime = addMinutes(startTime, selectedService.duration_minutes);
+    const endTime = addMinutes(startTime, safeDuration(selectedService.duration_minutes, 30));
 
     const availableResource = resources.find(resource => 
         !appointments.some(appt => {
@@ -339,5 +339,3 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     </Dialog>
   );
 }
-
-    
