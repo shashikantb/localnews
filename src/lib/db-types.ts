@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 export type UserRole = 'Business' | 'Gorakshak' | 'Gorakshak Admin' | 'Admin' | 'Public(जनता)';
@@ -425,6 +424,18 @@ export interface PendingRegistration extends Omit<NewUser, 'passwordplaintext'> 
     otp_expires_at: string;
     created_at: string;
 }
+
+// --- Business Booking Types ---
+export interface BusinessService {
+  id: number;
+  user_id: number;
+  name: string;
+  price: number;
+  duration_minutes: number;
+}
+
+export type NewBusinessService = Omit<BusinessService, 'id' | 'user_id'>;
+
 
 // AI Flow Types
 export type LocalHelperInput = {

@@ -6,7 +6,7 @@ import { getPostsByUserId, getPendingFamilyRequests, getFamilyRelationshipStatus
 import { getSession } from '@/app/auth/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building, ShieldCheck, Mail, Calendar, User as UserIcon, Edit, MessageSquare, Settings, Users, Briefcase, Phone, FileBarChart, Award, Share2, BadgeCheck } from 'lucide-react';
+import { Building, ShieldCheck, Mail, Calendar, User as UserIcon, Edit, MessageSquare, Settings, Users, Briefcase, Phone, FileBarChart, Award, Share2, BadgeCheck, Wrench } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { PostCard } from '@/components/post-card';
@@ -218,6 +218,25 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
         )}
 
         {isOwnProfile && profileUser.referral_code && <ReferralSharer code={profileUser.referral_code} />}
+
+        {isOwnProfile && isBusiness && (
+          <Card className="shadow-xl border border-border/60 rounded-xl bg-card/80 backdrop-blur-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Wrench className="w-6 h-6 mr-3 text-primary" />
+                Manage Business
+              </CardTitle>
+              <CardDescription>
+                Update your services, schedule, and view bookings.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+                <Button asChild>
+                    <Link href="/account/manage-business">Manage Services & Schedule</Link>
+                </Button>
+            </CardContent>
+          </Card>
+        )}
 
         {isOwnProfile && pendingRequests.length > 0 && (
           <FamilyRequestsList initialRequests={pendingRequests} />

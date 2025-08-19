@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration } from '@/lib/db-types';
+import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 
@@ -177,6 +177,19 @@ async function initializeDatabase(client: Pool | Client) {
       );
     `);
 
+    // Table for Business Services
+    await initClient.query(`
+      CREATE TABLE IF NOT EXISTS business_services (
+        id SERIAL PRIMARY KEY,
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        name VARCHAR(100) NOT NULL,
+        price NUMERIC(10, 2) NOT NULL,
+        duration_minutes INTEGER NOT NULL
+      );
+    `);
+    console.log("Table 'business_services' checked/created.");
+
+
     console.log("All tables checked/created.");
 
     // Create indexes for performance
@@ -184,6 +197,8 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE INDEX IF NOT EXISTS posts_createdat_idx ON posts (createdat DESC);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS posts_location_idx ON posts USING gist (ll_to_earth(latitude, longitude));`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS device_tokens_user_id_idx ON device_tokens (user_id);`);
+    await initClient.query(`CREATE INDEX IF NOT EXISTS business_services_user_id_idx ON business_services (user_id);`);
+
 
     console.log("Indexes checked/created.");
 
@@ -3307,3 +3322,69 @@ export async function deletePasswordResetToken(email: string): Promise<void> {
     }
 }
     
+// --- Business Service Functions ---
+export async function getBusinessServicesDb(userId: number): Promise<BusinessService[]> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) return [];
+  const client = await dbPool.connect();
+  try {
+    const query = 'SELECT * FROM business_services WHERE user_id = $1 ORDER BY name';
+    const result = await client.query(query, [userId]);
+    return result.rows;
+  } finally {
+    client.release();
+  }
+}
+
+export async function addBusinessServiceDb(userId: number, service: NewBusinessService): Promise<BusinessService> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+  try {
+    const query = `
+      INSERT INTO business_services (user_id, name, price, duration_minutes)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+    const values = [userId, service.name, service.price, service.duration_minutes];
+    const result = await client.query(query, values);
+    return result.rows[0];
+  } finally {
+    client.release();
+  }
+}
+
+export async function updateBusinessServiceDb(serviceId: number, userId: number, service: NewBusinessService): Promise<BusinessService | null> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+  try {
+    const query = `
+      UPDATE business_services
+      SET name = $1, price = $2, duration_minutes = $3
+      WHERE id = $4 AND user_id = $5
+      RETURNING *;
+    `;
+    const values = [service.name, service.price, service.duration_minutes, serviceId, userId];
+    const result = await client.query(query, values);
+    return result.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
+
+export async function deleteBusinessServiceDb(serviceId: number, userId: number): Promise<void> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+  try {
+    const query = 'DELETE FROM business_services WHERE id = $1 AND user_id = $2';
+    await client.query(query, [serviceId, userId]);
+  } finally {
+    client.release();
+  }
+}
