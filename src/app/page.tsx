@@ -11,7 +11,7 @@ import StatusFeed from '@/components/status-feed';
 import { StatusFeedSkeleton } from '@/components/status-feed-skeleton';
 import { getPosts } from './actions';
 import { Button } from '@/components/ui/button';
-import { Map, Sparkles, Trophy } from 'lucide-react';
+import { Map, Sparkles, Trophy, HandPlatter } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import TopPerformersList from '@/components/top-performers-list';
 import TopPerformerMarquee from '@/components/top-performer-marquee';
@@ -49,7 +49,7 @@ const HomePage: FC = () => {
               <PostComposerWithSession />
             </Suspense>
           </div>
-           <div className="col-span-2 grid grid-cols-3 gap-2 sm:gap-4">
+           <div className="col-span-2 grid grid-cols-2 gap-2 sm:gap-4">
               <Button variant="outline" asChild className="h-full text-base shadow-lg hover:shadow-primary/20 bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/50 transition-all duration-300 flex-col sm:flex-row gap-2">
                   <Link href="/map">
                       <Map className="h-5 w-5 sm:h-6 sm:w-6 text-primary"/>
@@ -57,33 +57,11 @@ const HomePage: FC = () => {
                   </Link>
               </Button>
               <Button variant="outline" asChild className="h-full text-base shadow-lg hover:shadow-primary/20 bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/50 transition-all duration-300 flex-col sm:flex-row gap-2">
-                  <Link href="/helper">
-                      <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-accent"/>
-                      <span className="text-xs sm:text-sm">AI Helper</span>
+                  <Link href="/?tab=services">
+                      <HandPlatter className="h-5 w-5 sm:h-6 sm:w-6 text-accent"/>
+                      <span className="text-xs sm:text-sm">Book Services</span>
                   </Link>
               </Button>
-               <Dialog>
-                  <DialogTrigger asChild>
-                    <Button variant="outline" className="h-full text-base shadow-lg hover:shadow-primary/20 bg-card/80 backdrop-blur-sm border-border/60 hover:border-primary/50 transition-all duration-300 flex-col sm:flex-row gap-2">
-                      <Trophy className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-500"/>
-                      <span className="text-xs sm:text-sm">LP Ranks</span>
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent>
-                      <DialogHeader>
-                          <DialogTitle className="flex items-center">
-                            <Trophy className="mr-2 h-6 w-6 text-yellow-500"/>
-                            Top Performers
-                          </DialogTitle>
-                          <DialogDescription>
-                              The top 10 users with the most LP Points.
-                          </DialogDescription>
-                      </DialogHeader>
-                      <Suspense fallback={<TopPerformersList.Skeleton />}>
-                        <TopPerformersList />
-                      </Suspense>
-                  </DialogContent>
-               </Dialog>
            </div>
         </div>
         

@@ -10,7 +10,7 @@ import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, upd
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed } from 'lucide-react';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -42,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { getApp, getApps, initializeApp } from 'firebase/app';
 import MandalList from './mandal-list';
+import Link from 'next/link';
 
 
 interface AndroidInterface {
@@ -56,7 +57,7 @@ declare global {
 
 const POSTS_PER_PAGE = 5;
 
-type FeedType = 'nearby' | 'family' | 'business' | 'festival';
+type FeedType = 'nearby' | 'family' | 'services' | 'festival';
 
 type FeedState = {
     posts: Post[];
@@ -120,7 +121,7 @@ export function NoPostsContent({ feedType, radiusKm, onRadiusChange }: { feedTyp
       title: 'No Family Pulses Yet',
       description: 'Your family members have not posted anything yet. Share a family post to get started!'
     },
-    business: {
+    services: {
       title: 'No Businesses Found',
       description: radiusKm ? `We looked within ${radiusKm} km. Want to try a wider radius?` : 'No businesses found in your area for the selected category. Try a different filter!'
     },
@@ -134,10 +135,10 @@ export function NoPostsContent({ feedType, radiusKm, onRadiusChange }: { feedTyp
   return (
     <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
       <CardContent className="flex flex-col items-center">
-        {feedType === 'business' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : feedType === 'festival' ? <PartyPopper className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
+        {feedType === 'services' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : feedType === 'festival' ? <PartyPopper className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
         <p className="text-2xl text-muted-foreground font-semibold">{currentMessage.title}</p>
         <p className="text-md text-muted-foreground/80 mt-2">{currentMessage.description}</p>
-        {feedType === 'business' && onRadiusChange && (
+        {feedType === 'services' && onRadiusChange && (
             <div className="flex gap-2 mt-4">
               {[10, 15, 25].map(r => (
                 <Button key={r} variant="outline" size="sm" onClick={() => onRadiusChange(r)}>
@@ -146,7 +147,7 @@ export function NoPostsContent({ feedType, radiusKm, onRadiusChange }: { feedTyp
               ))}
             </div>
         )}
-        {feedType !== 'business' && (
+        {feedType !== 'services' && (
             <div className="mt-6">
             <a
                 href="#"
@@ -320,7 +321,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   }, [requestLocation]);
 
   useEffect(() => {
-    if (activeTab === 'business' && location && !businessInitialLoad.current) {
+    if (activeTab === 'services' && location && !businessInitialLoad.current) {
       businessInitialLoad.current = true;
       fetchBusinesses(1, businessFeed.category);
     }
@@ -336,7 +337,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       if (feeds.family.posts.length === 0 && !feeds.family.isLoading) {
         fetchPosts('family', 1, sortBy, location);
       }
-    } else if (newTab === 'business') {
+    } else if (newTab === 'services') {
         if (!location) {
             setLocationPromptVisible(true);
             setBusinessFeed(initialBusinessFeedState);
@@ -430,7 +431,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const refreshFeed = useCallback(async () => {
     setIsRefreshing(true);
-    if(activeTab === 'business') {
+    if(activeTab === 'services') {
         await fetchBusinesses(1, businessFeed.category);
     } else if (activeTab === 'festival') {
         // MandalList will handle its own refresh
@@ -447,7 +448,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   }, [activeTab, fetchPosts, sortBy, fetchBusinesses, businessFeed.category, location]);
   
   const handleLoadMore = useCallback(async () => {
-    if (activeTab === 'business') {
+    if (activeTab === 'services') {
         if (businessFeed.isLoading || !businessFeed.hasMore) return;
         fetchBusinesses(businessFeed.page + 1, businessFeed.category);
     } else if (activeTab === 'festival') {
@@ -464,7 +465,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     let isLoading = false;
     let hasMore = false;
 
-    if (activeTab === 'business') {
+    if (activeTab === 'services') {
         isLoading = businessFeed.isLoading;
         hasMore = businessFeed.hasMore;
     } else if (activeTab !== 'festival') {
@@ -494,7 +495,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const handleSortChange = (newSortBy: SortOption) => {
     if (newSortBy === sortBy) return;
     setSortBy(newSortBy);
-    if(activeTab !== 'business' && activeTab !== 'festival') {
+    if(activeTab !== 'services' && activeTab !== 'festival') {
         fetchPosts(activeTab, 1, newSortBy, location);
     }
   };
@@ -515,7 +516,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         return <MandalList sessionUser={sessionUser} userLocation={location} />;
     }
 
-    if (activeTab === 'business') {
+    if (activeTab === 'services') {
         if (locationPromptVisible) {
             return (
                 <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
@@ -550,7 +551,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 ))}
 
                 {businessFeed.businesses.length === 0 && businessFeed.externalBusinesses.length === 0 && !businessFeed.isLoadingAI && (
-                    <NoPostsContent feedType='business' radiusKm={radiusKm} onRadiusChange={(r) => { setRadiusKm(r); fetchBusinesses(1, businessFeed.category); }} />
+                    <NoPostsContent feedType='services' radiusKm={radiusKm} onRadiusChange={(r) => { setRadiusKm(r); fetchBusinesses(1, businessFeed.category); }} />
                 )}
                 
                 {businessFeed.hasMore && <div ref={loaderRef} className="h-1 w-full" />}
@@ -571,6 +572,21 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     
     return (
       <div className="space-y-6">
+        {activeTab === 'nearby' && (
+          <Card className="shadow-lg hover:shadow-primary/10 transition-shadow duration-300 bg-blue-500/5 border-blue-500/20">
+            <CardContent className="p-4">
+                <Link href="/?tab=services" className="flex items-center gap-4">
+                  <div className="p-2 bg-primary/10 rounded-full border-2 border-primary/20">
+                      <HandPlatter className="h-6 w-6 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-primary">Local Services</h3>
+                    <p className="text-sm text-muted-foreground">Need a salon or car wash? Book now!</p>
+                  </div>
+                </Link>
+            </CardContent>
+          </Card>
+        )}
         {feed.posts.length > 0 ? (
           feed.posts.map((post, index) => (
             <PostCard key={post.id} post={post} userLocation={location} sessionUser={sessionUser} isFirst={index === 0} />
@@ -592,7 +608,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       { key: "nearby", label: "Nearby" },
       { key: "festival", label: "Festival" },
       ...(sessionUser ? [{ key: "family", label: "Family", badge: unreadFamilyPostCount }] : []),
-      { key: "business", label: "Business" },
+      { key: "services", label: "Services" },
   ];
 
   return (
@@ -631,7 +647,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 activeKey={activeTab}
             />
             <div className="flex items-center gap-2">
-              {activeTab === 'business' && (
+              {activeTab === 'services' && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">
@@ -647,7 +663,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {activeTab === 'business' ? (
+              {activeTab === 'services' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">
