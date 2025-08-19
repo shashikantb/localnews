@@ -416,7 +416,7 @@ export type NewGanpatiMandal = {
     admin_user_id: number; // This should be included when creating
 }
 
-// For OTP
+// --- OTP
 export interface PendingRegistration extends Omit<NewUser, 'passwordplaintext'> {
     id: number;
     passwordhash: string;
@@ -435,6 +435,15 @@ export interface BusinessService {
 }
 
 export type NewBusinessService = Omit<BusinessService, 'id' | 'user_id'>;
+
+export interface BusinessHour {
+    id: number;
+    user_id: number;
+    day_of_week: number; // 0 for Sunday, 1 for Monday, etc.
+    start_time: string; // "HH:MM"
+    end_time: string; // "HH:MM"
+    is_closed: boolean;
+}
 
 
 // AI Flow Types

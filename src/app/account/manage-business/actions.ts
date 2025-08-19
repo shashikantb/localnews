@@ -3,8 +3,8 @@
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/app/auth/actions';
-import { addBusinessServiceDb, getBusinessServicesDb, updateBusinessServiceDb, deleteBusinessServiceDb } from '@/lib/db';
-import type { NewBusinessService } from '@/lib/db-types';
+import { addBusinessServiceDb, getBusinessServicesDb, updateBusinessServiceDb, deleteBusinessServiceDb, getBusinessHoursDb, updateBusinessHoursDb } from '@/lib/db';
+import type { NewBusinessService, BusinessHour } from '@/lib/db-types';
 
 export async function getBusinessServices() {
     const { user } = await getSession();
@@ -55,6 +55,29 @@ export async function deleteBusinessService(serviceId: number) {
         revalidatePath('/account/manage-business');
         return { success: true };
     } catch(e: any) {
+        return { success: false, error: e.message };
+    }
+}
+
+// --- Schedule Actions ---
+export async function getBusinessHours() {
+    const { user } = await getSession();
+    if (!user) {
+        return [];
+    }
+    return getBusinessHoursDb(user.id);
+}
+
+export async function updateBusinessHours(hours: Omit<BusinessHour, 'id' | 'user_id'>[]) {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'Authentication required' };
+    }
+    try {
+        await updateBusinessHoursDb(user.id, hours);
+        revalidatePath('/account/manage-business');
+        return { success: true };
+    } catch (e: any) {
         return { success: false, error: e.message };
     }
 }
