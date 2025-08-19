@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService } from '@/lib/db-types';
+import type { ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 
@@ -189,6 +189,20 @@ async function initializeDatabase(client: Pool | Client) {
     `);
     console.log("Table 'business_services' checked/created.");
 
+    // Table for Business Hours
+    await initClient.query(`
+        CREATE TABLE IF NOT EXISTS business_hours (
+            id SERIAL PRIMARY KEY,
+            user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+            day_of_week INTEGER NOT NULL,
+            start_time TIME,
+            end_time TIME,
+            is_closed BOOLEAN DEFAULT true,
+            UNIQUE(user_id, day_of_week)
+        );
+    `);
+    console.log("Table 'business_hours' checked/created.");
+
 
     console.log("All tables checked/created.");
 
@@ -198,6 +212,7 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE INDEX IF NOT EXISTS posts_location_idx ON posts USING gist (ll_to_earth(latitude, longitude));`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS device_tokens_user_id_idx ON device_tokens (user_id);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_services_user_id_idx ON business_services (user_id);`);
+    await initClient.query(`CREATE INDEX IF NOT EXISTS business_hours_user_id_idx ON business_hours (user_id);`);
 
 
     console.log("Indexes checked/created.");
@@ -3387,4 +3402,53 @@ export async function deleteBusinessServiceDb(serviceId: number, userId: number)
   } finally {
     client.release();
   }
+}
+
+// --- Business Hours Functions ---
+export async function getBusinessHoursDb(userId: number): Promise<BusinessHour[]> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return [];
+
+    const client = await dbPool.connect();
+    try {
+        const query = 'SELECT * FROM business_hours WHERE user_id = $1 ORDER BY day_of_week';
+        const result = await client.query(query, [userId]);
+        return result.rows;
+    } finally {
+        client.release();
+    }
+}
+
+export async function updateBusinessHoursDb(userId: number, hours: Omit<BusinessHour, 'id' | 'user_id'>[]): Promise<void> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+
+    const client = await dbPool.connect();
+    try {
+        await client.query('BEGIN');
+
+        // Delete old schedule for the user
+        await client.query('DELETE FROM business_hours WHERE user_id = $1', [userId]);
+
+        if (hours.length > 0) {
+            // Prepare and insert the new schedule
+            const values = hours.map(h => `(${userId}, ${h.day_of_week}, ${h.is_closed ? 'NULL' : `'${h.start_time}'`}, ${h.is_closed ? 'NULL' : `'${h.end_time}'`}, ${h.is_closed})`).join(',');
+            
+            const insertQuery = `
+                INSERT INTO business_hours (user_id, day_of_week, start_time, end_time, is_closed)
+                VALUES ${values};
+            `;
+            await client.query(insertQuery);
+        }
+
+        await client.query('COMMIT');
+    } catch (error) {
+        await client.query('ROLLBACK');
+        console.error("Error updating business hours:", error);
+        throw error;
+    } finally {
+        client.release();
+    }
 }
