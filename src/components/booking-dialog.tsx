@@ -111,7 +111,9 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     while (currentTime < endTime) {
       const slotEndTime = addMinutes(currentTime, serviceDuration);
       if (slotEndTime > endTime) break;
-      if (isPast(currentTime) && !isToday(currentTime)) {
+
+      // isPast check should only apply to today's date
+      if (isToday(selectedDate) && isPast(slotEndTime)) {
           currentTime = addMinutes(currentTime, 15);
           continue;
       }
