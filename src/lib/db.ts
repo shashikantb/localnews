@@ -3440,7 +3440,19 @@ export async function getBusinessHoursDb(userId: number): Promise<BusinessHour[]
 
     const client = await dbPool.connect();
     try {
-        const query = 'SELECT * FROM business_hours WHERE user_id = $1 ORDER BY day_of_week';
+        // Use TO_CHAR to format the time to HH24:MI (e.g., '09:00') which matches the UI's options.
+        const query = `
+            SELECT 
+                id, 
+                user_id, 
+                day_of_week, 
+                TO_CHAR(start_time, 'HH24:MI') as start_time, 
+                TO_CHAR(end_time, 'HH24:MI') as end_time, 
+                is_closed 
+            FROM business_hours 
+            WHERE user_id = $1 
+            ORDER BY day_of_week;
+        `;
         const result = await client.query(query, [userId]);
         return result.rows;
     } finally {
@@ -3457,7 +3469,7 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
     try {
         await client.query('BEGIN');
 
-        // Delete old schedule for the user
+        // It's safer and simpler to delete the old schedule and insert the new one.
         await client.query('DELETE FROM business_hours WHERE user_id = $1', [userId]);
 
         if (hours.length > 0) {
@@ -3466,6 +3478,7 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
                 VALUES ($1, $2, $3, $4, $5);
             `;
             for(const h of hours) {
+                // If the day is closed, start and end times should be NULL.
                 const startTime = h.is_closed ? null : h.start_time;
                 const endTime = h.is_closed ? null : h.end_time;
                 await client.query(insertQuery, [userId, h.day_of_week, startTime, endTime, h.is_closed]);
@@ -3481,6 +3494,7 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
         client.release();
     }
 }
+
 
 // --- Business Resource Functions ---
 export async function getBusinessResourcesDb(userId: number): Promise<BusinessResource[]> {

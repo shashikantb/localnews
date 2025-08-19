@@ -29,12 +29,12 @@ const scheduleSchema = z.object({
     z.object({
       day_of_week: z.number(),
       is_closed: z.boolean(),
-      start_time: z.string(),
-      end_time: z.string(),
+      start_time: z.string().nullable(),
+      end_time: z.string().nullable(),
     })
   ).superRefine((schedule, ctx) => {
     schedule.forEach((day, index) => {
-        if(!day.is_closed && day.start_time >= day.end_time) {
+        if(!day.is_closed && day.start_time && day.end_time && day.start_time >= day.end_time) {
             ctx.addIssue({
                 path: [`schedule`, index, 'end_time'],
                 message: 'End time must be after start time.',
@@ -72,6 +72,7 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
   const form = useForm<ScheduleFormData>({
     resolver: zodResolver(scheduleSchema),
     defaultValues: getDefaultValues(),
+    mode: 'onChange',
   });
 
   const { fields } = useFieldArray({
@@ -121,7 +122,7 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
                             name={`schedule.${index}.start_time`}
                             control={form.control}
                             render={({ field: timeField }) => (
-                                <Select onValueChange={timeField.onChange} value={timeField.value}>
+                                <Select onValueChange={timeField.onChange} value={timeField.value || '09:00'}>
                                     <SelectTrigger><SelectValue/></SelectTrigger>
                                     <SelectContent>{TIME_OPTIONS.map(t => <SelectItem key={`start-${t}`} value={t}>{t}</SelectItem>)}</SelectContent>
                                 </Select>
@@ -132,7 +133,7 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
                             name={`schedule.${index}.end_time`}
                             control={form.control}
                             render={({ field: timeField }) => (
-                                 <Select onValueChange={timeField.onChange} value={timeField.value}>
+                                 <Select onValueChange={timeField.onChange} value={timeField.value || '18:00'}>
                                     <SelectTrigger><SelectValue/></SelectTrigger>
                                     <SelectContent>{TIME_OPTIONS.map(t => <SelectItem key={`end-${t}`} value={t}>{t}</SelectItem>)}</SelectContent>
                                 </Select>
