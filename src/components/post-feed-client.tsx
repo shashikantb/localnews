@@ -286,7 +286,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
         setLocation(newLocation);
         setIsFetchingLocation(false);
-        toast.dismiss();
+        toast({ title: "Location Found!", description: "Loading content for your area." });
 
         if (!liveSeedingTriggered.current) {
           triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
