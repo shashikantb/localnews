@@ -71,7 +71,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       const [s, h, r] = await Promise.all([
         api<{services:any[]}>('/api/booking/services/' + business.id),
         api<{hours:any[]}>('/api/booking/hours/' + business.id),
-        api<{resources:any[]}>('/api/booking/resources/' + business.id),
+        api<{resources:any[]}>(`/api/booking/resources/${business.id}`),
       ]);
       setServices(s.services);
       setHours(h.hours);
