@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { type FC } from 'react';
@@ -9,8 +8,8 @@ import type { Post, User, SortOption, BusinessUser, ExternalBusiness } from '@/l
 import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, updateUserLocation, getUnreadFamilyPostCount, markFamilyFeedAsRead, triggerLiveSeeding, findExternalBusinesses } from '@/app/actions';
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter } from 'lucide-react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -193,6 +192,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const [locationPromptVisible, setLocationPromptVisible] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   
+  const [selectedService, setSelectedService] = useState<string | null>(null);
+  
   const liveSeedingTriggered = useRef(false);
   const businessInitialLoad = useRef(false);
 
@@ -319,13 +320,15 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
-
+  
   useEffect(() => {
     if (activeTab === 'services' && location && !businessInitialLoad.current) {
-      businessInitialLoad.current = true;
-      fetchBusinesses(1, businessFeed.category);
+        if (selectedService) {
+            businessInitialLoad.current = true;
+            fetchBusinesses(1, selectedService);
+        }
     }
-  }, [activeTab, location, fetchBusinesses, businessFeed.category]);
+  }, [activeTab, location, fetchBusinesses, selectedService]);
 
   
   const handleTabChange = useCallback((newTab: FeedType) => {
@@ -338,11 +341,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchPosts('family', 1, sortBy, location);
       }
     } else if (newTab === 'services') {
+        setSelectedService(null);
         if (!location) {
             setLocationPromptVisible(true);
             setBusinessFeed(initialBusinessFeedState);
-        } else if (businessFeed.businesses.length === 0 && !businessFeed.isLoading) {
-            fetchBusinesses(1, businessFeed.category);
         }
     } else if (newTab === 'festival') {
         setLocationPromptVisible(false);
@@ -353,7 +355,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             fetchPosts('nearby', 1, sortBy, location);
         }
     }
-  }, [unreadFamilyPostCount, feeds.family.posts.length, feeds.family.isLoading, fetchPosts, sortBy, location, businessFeed.businesses.length, businessFeed.isLoading, fetchBusinesses, businessFeed.category, feeds.nearby.posts.length, feeds.nearby.isLoading]);
+  }, [unreadFamilyPostCount, feeds.family.posts.length, feeds.family.isLoading, fetchPosts, sortBy, location, feeds.nearby.posts.length, feeds.nearby.isLoading]);
 
   useEffect(() => {
     handleTabChange(activeTab);
@@ -511,12 +513,34 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     fetchBusinesses(1, businessFeed.category);
   }
 
+  const renderServiceCategories = () => (
+    <div className="space-y-6">
+        <h2 className="text-2xl font-bold text-center text-primary tracking-tight">Select a Service</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Card onClick={() => { setSelectedService('Saloon / Barber Shop'); fetchBusinesses(1, 'Saloon / Barber Shop'); }} className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200">
+                <Scissors className="h-12 w-12 text-accent mb-3"/>
+                <p className="font-semibold text-lg">Saloon</p>
+                <p className="text-sm text-muted-foreground">Haircuts, Shaving, Styling</p>
+            </Card>
+            <Card onClick={() => { setSelectedService('Car/Bike Washing'); fetchBusinesses(1, 'Car/Bike Washing'); }} className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200">
+                <Wind className="h-12 w-12 text-accent mb-3"/>
+                <p className="font-semibold text-lg">Car/Bike Washing</p>
+                <p className="text-sm text-muted-foreground">Cleaning, Polishing, Detailing</p>
+            </Card>
+        </div>
+    </div>
+  );
+
   const renderFeedContent = () => {
     if (activeTab === 'festival') {
         return <MandalList sessionUser={sessionUser} userLocation={location} />;
     }
 
     if (activeTab === 'services') {
+        if (!selectedService) {
+            return renderServiceCategories();
+        }
+
         if (locationPromptVisible) {
             return (
                 <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
@@ -543,6 +567,11 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         
         return (
             <div className="space-y-6">
+                <Button variant="ghost" onClick={() => setSelectedService(null)} className="mb-2">
+                    <ArrowLeft className="mr-2 h-4 w-4"/>
+                    Back to Services
+                </Button>
+
                 {businessFeed.businesses.map((business) => (
                     <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} />
                 ))}
@@ -647,7 +676,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 activeKey={activeTab}
             />
             <div className="flex items-center gap-2">
-              {activeTab === 'services' && (
+              {activeTab === 'services' && selectedService && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">
@@ -663,32 +692,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {activeTab === 'services' ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 shadow-sm">
-                      <Filter className="w-4 h-4 mr-2" />
-                      <span>Category</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
-                    <ScrollArea className="h-72">
-                      <DropdownMenuRadioGroup value={businessFeed.category || 'all'} onValueChange={handleCategoryChange} className="p-1">
-                        <DropdownMenuRadioItem value="all">All Categories</DropdownMenuRadioItem>
-                        <DropdownMenuSeparator />
-                          {Object.entries(BUSINESS_CATEGORIES).map(([group, categories]) => (
-                              <React.Fragment key={group}>
-                                  <DropdownMenuLabel>{group}</DropdownMenuLabel>
-                                  {categories.map(category => (
-                                      <DropdownMenuRadioItem key={category} value={category}>{category}</DropdownMenuRadioItem>
-                                  ))}
-                              </React.Fragment>
-                          ))}
-                      </DropdownMenuRadioGroup>
-                    </ScrollArea>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              ) : activeTab !== 'festival' ? (
+              {activeTab !== 'services' && activeTab !== 'festival' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">

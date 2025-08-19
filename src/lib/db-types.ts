@@ -25,6 +25,9 @@ export const BUSINESS_CATEGORIES = {
     "Electrician", "Plumber", "Carpenter", "Painter", "Civil Worker / Mason",
     "AC / Refrigerator Mechanic", "CCTV Installer", "RO / Water Purifier Service", "Gas Stove Repair",
   ],
+  "Vehicle Services": [
+      "Car/Bike Washing",
+  ],
   "Professional & Utility Services": [
     "Internet / Wifi Provider", "Cable TV Provider", "Property Dealer / Agent",
     "Tuition Classes / Coaching", "Driving Instructor", "Computer Repair & Service",
