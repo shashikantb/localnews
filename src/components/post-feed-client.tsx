@@ -10,7 +10,7 @@ import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, upd
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors } from 'lucide-react';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors, Map, List } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -199,14 +199,18 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
   }, []);
   
-  // Fetch unread family post count on initial load and periodically
+  // This effect will only poll for the unread family count.
+  // It will NOT cause a re-render that resets the business feed.
   useEffect(() => {
-    if (!sessionUser) return;
+    if (!sessionUser) {
+      setUnreadFamilyPostCount(0);
+      return;
+    }
     const fetchCount = () => {
       getUnreadFamilyPostCount().then(setUnreadFamilyPostCount);
     };
     fetchCount(); // Initial fetch
-    const intervalId = setInterval(fetchCount, 30000); // Poll every 30 seconds
+    const intervalId = setInterval(fetchCount, 30000);
     return () => clearInterval(intervalId);
   }, [sessionUser]);
 
@@ -248,7 +252,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         return;
     }
     setLocationPromptVisible(false);
-    setBusinessFeed(prev => ({ ...prev, isLoading: true, category }));
+    setBusinessFeed(prev => ({ ...prev, isLoading: true, category: category || prev.category }));
 
     try {
       const newBusinesses = await getNearbyBusinesses({ page, limit: POSTS_PER_PAGE, latitude: location.latitude, longitude: location.longitude, category, radiusKm });
@@ -323,10 +327,11 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchPosts('family', 1, sortBy, location);
       }
     } else if (newTab === 'services') {
+        // Reset the service selection when the main tab is clicked
         setSelectedService(null);
+        setBusinessFeed(initialBusinessFeedState); // Clear old results
         if (!location) {
             setLocationPromptVisible(true);
-            setBusinessFeed(initialBusinessFeedState);
         }
     } else if (newTab === 'festival') {
         setLocationPromptVisible(false);
@@ -339,9 +344,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
   }, [unreadFamilyPostCount, feeds.family.posts.length, feeds.family.isLoading, fetchPosts, sortBy, location, feeds.nearby.posts.length, feeds.nearby.isLoading]);
 
+  // This effect now only runs when the active tab changes from the URL
   useEffect(() => {
     handleTabChange(activeTab);
-  }, [activeTab, handleTabChange]);
+  }, [activeTab]);
 
   const handleNotificationRegistration = async () => {
     if (notificationPermissionStatus === 'granted') {
@@ -483,12 +489,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchPosts(activeTab, 1, newSortBy, location);
     }
   };
-
-  const handleCategoryChange = (newCategory: string) => {
-    const category = newCategory === 'all' ? undefined : newCategory;
-    if(category === businessFeed.category) return;
-    fetchBusinesses(1, category);
-  };
   
   const handleRadiusChange = (newRadius: number) => {
     setRadiusKm(newRadius);
@@ -545,16 +545,21 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         
         return (
             <div className="space-y-6">
-                <Button variant="ghost" onClick={() => setSelectedService(null)} className="mb-2">
-                    <ArrowLeft className="mr-2 h-4 w-4"/>
-                    Back to Services
-                </Button>
+                <div className="flex justify-between items-center mb-2">
+                    <Button variant="ghost" onClick={() => setSelectedService(null)}>
+                        <ArrowLeft className="mr-2 h-4 w-4"/>
+                        Back to Services
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-9 shadow-sm" disabled>
+                        <Map className="mr-2 h-4 w-4"/> Map View
+                    </Button>
+                </div>
 
                 {businessFeed.businesses.map((business) => (
                     <BusinessCard key={`db-${business.id}`} business={business} userLocation={location} />
                 ))}
 
-                {businessFeed.businesses.length === 0 && (
+                {!businessFeed.isLoading && businessFeed.businesses.length === 0 && (
                     <NoPostsContent feedType='services' radiusKm={radiusKm} onRadiusChange={handleRadiusChange} category={businessFeed.category} />
                 )}
                 
@@ -708,3 +713,4 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 };
 
 export default PostFeedClient;
+
