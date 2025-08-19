@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dialog';
 import { Loader2, Calendar as CalendarIcon, Clock, Scissors, Armchair, ChevronLeft, Check, ArrowRight } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
-import { add, format, parse, setHours, setMinutes, startOfDay, isPast, isToday, getDay, addMinutes, areIntervalsOverlapping } from 'date-fns';
+import { format, setHours, setMinutes, startOfDay, getDay, addMinutes, isPast, isToday, areIntervalsOverlapping } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -28,6 +28,19 @@ interface BookingDialogProps {
 }
 
 const steps = ['Select Service', 'Select Date & Time', 'Confirm Booking'];
+
+// Helper to safely parse dates, returning null for invalid ones
+const toValidDate = (v: string | Date | null | undefined) => {
+  if (!v) return null;
+  const d = v instanceof Date ? v : new Date(v);
+  return Number.isNaN(d.getTime()) ? null : d;
+};
+
+// Helper to ensure service duration is a valid number
+const safeDuration = (n: unknown, fallback = 30) => {
+  const num = typeof n === 'number' ? n : Number(n);
+  return Number.isFinite(num) && num > 0 ? num : fallback;
+};
 
 async function api<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, { ...init, cache: 'no-store' });
@@ -56,9 +69,9 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     setIsLoading(true);
     try {
       const [s, h, r] = await Promise.all([
-        api<{services:any[]}>(`/api/booking/services/${business.id}`),
-        api<{hours:any[]}>(`/api/booking/hours/${business.id}`),
-        api<{resources:any[]}>(`/api/booking/resources/${business.id}`),
+        api<{services:any[]}>('/api/booking/services/' + business.id),
+        api<{hours:any[]}>('/api/booking/hours/' + business.id),
+        api<{resources:any[]}>('/api/booking/resources/' + business.id),
       ]);
       setServices(s.services);
       setHours(h.hours);
@@ -87,58 +100,68 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   useEffect(() => {
     if (!selectedDate) return;
     api<{appointments:any[]}>(`/api/booking/appointments?businessId=${business.id}&date=${format(selectedDate,'yyyy-MM-dd')}`)
-      .then(d => setAppointments(d.appointments))
+      .then(d => setAppointments(Array.isArray(d.appointments) ? d.appointments : []))
       .catch(() => setAppointments([]));
   }, [selectedDate, business.id]);
 
   const timeSlots = useMemo(() => {
-    if (!selectedDate || !selectedService || !hours) return [];
+    if (!selectedDate || !selectedService || !Array.isArray(hours)) return [];
 
     const dayOfWeek = getDay(selectedDate);
-    const dayHours = hours.find(h => h.day_of_week === dayOfWeek);
+    const dayHours = hours.find(h => h?.day_of_week === dayOfWeek);
 
-    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
-        return [];
-    }
+    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) return [];
 
-    const availableSlots = [];
-    const serviceDuration = selectedService.duration_minutes;
-    const [startH, startM] = dayHours.start_time.split(':').map(Number);
-    const [endH, endM] = dayHours.end_time.split(':').map(Number);
+    const serviceDuration = safeDuration((selectedService as any).duration_minutes, 30);
 
-    let currentTime = setMinutes(setHours(startOfDay(selectedDate), startH), startM);
-    const endTime = setMinutes(setHours(startOfDay(selectedDate), endH), endM);
-    
-    while (currentTime < endTime) {
-      const slotEndTime = addMinutes(currentTime, serviceDuration);
-      if (slotEndTime > endTime) break;
+    const [startH, startM] = String(dayHours.start_time).split(':').map(Number);
+    const [endH, endM]   = String(dayHours.end_time).split(':').map(Number);
 
-      // isPast check should only apply to today's date
-      if (isToday(selectedDate) && isPast(slotEndTime)) {
-          currentTime = addMinutes(currentTime, 15);
-          continue;
+    const start = setMinutes(setHours(startOfDay(selectedDate), startH || 0), startM || 0);
+    const end   = setMinutes(setHours(startOfDay(selectedDate), endH || 0),   endM || 0);
+
+    if (!(start < end)) return [];
+
+    const out: string[] = [];
+    let cur = start;
+
+    while (cur < end) {
+      const slotEnd = addMinutes(cur, serviceDuration);
+      if (slotEnd > end) break;
+
+      // Past-time filter only for today
+      if (isToday(selectedDate) && isPast(slotEnd)) {
+        cur = addMinutes(cur, 15);
+        continue;
       }
-      
-      const neededResources = 1; // Assuming 1 resource per appointment for now
+
+      // Resource overlap check (defensive against bad rows)
+      const needed = 1;
       const availableResources = resources.filter(resource => {
-          const isBooked = appointments.some(appt => 
-              appt.resource_id === resource.id &&
-              areIntervalsOverlapping(
-                  { start: currentTime, end: slotEndTime },
-                  { start: new Date(appt.start_time), end: new Date(appt.end_time) },
-                  { inclusive: false }
-              )
-          );
+          const isBooked = appointments.some(appt => {
+              if (appt.resource_id !== resource.id) return false;
+              const aStart = toValidDate(appt?.start_time);
+              const aEnd   = toValidDate(appt?.end_time);
+              if (!aStart || !aEnd) return false; // ignore bad rows instead of crashing
+              try {
+                return areIntervalsOverlapping(
+                    { start: cur, end: slotEnd },
+                    { start: aStart,  end: aEnd },
+                    { inclusive: false }
+                );
+              } catch {
+                return false;
+              }
+          });
           return !isBooked;
       });
 
-      if (availableResources.length >= neededResources) {
-        availableSlots.push(format(currentTime, 'HH:mm'));
+      if (availableResources.length >= needed) {
+        out.push(format(cur, 'HH:mm'));
       }
-      
-      currentTime = addMinutes(currentTime, 15); // Check every 15 minutes for a slot
+      cur = addMinutes(cur, 15);
     }
-    return availableSlots;
+    return out;
   }, [selectedDate, selectedService, hours, resources, appointments]);
 
   const handleCreateAppointment = async () => {
@@ -158,13 +181,16 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     const endTime = addMinutes(startTime, selectedService.duration_minutes);
 
     const availableResource = resources.find(resource => 
-        !appointments.some(appt => 
-            appt.resource_id === resource.id &&
-            areIntervalsOverlapping(
+        !appointments.some(appt => {
+            if (appt.resource_id !== resource.id) return false;
+            const aStart = toValidDate(appt.start_time);
+            const aEnd = toValidDate(appt.end_time);
+            if (!aStart || !aEnd) return false;
+            return areIntervalsOverlapping(
                 { start: startTime, end: endTime },
-                { start: new Date(appt.start_time), end: new Date(appt.end_time) }
+                { start: aStart, end: aEnd }
             )
-        )
+        })
     );
 
     if (!availableResource) {
@@ -293,7 +319,15 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
             {currentStep > 0 && <Button variant="ghost" onClick={() => setCurrentStep(currentStep - 1)}><ChevronLeft className="mr-2 h-4 w-4"/> Back</Button>}
             <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
             {currentStep < 2 ? (
-                <Button onClick={() => setCurrentStep(currentStep + 1)} disabled={currentStep === 1 && !selectedTime}>Next <ArrowRight className="ml-2 h-4 w-4"/></Button>
+                <Button 
+                    onClick={() => {
+                        if (currentStep === 0 && !selectedService) return;
+                        setCurrentStep(currentStep + 1);
+                    }}
+                    disabled={currentStep === 0 ? !selectedService : (currentStep === 1 ? !selectedTime : false)}
+                >
+                    Next <ArrowRight className="ml-2 h-4 w-4"/>
+                </Button>
             ) : (
                 <Button onClick={handleCreateAppointment} disabled={isSubmitting}>
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
