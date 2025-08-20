@@ -66,7 +66,7 @@ const PostComposerLoader: FC<PostComposerLoaderProps> = ({ sessionUser, mandalId
             <div className="flex-shrink-0 h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center">
                 <Zap className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
             </div>
-            <span className="text-muted-foreground text-xs sm:text-sm font-semibold">Share Pulse</span>
+            <span className="text-muted-foreground text-xs sm:text-sm font-semibold">Share Post</span>
         </Button>
     );
 
@@ -79,7 +79,7 @@ const PostComposerLoader: FC<PostComposerLoaderProps> = ({ sessionUser, mandalId
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-semibold text-primary flex items-center">
                         <Zap className="w-7 h-7 mr-2 text-accent drop-shadow-sm" />
-                        {isMandalPost ? 'Post a Mandal Update' : 'Share Your Pulse'}
+                        {isMandalPost ? 'Post a Mandal Update' : 'Share Your Post'}
                     </DialogTitle>
                     <DialogDescription>
                       {isMandalPost ? 'This post will be associated with your Mandal.' : 'Create and share a new post with your community. Add content, tags, and media.'}

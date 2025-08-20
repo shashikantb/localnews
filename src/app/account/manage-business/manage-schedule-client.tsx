@@ -27,7 +27,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
 });
 
 const ALL_TIMEZONES = Intl.supportedValuesOf('timeZone');
-const INDIAN_SUBCONTINENT_TIMEZONES = ALL_TIMEZONES.filter(tz => tz.startsWith('Asia/Kolkata') || tz.startsWith('Asia/Dhaka') || tz.startsWith('Asia/Karachi') || tz.startsWith('Asia/Kathmandu'));
+const INDIAN_SUBCONTINENT_TIMEZONES = ALL_TIMEZONES.filter(tz => tz.startsWith('Asia/Calcutta') || tz.startsWith('Asia/Dhaka') || tz.startsWith('Asia/Karachi') || tz.startsWith('Asia/Kathmandu'));
 
 const scheduleSchema = z.object({
   timezone: z.string().min(1, "Timezone is required."),
