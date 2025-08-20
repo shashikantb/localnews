@@ -8,7 +8,7 @@ import {
   format, setHours, setMinutes, startOfDay, getDay,
   addMinutes, isPast, isToday, areIntervalsOverlapping
 } from 'date-fns';
-import { utcToZonedTime } from 'date-fns-tz';
+import { toDate } from 'date-fns-tz';
 
 // Re-export db-types
 export * from './db-types';
@@ -3670,9 +3670,11 @@ export async function updateAppointmentStatusDb(appointmentId: number, status: A
     if (!dbPool) return null;
     const client = await dbPool.connect();
     try {
-        const whereClause = isCustomer
-            ? 'id = $1 AND customer_id = $2'
-            : 'id = $1 AND business_id = $2';
+        let whereClause = 'id = $1 AND business_id = $2';
+        if (isCustomer) {
+            // Customers can only cancel their own confirmed appointments.
+            whereClause = `id = $1 AND customer_id = $2 AND status = 'confirmed'`;
+        }
 
         const query = `
             UPDATE appointments
@@ -3734,11 +3736,12 @@ export async function findFirstAvailableResourceDb(businessId: number, startTime
 // --- NEW SERVER-SIDE SLOT CALCULATION ---
 
 // Helper function to safely parse a time string "HH:MM"
-function parseTime(timeStr: string, date: Date): Date | null {
-  if (!/^\d{2}:\d{2}$/.test(timeStr)) return null;
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  if (hours > 23 || minutes > 59) return null;
-  return setMinutes(setHours(startOfDay(date), hours), minutes);
+function parseTime(timeStr: string, date: Date, timeZone: string): Date | null {
+    if (!/^\d{2}:\d{2}$/.test(timeStr)) return null;
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    if (hours > 23 || minutes > 59) return null;
+    const localDateString = `${format(date, 'yyyy-MM-dd')}T${timeStr}:00`;
+    return toDate(localDateString, { timeZone });
 }
 
 // DOW tolerant match
@@ -3749,80 +3752,75 @@ const dowMatches = (dbDow: number, jsDow: number) => {
 };
 
 export async function getAvailableSlotsDb(businessId: number, serviceId: number, dateStr: string): Promise<string[]> {
-  await ensureDbInitialized();
-  const dbPool = getDbPool();
-  if (!dbPool) throw new Error("Database not configured.");
-  const client = await dbPool.connect();
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) throw new Error("Database not configured.");
+    const client = await dbPool.connect();
 
-  try {
-    const selectedDate = new Date(dateStr);
-    const jsDow = getDay(selectedDate); // 0 = Sunday, 1 = Monday...
+    try {
+        const selectedDate = toDate(dateStr); // Use toDate to ensure correct timezone handling initially
+        const jsDow = getDay(selectedDate);
 
-    // 1. Fetch all necessary data in parallel
-    const [serviceRes, hoursRes, resourcesRes, appointmentsRes] = await Promise.all([
-      client.query('SELECT duration_minutes FROM business_services WHERE id = $1 AND user_id = $2', [serviceId, businessId]),
-      getBusinessHoursDb(businessId), // Use existing function
-      getBusinessResourcesDb(businessId), // Use existing function
-      getAppointmentsForBusinessDb(businessId, dateStr), // Use existing function
-    ]);
+        const [serviceRes, businessRes, resourcesRes, appointmentsRes] = await Promise.all([
+            client.query('SELECT duration_minutes FROM business_services WHERE id = $1 AND user_id = $2', [serviceId, businessId]),
+            client.query(`SELECT timezone FROM users WHERE id = $1`, [businessId]),
+            getBusinessResourcesDb(businessId),
+            getAppointmentsForBusinessDb(businessId, dateStr),
+        ]);
 
-    // 2. Validate data
-    const serviceDuration = serviceRes.rows[0]?.duration_minutes;
-    if (!serviceDuration) throw new Error("Service not found or has no duration.");
+        const serviceDuration = serviceRes.rows[0]?.duration_minutes;
+        if (!serviceDuration) throw new Error("Service not found or has no duration.");
 
-    const dayHours = hoursRes.find((h: BusinessHour) => dowMatches(h.day_of_week, jsDow));
-    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
-      return []; // Business is closed on this day
-    }
+        const businessTimeZone = businessRes.rows[0]?.timezone;
+        if (!businessTimeZone) throw new Error("Business timezone is not set.");
+        
+        const businessHours = await getBusinessHoursDb(businessId);
+        const dayHours = businessHours.find((h: BusinessHour) => dowMatches(h.day_of_week, jsDow));
+        
+        if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
+            return []; // Business is closed on this day
+        }
 
-    const resources = resourcesRes.length > 0 ? resourcesRes : [{ id: 'auto-1', name: 'Seat 1' }];
+        const resources = resourcesRes.length > 0 ? resourcesRes : [{ id: 0, user_id: businessId, name: 'Default Resource' }];
 
-    // 3. Generate slots
-    const startTime = parseTime(dayHours.start_time, selectedDate);
-    const endTime = parseTime(dayHours.end_time, selectedDate);
-    if (!startTime || !endTime || !(startTime < endTime)) {
-        return []; // Invalid hours
-    }
+        const startTime = parseTime(dayHours.start_time, selectedDate, businessTimeZone);
+        const endTime = parseTime(dayHours.end_time, selectedDate, businessTimeZone);
+        
+        if (!startTime || !endTime || !(startTime < endTime)) return [];
 
-    const availableSlots: string[] = [];
-    let currentTime = startTime;
-    const bufferMinutes = 5; // 5 minute buffer
+        const availableSlots: string[] = [];
+        let currentTime = startTime;
+        const bufferMinutes = 15; // Set buffer to 15 mins to create standard slots
 
-    while (addMinutes(currentTime, serviceDuration) <= endTime) {
-        const slotStart = currentTime;
-        const slotEnd = addMinutes(slotStart, serviceDuration);
+        while (addMinutes(currentTime, serviceDuration) <= endTime) {
+            const slotStart = currentTime;
+            
+            if (!isPast(slotStart) || isToday(slotStart)) {
+                // Check how many resources are busy at this exact time
+                const busyResourcesCount = appointmentsRes.filter(appt => 
+                    appt.status === 'confirmed' &&
+                    areIntervalsOverlapping(
+                        { start: slotStart, end: addMinutes(slotStart, serviceDuration) },
+                        { start: new Date(appt.start_time), end: new Date(appt.end_time) },
+                        { inclusive: false }
+                    )
+                ).length;
+                
+                // If the number of busy resources is less than total resources, a slot is available
+                if (busyResourcesCount < resources.length) {
+                    availableSlots.push(format(utcToZonedTime(slotStart, businessTimeZone), 'HH:mm'));
+                }
+            }
 
-        // Skip slots that have already passed for today
-        if (isToday(selectedDate) && isPast(slotStart)) {
             currentTime = addMinutes(currentTime, bufferMinutes);
-            continue;
         }
 
-        // Find how many appointments overlap with this potential slot
-        const overlappingAppointments = appointmentsRes.filter(appt => 
-            appt.status === 'confirmed' &&
-            areIntervalsOverlapping(
-                { start: slotStart, end: slotEnd },
-                { start: new Date(appt.start_time), end: new Date(appt.end_time) },
-                { inclusive: false }
-            )
-        );
+        return availableSlots;
 
-        // If the number of overlapping appointments is less than the number of available resources, the slot is available
-        if (overlappingAppointments.length < resources.length) {
-            availableSlots.push(format(slotStart, 'HH:mm'));
-        }
-
-        // Move to the next potential slot
-        currentTime = addMinutes(currentTime, bufferMinutes);
+    } catch (error) {
+        console.error("Error calculating available slots:", error);
+        throw error;
+    } finally {
+        client.release();
     }
-
-    return availableSlots;
-
-  } catch (error) {
-    console.error("Error calculating available slots:", error);
-    throw error;
-  } finally {
-    client.release();
-  }
 }

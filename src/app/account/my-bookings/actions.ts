@@ -21,6 +21,7 @@ export async function cancelMyBooking(appointmentId: number): Promise<{ success:
     }
 
     try {
+        // The last parameter `isCustomer` should be true.
         const result = await updateAppointmentStatusDb(appointmentId, 'cancelled', user.id, true);
         if (!result) {
             return { success: false, error: 'Appointment not found or you do not have permission to cancel it.' };
