@@ -72,13 +72,19 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+  // pick the right id regardless of what the card passes down
+  const businessId =
+    (business as any).owner_user_id ??
+    (business as any).user_id ??
+    business.id;
+
   const fetchBusinessData = useCallback(async () => {
     setIsLoading(true);
     try {
       const [s, h, r] = await Promise.all([
-        api<{services:any[]}>('/api/booking/services/' + business.id),
-        api<{hours:any[]}>('/api/booking/hours/' + business.id),
-        api<{resources:any[]}>(`/api/booking/resources/${business.id}`),
+        api<{services:any[]}>(`/api/booking/services/${businessId}`),
+        api<{hours:any[]}>(`/api/booking/hours/${businessId}`),
+        api<{resources:any[]}>(`/api/booking/resources/${businessId}`),
       ]);
       setServices(s.services);
       setHours(h.hours);
@@ -90,7 +96,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     } finally {
       setIsLoading(false);
     }
-  }, [business.id, toast]);
+  }, [businessId, toast]);
 
   useEffect(() => {
     if (isOpen) {
@@ -106,10 +112,18 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
 
   useEffect(() => {
     if (!selectedDate) return;
-    api<{appointments:any[]}>(`/api/booking/appointments?businessId=${business.id}&date=${format(selectedDate,'yyyy-MM-dd')}`)
+    api<{appointments:any[]}>(`/api/booking/appointments?businessId=${businessId}&date=${format(selectedDate,'yyyy-MM-dd')}`)
       .then(d => setAppointments(Array.isArray(d.appointments) ? d.appointments : []))
       .catch(() => setAppointments([]));
-  }, [selectedDate, business.id]);
+  }, [selectedDate, businessId]);
+
+  const effectiveResources = useMemo(() => {
+    if (Array.isArray(resources) && resources.length > 0) return resources;
+    // Fallback if no resources are configured
+    return Array.from({ length: 1 }, (_, i) => ({
+      id: `auto-${i+1}`, name: `Seat ${i+1}`, user_id: businessId
+    }));
+  }, [resources, businessId]);
 
   const timeSlots = useMemo(() => {
     if (!selectedDate || !selectedService || !Array.isArray(hours)) return [];
@@ -141,34 +155,31 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
         continue;
       }
       
-      const availableResourcesForSlot = resources.filter(resource => {
-          const isResourceBooked = appointments.some(appt => {
-              if (appt.resource_id !== resource.id) return false;
-              
-              const aStart = toValidDate(appt?.start_time);
-              const aEnd   = toValidDate(appt?.end_time);
-              if (!aStart || !aEnd) return false;
-
-              try {
-                return areIntervalsOverlapping(
-                    { start: cur, end: slotEnd },
-                    { start: aStart,  end: aEnd },
-                    { inclusive: true }
-                );
-              } catch {
-                return true; 
-              }
-          });
-          return !isResourceBooked;
+      const appointmentsInSlot = appointments.filter(appt => {
+          const aStart = toValidDate(appt?.start_time);
+          const aEnd   = toValidDate(appt?.end_time);
+          if (!aStart || !aEnd) return false;
+          try {
+            return areIntervalsOverlapping(
+                { start: cur, end: slotEnd },
+                { start: aStart,  end: aEnd },
+                { inclusive: true }
+            );
+          } catch {
+            return false; 
+          }
       });
+      
+      const bookedResourceIds = new Set(appointmentsInSlot.map(a => a.resource_id));
+      const availableResourceCount = effectiveResources.filter(r => !bookedResourceIds.has(r.id)).length;
 
-      if (availableResourcesForSlot.length > 0) {
+      if (availableResourceCount > 0) {
         out.push(format(cur, 'HH:mm'));
       }
       cur = addMinutes(cur, 15);
     }
     return out;
-  }, [selectedDate, selectedService, hours, resources, appointments]);
+  }, [selectedDate, selectedService, hours, appointments, effectiveResources]);
 
   const handleCreateAppointment = async () => {
     if (!sessionUser) {
@@ -186,19 +197,19 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     const startTime = setMinutes(setHours(selectedDate, hour), minute);
     const endTime = addMinutes(startTime, safeDuration(selectedService.duration_minutes, 30));
 
-    const availableResource = resources.find(resource => 
-        !appointments.some(appt => {
-            if (appt.resource_id !== resource.id) return false;
-            const aStart = toValidDate(appt.start_time);
-            const aEnd = toValidDate(appt.end_time);
-            if (!aStart || !aEnd) return false;
-            return areIntervalsOverlapping(
-                { start: startTime, end: endTime },
-                { start: aStart, end: aEnd },
-                { inclusive: true }
-            )
-        })
-    );
+    const appointmentsInSlot = appointments.filter(appt => {
+        const aStart = toValidDate(appt.start_time);
+        const aEnd = toValidDate(appt.end_time);
+        if (!aStart || !aEnd) return false;
+        return areIntervalsOverlapping(
+            { start: startTime, end: endTime },
+            { start: aStart, end: aEnd },
+            { inclusive: true }
+        )
+    });
+    const bookedResourceIds = new Set(appointmentsInSlot.map(a => a.resource_id));
+    const availableResource = effectiveResources.find(r => !bookedResourceIds.has(r.id));
+
 
     if (!availableResource) {
         toast({ variant: "destructive", title: "Slot taken!", description: "This time slot was just booked. Please select another time."});
@@ -212,7 +223,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
         method:'POST',
         headers:{ 'Content-Type':'application/json' },
         body: JSON.stringify({
-          business_id: business.id,
+          business_id: businessId,
           service_id: selectedService.id,
           resource_id: availableResource.id,
           start_time: startTime.toISOString(),
