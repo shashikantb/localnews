@@ -27,6 +27,32 @@ function isSlotAvailable(
     return conflictingAppointments < totalResources;
 }
 
+// Helper function to reliably convert local time in a given timezone to a UTC Date object
+function convertToUtc(date: string, time: string, timeZone: string): Date {
+  const dtString = `${date}T${time}:00`;
+  // Create a formatter to get parts, including the offset
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone,
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: 'numeric',
+    second: 'numeric',
+    timeZoneName: 'longOffset',
+  });
+  
+  const parts = formatter.formatToParts(new Date());
+  const offsetPart = parts.find((part) => part.type === 'timeZoneName');
+  
+  // Example offsetPart.value: "GMT-5" or "GMT+5:30"
+  const offsetString = offsetPart ? offsetPart.value.replace('GMT', '') : '+00:00';
+
+  const isoStringWithOffset = `${dtString}${offsetString}`;
+  return new Date(isoStringWithOffset);
+}
+
+
 export async function POST(req: Request) {
   try {
     const { user: sessionUser } = await getSession();
@@ -64,17 +90,8 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
     const totalResources = resources.length > 0 ? resources.length : 1;
     
-    // --- THIS IS THE FIX ---
     // Correctly convert the selected local time in the business's timezone to a UTC Date object.
-    const localDateTimeString = `${body.date}T${body.time}:00`;
-    // Create a formatter for the business's timezone to get the offset
-    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: businessTimeZone, timeZoneName: 'longOffset' });
-    const parts = formatter.formatToParts(new Date());
-    const timeZoneOffset = parts.find(part => part.type === 'timeZoneName')?.value.replace('GMT', '') || '+00:00';
-    
-    const isoStringWithOffset = `${localDateTimeString}${timeZoneOffset}`;
-    const slotStartUtc = new Date(isoStringWithOffset);
-
+    const slotStartUtc = convertToUtc(body.date, body.time, businessTimeZone);
 
     if (isBefore(new Date(), slotStartUtc)) {
         return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
