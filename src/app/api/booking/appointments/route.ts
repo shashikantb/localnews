@@ -1,7 +1,7 @@
 
 
 import { NextResponse } from "next/server";
-import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getBusinessHoursDb, getAppointmentsForBusinessDb } from "@/lib/db";
+import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getBusinessHoursDb, getAppointmentsForBusinessDb, getBusinessResourcesDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
 import type { Appointment, BusinessHour } from "@/lib/db-types";
 import { addMinutes, areIntervalsOverlapping, isBefore } from "date-fns";
