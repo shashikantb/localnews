@@ -3,7 +3,6 @@
 import { NextResponse } from "next/server";
 import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getBusinessHoursDb, getAppointmentsForBusinessDb, getBusinessResourcesDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
-import type { Appointment, BusinessHour } from "@/lib/db-types";
 import { addMinutes, isBefore } from "date-fns";
 
 export const dynamic = 'force-dynamic';
@@ -47,11 +46,10 @@ export async function POST(req: Request) {
     }
 
     // Server-side validation
-    const [service, business, resources, businessHours, existingAppointments] = await Promise.all([
+    const [service, business, resources, existingAppointments] = await Promise.all([
         getBusinessServiceByIdDb(body.service_id),
         getUserByIdDb(body.business_id),
         getBusinessResourcesDb(body.business_id),
-        getBusinessHoursDb(body.business_id),
         getAppointmentsForBusinessDb(body.business_id, body.date),
     ]);
 
@@ -66,25 +64,24 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
     const totalResources = resources.length > 0 ? resources.length : 1;
     
-    // The user selects a time in the business's timezone. We need to create a Date object
-    // that correctly represents this, then convert it to a UTC ISO string for the database.
-    // The string "YYYY-MM-DDTHH:mm:ss" without 'Z' is interpreted as local time.
-    const slotStartInLocal = new Date(`${body.date}T${body.time}:00`);
+    // Correctly create a local Date object, then convert it to a UTC date object for the database.
+    const naiveDateTimeStr = `${body.date}T${body.time}:00`;
+    // This creates a Date object representing the LOCAL time of the server.
+    const slotStart = new Date(naiveDateTimeStr);
     
-    // Re-verify that the selected time is not in the past.
-    if (isBefore(slotStartInLocal, new Date())) {
+    if (isBefore(slotStart, new Date())) {
         return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
     }
     
-    const slotEndInLocal = addMinutes(slotStartInLocal, service.duration_minutes);
+    const slotEnd = addMinutes(slotStart, service.duration_minutes);
 
     // Re-verify availability on the server to prevent race conditions
-    const isStillAvailable = isSlotAvailable(slotStartInLocal, slotEndInLocal, existingAppointments, totalResources);
+    const isStillAvailable = isSlotAvailable(slotStart, slotEnd, existingAppointments, totalResources);
     if (!isStillAvailable) {
         return NextResponse.json({ success: false, error: "The selected time slot is no longer available." }, { status: 409 }); // 409 Conflict
     }
 
-    const resource = await findFirstAvailableResourceDb(body.business_id, slotStartInLocal, slotEndInLocal);
+    const resource = await findFirstAvailableResourceDb(body.business_id, slotStart, slotEnd);
     if (!resource) {
         return NextResponse.json({ success: false, error: "No available resources for this time slot." }, { status: 409 });
     }
@@ -94,9 +91,8 @@ export async function POST(req: Request) {
         business_id: body.business_id,
         service_id: body.service_id,
         resource_id: resource.id,
-        // Convert the local time date objects to UTC ISO strings for database storage
-        start_time: slotStartInLocal.toISOString(),
-        end_time: slotEndInLocal.toISOString(),
+        start_time: slotStart.toISOString(),
+        end_time: slotEnd.toISOString(),
         timezone: businessTimeZone,
      });
 

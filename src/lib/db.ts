@@ -5,8 +5,7 @@ import type { Appointment, BusinessAppointment, ConversationDetails, CustomerApp
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 import {
-  format, setHours, setMinutes, startOfDay, getDay,
-  addMinutes, areIntervalsOverlapping
+  format,
 } from 'date-fns';
 
 // Re-export db-types
