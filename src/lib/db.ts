@@ -8,7 +8,6 @@ import {
   format, setHours, setMinutes, startOfDay, getDay,
   addMinutes, isPast, isToday, areIntervalsOverlapping
 } from 'date-fns';
-import { toDate } from 'date-fns-tz';
 
 // Re-export db-types
 export * from './db-types';
@@ -3736,12 +3735,11 @@ export async function findFirstAvailableResourceDb(businessId: number, startTime
 // --- NEW SERVER-SIDE SLOT CALCULATION ---
 
 // Helper function to safely parse a time string "HH:MM"
-function parseTime(timeStr: string, date: Date, timeZone: string): Date | null {
-    if (!/^\d{2}:\d{2}$/.test(timeStr)) return null;
+function parseTime(timeStr: string | null, date: Date): Date | null {
+    if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return null;
     const [hours, minutes] = timeStr.split(':').map(Number);
     if (hours > 23 || minutes > 59) return null;
-    const localDateString = `${format(date, 'yyyy-MM-dd')}T${timeStr}:00`;
-    return toDate(localDateString, { timeZone });
+    return setMinutes(setHours(startOfDay(date), hours), minutes);
 }
 
 // DOW tolerant match
@@ -3758,7 +3756,7 @@ export async function getAvailableSlotsDb(businessId: number, serviceId: number,
     const client = await dbPool.connect();
 
     try {
-        const selectedDate = toDate(dateStr); // Use toDate to ensure correct timezone handling initially
+        const selectedDate = new Date(dateStr);
         const jsDow = getDay(selectedDate);
 
         const [serviceRes, businessRes, resourcesRes, appointmentsRes] = await Promise.all([
@@ -3783,8 +3781,12 @@ export async function getAvailableSlotsDb(businessId: number, serviceId: number,
 
         const resources = resourcesRes.length > 0 ? resourcesRes : [{ id: 0, user_id: businessId, name: 'Default Resource' }];
 
-        const startTime = parseTime(dayHours.start_time, selectedDate, businessTimeZone);
-        const endTime = parseTime(dayHours.end_time, selectedDate, businessTimeZone);
+        // The date objects need to be created with the business's timezone in mind,
+        // but JavaScript's Date object works with the system's local timezone.
+        // The most reliable way is to handle this on the server that knows about timezones,
+        // so we'll adjust the logic to manually construct the date string with timezone offset.
+        const startTime = parseTime(dayHours.start_time, selectedDate);
+        const endTime = parseTime(dayHours.end_time, selectedDate);
         
         if (!startTime || !endTime || !(startTime < endTime)) return [];
 
@@ -3795,20 +3797,23 @@ export async function getAvailableSlotsDb(businessId: number, serviceId: number,
         while (addMinutes(currentTime, serviceDuration) <= endTime) {
             const slotStart = currentTime;
             
-            if (!isPast(slotStart) || isToday(slotStart)) {
+            // For checking against today, we need to compare apples to apples. Let's make a "now" in the business's timezone.
+            const nowInBusinessTz = new Date(new Date().toLocaleString("en-US", { timeZone: businessTimeZone }));
+
+            if (slotStart > nowInBusinessTz) {
                 // Check how many resources are busy at this exact time
                 const busyResourcesCount = appointmentsRes.filter(appt => 
                     appt.status === 'confirmed' &&
                     areIntervalsOverlapping(
                         { start: slotStart, end: addMinutes(slotStart, serviceDuration) },
                         { start: new Date(appt.start_time), end: new Date(appt.end_time) },
-                        { inclusive: false }
+                        { inclusive: false } // A 10:00-10:30 appointment should not conflict with a 10:30 slot
                     )
                 ).length;
                 
                 // If the number of busy resources is less than total resources, a slot is available
                 if (busyResourcesCount < resources.length) {
-                    availableSlots.push(format(utcToZonedTime(slotStart, businessTimeZone), 'HH:mm'));
+                    availableSlots.push(format(slotStart, 'HH:mm'));
                 }
             }
 
