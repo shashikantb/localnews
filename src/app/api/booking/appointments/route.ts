@@ -65,6 +65,7 @@ export async function POST(req: Request) {
     const totalResources = resources.length > 0 ? resources.length : 1;
     
     // Construct a naive date object representing the local time selected by the user
+    // IMPORTANT: This creates a Date object in the SERVER's timezone.
     const slotStart = new Date(`${body.date}T${body.time}:00`);
 
     if (isBefore(slotStart, new Date())) {
