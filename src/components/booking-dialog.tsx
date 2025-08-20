@@ -84,6 +84,8 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTime, setSelectedTime] = useState<string | null>(null);
 
+  const activeService = selectedService ?? (services.length === 1 ? services[0] : null);
+
   // Prefer owner/user id if present
   const businessId =
     (business as any).owner_user_id ??
@@ -101,15 +103,6 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       setServices(s.services);
       setHours(h.hours);
       setResources(r.resources);
-
-      // --- DEBUG LOG 1 ---
-      console.log("--- BOOKING DATA FETCHED ---", {
-        businessIdUsed: businessId,
-        hoursCount: h.hours?.length,
-        resourcesCount: r.resources?.length,
-        firstHour: h.hours?.[0],
-      });
-
     } catch (e) {
       console.error(e);
       toast({ variant: 'destructive', title: 'Failed to load booking data' });
@@ -139,17 +132,12 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
   useEffect(() => {
     if (!dateKey) return;
     
-    // --- DEBUG LOG 2 ---
-    console.log(`--- FETCHING APPOINTMENTS for date: ${dateKey} ---`);
-
     api<{ appointments: any[] }>(
       `/api/booking/appointments?businessId=${businessId}&date=${dateKey}&_=${Date.now()}`
     )
       .then((d) => {
         const fetchedAppointments = Array.isArray(d.appointments) ? d.appointments : [];
         setAppointments(fetchedAppointments);
-        // --- DEBUG LOG 3 ---
-        console.log(`--- APPOINTMENTS RECEIVED for ${dateKey} ---`, { count: fetchedAppointments.length, data: fetchedAppointments });
       })
       .catch(() => setAppointments([]));
   }, [dateKey, businessId]);
@@ -164,80 +152,59 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     }));
   }, [resources, businessId]);
 
-  const timeSlots = useMemo(() => {
-    if (!selectedDate || !selectedService || !Array.isArray(hours)) return [];
-
-    const jsDow = getDay(selectedDate);
-    const dayHours = hours.find((h) => dowMatches(Number(h?.day_of_week), jsDow));
-
-    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
-        // --- DEBUG LOG 4 (No Slots Reason) ---
-        console.log("--- SLOT CALCULATION HALTED ---", {
-            reason: "Day is closed or hours are not defined",
-            jsDow,
-            dayHoursFound: dayHours
-        });
+    const timeSlots = useMemo(() => {
+    if (!selectedDate || !Array.isArray(hours) || !activeService) {
         return [];
     }
 
-    const serviceDuration = safeDuration((selectedService as any).duration_minutes, 30);
+    const jsDow = getDay(selectedDate);
+    const dayHours = hours.find(h => dowMatches(Number(h?.day_of_week), jsDow));
+
+    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
+        return [];
+    }
+
+    const serviceDuration = safeDuration((activeService as any).duration_minutes, 30);
 
     const [startH, startM] = String(dayHours.start_time).split(':').map(Number);
-    const [endH, endM] = String(dayHours.end_time).split(':').map(Number);
+    const [endH, endM]   = String(dayHours.end_time).split(':').map(Number);
 
     const start = setMinutes(setHours(startOfDay(selectedDate), startH || 0), startM || 0);
-    const end = setMinutes(setHours(startOfDay(selectedDate), endH || 0), endM || 0);
-
+    const end   = setMinutes(setHours(startOfDay(selectedDate), endH || 0),   endM || 0);
     if (!(start < end)) return [];
 
     const out: string[] = [];
     let cur = start;
 
     while (cur < end) {
-      const slotEnd = addMinutes(cur, serviceDuration);
-      if (slotEnd > end) break;
+        const slotEnd = addMinutes(cur, serviceDuration);
+        if (slotEnd > end) break;
 
-      if (isToday(selectedDate) && isPast(cur)) {
-        cur = addMinutes(cur, 15);
-        continue;
-      }
-
-      const appointmentsInSlot = appointments.filter((appt) => {
-        const aStart = toValidDate(appt?.start_time);
-        const aEnd = toValidDate(appt?.end_time);
-        if (!aStart || !aEnd) return false;
-        try {
-          return areIntervalsOverlapping(
-            { start: cur, end: slotEnd },
-            { start: aStart, end: aEnd },
-            { inclusive: false },
-          );
-        } catch {
-          return false;
+        if (isToday(selectedDate) && isPast(cur)) {
+            cur = addMinutes(cur, 15);
+            continue;
         }
-      });
 
-      const bookedResourceIds = new Set(appointmentsInSlot.map((a) => idStr(a.resource_id)));
-      const availableResourceCount = effectiveResources.filter((r) => !bookedResourceIds.has(idStr(r.id))).length;
+        const appointmentsInSlot = appointments.filter(appt => {
+            const aStart = toValidDate(appt?.start_time);
+            const aEnd   = toValidDate(appt?.end_time);
+            if (!aStart || !aEnd) return false;
+            return areIntervalsOverlapping(
+                { start: cur, end: slotEnd },
+                { start: aStart, end: aEnd },
+                { inclusive: false }
+            );
+        });
 
-      if (availableResourceCount > 0) {
-        out.push(format(cur, 'HH:mm'));
-      }
-      cur = addMinutes(cur, 15);
+        const bookedResourceIds = new Set(appointmentsInSlot.map((a) => idStr(a.resource_id)));
+        const availableResourceCount = effectiveResources.filter(r => !bookedResourceIds.has(idStr(r.id))).length;
+
+        if (availableResourceCount > 0) out.push(format(cur, "HH:mm"));
+        cur = addMinutes(cur, 15);
     }
-    
-    // --- DEBUG LOG 5 (Final Result) ---
-    console.log("--- SLOT CALCULATION COMPLETE ---", {
-        forDate: selectedDate.toDateString(),
-        dayHours,
-        serviceDuration,
-        effectiveResourceCount: effectiveResources.length,
-        foundAppointments: appointments.length,
-        calculatedSlots: out
-    });
 
     return out;
-  }, [selectedDate, selectedService, hours, appointments, effectiveResources]);
+  }, [selectedDate, activeService, hours, appointments, effectiveResources, services]);
 
   const handleCreateAppointment = async () => {
     if (!sessionUser) {
@@ -249,7 +216,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       router.push('/login');
       return;
     }
-    if (!selectedService || !selectedDate || !selectedTime) {
+    if (!activeService || !selectedDate || !selectedTime) {
       toast({ variant: 'destructive', title: 'Incomplete selection' });
       return;
     }
@@ -257,7 +224,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
 
     const [hour, minute] = selectedTime.split(':').map(Number);
     const startTime = setMinutes(setHours(selectedDate, hour), minute);
-    const endTime = addMinutes(startTime, safeDuration(selectedService.duration_minutes, 30));
+    const endTime = addMinutes(startTime, safeDuration(activeService.duration_minutes, 30));
 
     const appointmentsInSlot = appointments.filter((appt) => {
       const aStart = toValidDate(appt.start_time);
@@ -288,7 +255,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         business_id: businessId,
-        service_id: selectedService.id,
+        service_id: activeService.id,
         resource_id: availableResource.id,
         start_time: startTime.toISOString(),
         end_time: endTime.toISOString(),
@@ -397,7 +364,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Service:</span>{' '}
-                <span className="font-semibold">{selectedService?.name}</span>
+                <span className="font-semibold">{activeService?.name}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Date:</span>{' '}
@@ -409,7 +376,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
               </div>
               <div className="flex justify-between text-lg text-primary">
                 <span className="text-muted-foreground">Price:</span>{' '}
-                <span className="font-bold">₹{selectedService?.price}</span>
+                <span className="font-bold">₹{activeService?.price}</span>
               </div>
             </div>
           </div>
@@ -449,10 +416,10 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
           {currentStep < 2 ? (
             <Button
               onClick={() => {
-                if (currentStep === 0 && !selectedService) return;
+                if (currentStep === 0 && !activeService) return;
                 setCurrentStep(currentStep + 1);
               }}
-              disabled={currentStep === 0 ? !selectedService : currentStep === 1 ? !selectedTime : false}
+              disabled={currentStep === 0 ? !activeService : currentStep === 1 ? !selectedTime : false}
             >
               Next <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
