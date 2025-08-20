@@ -485,6 +485,7 @@ export interface CustomerAppointment extends Appointment {
     business_avatar: string | null;
     service_name: string;
     price: number;
+    resource_name: string;
 }
 
 

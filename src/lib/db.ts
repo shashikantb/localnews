@@ -280,7 +280,7 @@ async function initializeDatabase(client: Pool | Client) {
     }
     
     // Check for and create the official user if it doesn't exist
-    const officialUserCheck = await client.query("SELECT 1 FROM users WHERE email = $1", [OFFICIAL_USER_EMAIL]);
+    const officialUserCheck = await client.query("SELECT id FROM users WHERE email = $1", [OFFICIAL_USER_EMAIL]);
     if (officialUserCheck.rowCount === 0 && process.env.OFFICIAL_USER_PASSWORD) {
         const salt = await bcrypt.genSalt(10);
         const passwordhash = await bcrypt.hash(process.env.OFFICIAL_USER_PASSWORD, salt);
@@ -3648,10 +3648,12 @@ export async function getAppointmentsForCustomerDb(customerId: number): Promise<
             b.name as business_name,
             b.profilepictureurl as business_avatar,
             s.name as service_name,
-            s.price
+            s.price,
+            r.name as resource_name
           FROM appointments a
           JOIN users b ON a.business_id = b.id
           JOIN business_services s ON a.service_id = s.id
+          JOIN business_resources r ON a.resource_id = r.id
           WHERE a.customer_id = $1
           ORDER BY a.start_time DESC
         `;
@@ -3729,4 +3731,3 @@ export async function findFirstAvailableResourceDb(businessId: number, startTime
         client.release();
     }
 }
-

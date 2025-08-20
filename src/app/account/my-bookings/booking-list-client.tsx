@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { Loader2, Calendar, Clock, Tag, Building, XCircle, CheckCircle } from 'lucide-react';
+import { Loader2, Calendar, Clock, Tag, Building, XCircle, CheckCircle, Armchair } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,7 +24,6 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { toMs } from '@/lib/toMs';
 
 const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (id: number) => void }> = ({ appointment, onCancel }) => {
     const [isCancelling, startTransition] = useTransition();
@@ -42,8 +41,8 @@ const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (i
         });
     };
     
-    const isUpcoming = appointment.status === 'confirmed' && toMs(appointment.start_time) > Date.now();
-    const startDate = new Date(toMs(appointment.start_time));
+    const isUpcoming = appointment.status === 'confirmed' && new Date(appointment.start_time).getTime() > Date.now();
+    const startDate = new Date(appointment.start_time);
 
     return (
         <Card className="shadow-lg border-border/60">
@@ -68,6 +67,7 @@ const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (i
             <CardContent className="space-y-3 text-sm">
                 <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(startDate, 'EEEE, MMMM d, yyyy')}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(startDate, 'h:mm a')}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Armchair className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{appointment.resource_name}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Tag className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">₹{appointment.price}</span></div>
             </CardContent>
             {isUpcoming && (
@@ -112,7 +112,7 @@ export default function BookingListClient({ initialBookings }: BookingListClient
     const normalizedBookings = useMemo(() => 
         (bookings ?? []).map((b) => ({
             ...b,
-            __startMs: toMs(b.start_time),
+            __startMs: new Date(b.start_time).getTime(),
         })), 
     [bookings]);
 

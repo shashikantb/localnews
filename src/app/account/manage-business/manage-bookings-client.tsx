@@ -10,12 +10,11 @@ import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Loader2, Check, User, Clock, Scissors, Tag } from 'lucide-react';
+import { Loader2, Check, User, Clock, Scissors, Tag, Armchair } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { toMs } from '@/lib/toMs';
 
 const AppointmentCard: React.FC<{ appointment: BusinessAppointment, onStatusChange: (id: number, status: AppointmentStatus) => void; isUpdating: boolean; }> = ({ appointment, onStatusChange, isUpdating }) => {
     const { toast } = useToast();
@@ -50,14 +49,17 @@ const AppointmentCard: React.FC<{ appointment: BusinessAppointment, onStatusChan
                 </Avatar>
                 <div>
                     <p className="font-semibold text-foreground">{appointment.customer_name}</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Scissors className="w-3 h-3"/>{appointment.service_name}</p>
-                    <p className="text-sm text-muted-foreground flex items-center gap-1.5"><Tag className="w-3 h-3"/>₹{appointment.price}</p>
+                    <div className="text-sm text-muted-foreground space-y-1 mt-1">
+                        <p className="flex items-center gap-1.5"><Scissors className="w-3 h-3"/>{appointment.service_name}</p>
+                        <p className="flex items-center gap-1.5"><Armchair className="w-3 h-3"/>{appointment.resource_name}</p>
+                        <p className="flex items-center gap-1.5"><Tag className="w-3 h-3"/>₹{appointment.price}</p>
+                    </div>
                 </div>
             </div>
             <div className="flex flex-col items-start sm:items-end gap-2">
                  <div className="text-sm font-medium flex items-center gap-2">
                     <Clock className="w-4 h-4 text-primary"/>
-                    {format(new Date(toMs(appointment.start_time)), 'h:mm a')} - {format(new Date(toMs(appointment.end_time)), 'h:mm a')}
+                    {format(new Date(appointment.start_time), 'h:mm a')} - {format(new Date(appointment.end_time), 'h:mm a')}
                  </div>
                  <div className="flex items-center gap-2">
                     <Badge variant={getStatusVariant(appointment.status)} className="capitalize">{appointment.status}</Badge>
@@ -98,7 +100,7 @@ export default function ManageBookingsClient() {
     const normalizedAppointments = useMemo(() => {
         return (appointments ?? []).map((appt) => ({
             ...appt,
-            __startMs: toMs(appt.start_time),
+            __startMs: new Date(appt.start_time).getTime(),
         }));
     }, [appointments]);
 
