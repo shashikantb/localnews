@@ -556,8 +556,10 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                         <ArrowLeft className="mr-2 h-4 w-4"/>
                         Back to Services
                     </Button>
-                    <Button variant="outline" size="sm" className="h-9 shadow-sm" disabled>
+                    <Button variant="outline" size="sm" className="h-9 shadow-sm" asChild>
+                      <Link href="/map">
                         <Map className="mr-2 h-4 w-4"/> Map View
+                      </Link>
                     </Button>
                 </div>
 
