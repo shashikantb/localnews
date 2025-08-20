@@ -6,7 +6,7 @@ import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 import {
   format, setHours, setMinutes, startOfDay, getDay,
-  addMinutes, isPast, isToday, areIntervalsOverlapping
+  addMinutes, areIntervalsOverlapping
 } from 'date-fns';
 
 // Re-export db-types
@@ -3719,8 +3719,8 @@ export async function findFirstAvailableResourceDb(businessId: number, startTime
             AND NOT EXISTS (
                 SELECT 1 FROM appointments a
                 WHERE a.resource_id = r.id
-                AND a.start_time < $3 AND a.end_time > $2
                 AND a.status = 'confirmed'
+                AND a.start_time < $3 AND a.end_time > $2
             )
             LIMIT 1;
         `;
@@ -3739,7 +3739,9 @@ function parseTime(timeStr: string | null, date: Date): Date | null {
     if (!timeStr || !/^\d{2}:\d{2}$/.test(timeStr)) return null;
     const [hours, minutes] = timeStr.split(':').map(Number);
     if (hours > 23 || minutes > 59) return null;
-    return setMinutes(setHours(startOfDay(date), hours), minutes);
+    // We work with UTC dates on the server, so construct the date in UTC.
+    const utcDate = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate(), hours, minutes));
+    return utcDate;
 }
 
 // DOW tolerant match
@@ -3756,35 +3758,31 @@ export async function getAvailableSlotsDb(businessId: number, serviceId: number,
     const client = await dbPool.connect();
 
     try {
-        const selectedDate = new Date(dateStr);
-        const jsDow = getDay(selectedDate);
+        // The date string from the client is treated as being in the business's local time.
+        // For server logic, we need to convert it to a Date object.
+        const selectedDate = new Date(`${dateStr}T00:00:00.000Z`); // Treat as UTC midnight to start
+        const jsDow = selectedDate.getUTCDay();
 
+        // Fetch all required data in parallel
         const [serviceRes, businessRes, resourcesRes, appointmentsRes] = await Promise.all([
             client.query('SELECT duration_minutes FROM business_services WHERE id = $1 AND user_id = $2', [serviceId, businessId]),
-            client.query(`SELECT timezone FROM users WHERE id = $1`, [businessId]),
+            getBusinessHoursDb(businessId),
             getBusinessResourcesDb(businessId),
             getAppointmentsForBusinessDb(businessId, dateStr),
         ]);
 
         const serviceDuration = serviceRes.rows[0]?.duration_minutes;
         if (!serviceDuration) throw new Error("Service not found or has no duration.");
-
-        const businessTimeZone = businessRes.rows[0]?.timezone;
-        if (!businessTimeZone) throw new Error("Business timezone is not set.");
         
-        const businessHours = await getBusinessHoursDb(businessId);
-        const dayHours = businessHours.find((h: BusinessHour) => dowMatches(h.day_of_week, jsDow));
-        
+        const dayHours = businessRes.find((h: BusinessHour) => dowMatches(h.day_of_week, jsDow));
         if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
             return []; // Business is closed on this day
         }
 
         const resources = resourcesRes.length > 0 ? resourcesRes : [{ id: 0, user_id: businessId, name: 'Default Resource' }];
+        const totalResources = resources.length;
 
-        // The date objects need to be created with the business's timezone in mind,
-        // but JavaScript's Date object works with the system's local timezone.
-        // The most reliable way is to handle this on the server that knows about timezones,
-        // so we'll adjust the logic to manually construct the date string with timezone offset.
+        // The start and end times from DB are "HH:MM". We need to combine them with the selected date.
         const startTime = parseTime(dayHours.start_time, selectedDate);
         const endTime = parseTime(dayHours.end_time, selectedDate);
         
@@ -3792,29 +3790,31 @@ export async function getAvailableSlotsDb(businessId: number, serviceId: number,
 
         const availableSlots: string[] = [];
         let currentTime = startTime;
-        const bufferMinutes = 15; // Set buffer to 15 mins to create standard slots
+        const bufferMinutes = 15; // Set buffer to 15 mins to create standard slots like 9:00, 9:15, 9:30
 
         while (addMinutes(currentTime, serviceDuration) <= endTime) {
             const slotStart = currentTime;
-            
-            // For checking against today, we need to compare apples to apples. Let's make a "now" in the business's timezone.
-            const nowInBusinessTz = new Date(new Date().toLocaleString("en-US", { timeZone: businessTimeZone }));
+            const slotEnd = addMinutes(slotStart, serviceDuration);
 
-            if (slotStart > nowInBusinessTz) {
-                // Check how many resources are busy at this exact time
-                const busyResourcesCount = appointmentsRes.filter(appt => 
-                    appt.status === 'confirmed' &&
-                    areIntervalsOverlapping(
-                        { start: slotStart, end: addMinutes(slotStart, serviceDuration) },
-                        { start: new Date(appt.start_time), end: new Date(appt.end_time) },
-                        { inclusive: false } // A 10:00-10:30 appointment should not conflict with a 10:30 slot
-                    )
-                ).length;
-                
-                // If the number of busy resources is less than total resources, a slot is available
-                if (busyResourcesCount < resources.length) {
-                    availableSlots.push(format(slotStart, 'HH:mm'));
-                }
+            // Don't show slots that are in the past
+            if (slotStart < new Date()) {
+                currentTime = addMinutes(currentTime, bufferMinutes);
+                continue;
+            }
+
+            // Count how many appointments conflict with this potential slot
+            const conflictingAppointments = appointmentsRes.filter(appt => 
+                appt.status === 'confirmed' &&
+                areIntervalsOverlapping(
+                    { start: slotStart, end: slotEnd },
+                    { start: new Date(appt.start_time), end: new Date(appt.end_time) },
+                    { inclusive: false } // A 10:00-10:30 appointment should not conflict with a 10:30 slot
+                )
+            ).length;
+            
+            // If the number of conflicting appointments is less than the total resources, the slot is available.
+            if (conflictingAppointments < totalResources) {
+                availableSlots.push(format(slotStart, 'HH:mm'));
             }
 
             currentTime = addMinutes(currentTime, bufferMinutes);
