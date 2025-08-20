@@ -9,15 +9,16 @@ import ManageServicesClient from './manage-services-client';
 import ManageScheduleClient from './manage-schedule-client';
 import ManageResourcesClient from './manage-resources-client';
 import ManageBookingsClient from './manage-bookings-client';
-import type { BusinessService, BusinessHour, BusinessResource } from '@/lib/db-types';
+import type { BusinessService, BusinessHour, BusinessResource, User } from '@/lib/db-types';
 
 interface ManageBusinessTabsProps {
     initialServices: BusinessService[];
     initialHours: BusinessHour[];
     initialResources: BusinessResource[];
+    businessUser: User;
 }
 
-export default function ManageBusinessTabs({ initialServices, initialHours, initialResources }: ManageBusinessTabsProps) {
+export default function ManageBusinessTabs({ initialServices, initialHours, initialResources, businessUser }: ManageBusinessTabsProps) {
     return (
         <Tabs defaultValue="bookings" className="w-full">
             <TabsList className="grid w-full grid-cols-4">
@@ -64,10 +65,10 @@ export default function ManageBusinessTabs({ initialServices, initialHours, init
                             <Clock className="w-6 h-6 mr-3 text-primary" />
                            Hours & Schedule
                         </CardTitle>
-                        <CardDescription>Set your weekly working hours and days off.</CardDescription>
+                        <CardDescription>Set your weekly working hours, days off, and business timezone.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <ManageScheduleClient initialHours={initialHours} />
+                        <ManageScheduleClient initialHours={initialHours} businessUser={businessUser} />
                     </CardContent>
                 </Card>
             </TabsContent>

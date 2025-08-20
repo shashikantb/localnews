@@ -66,13 +66,13 @@ export async function getBusinessHours(businessId: number) {
     return getBusinessHoursDb(businessId);
 }
 
-export async function updateBusinessHours(hours: Omit<BusinessHour, 'id' | 'user_id'>[]) {
+export async function updateBusinessHours(hours: Omit<BusinessHour, 'id' | 'user_id'>[], timezone: string) {
     const { user } = await getSession();
     if (!user) {
         return { success: false, error: 'Authentication required' };
     }
     try {
-        await updateBusinessHoursDb(user.id, hours);
+        await updateBusinessHoursDb(user.id, hours, timezone);
         revalidatePath('/account/manage-business');
         return { success: true };
     } catch (e: any) {

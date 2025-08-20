@@ -1,7 +1,8 @@
 
+
 import { getSession } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
-import { getBusinessServicesDb, getBusinessHoursDb, getBusinessResourcesDb } from '@/lib/db';
+import { getBusinessServicesDb, getBusinessHoursDb, getBusinessResourcesDb, getUserByIdDb } from '@/lib/db';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -18,12 +19,18 @@ export default async function ManageBusinessPage() {
         redirect('/');
     }
 
-    // Fetch initial data for all tabs in parallel
-    const [initialServices, initialHours, initialResources] = await Promise.all([
+    // Fetch initial data for all tabs in parallel, including full business user details for timezone
+    const [initialServices, initialHours, initialResources, businessUser] = await Promise.all([
         getBusinessServicesDb(user.id),
         getBusinessHoursDb(user.id),
         getBusinessResourcesDb(user.id),
+        getUserByIdDb(user.id), // Fetch the full user object
     ]);
+    
+    if(!businessUser) {
+        // This case should ideally not happen if the session is valid
+        redirect('/');
+    }
 
     return (
         <div className="flex flex-col items-center p-4 sm:p-6 md:p-8">
@@ -51,6 +58,7 @@ export default async function ManageBusinessPage() {
                     initialServices={initialServices}
                     initialHours={initialHours}
                     initialResources={initialResources}
+                    businessUser={businessUser}
                 />
             </div>
         </div>

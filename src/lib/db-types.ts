@@ -67,6 +67,7 @@ export interface User {
   lp_points: number;
   referral_code: string;
   last_family_feed_view_at?: string | null;
+  timezone?: string | null;
 }
 
 export interface BusinessUser extends User {
@@ -466,6 +467,7 @@ export interface Appointment {
     end_time: string;
     status: AppointmentStatus;
     created_at: string;
+    timezone?: string | null;
 }
 
 // Enriched Appointment type for display
@@ -475,12 +477,14 @@ export interface BusinessAppointment extends Appointment {
     service_name: string;
     service_duration: number;
     resource_name: string;
+    price: number;
 }
 
 export interface CustomerAppointment extends Appointment {
     business_name: string;
     business_avatar: string | null;
     service_name: string;
+    price: number;
 }
 
 

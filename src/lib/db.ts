@@ -8,6 +8,7 @@ import {
   format, setHours, setMinutes, startOfDay, getDay,
   addMinutes, isPast, isToday, areIntervalsOverlapping
 } from 'date-fns';
+import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 
 // Re-export db-types
 export * from './db-types';
@@ -49,7 +50,8 @@ async function initializeDatabase(client: Pool | Client) {
         referral_code VARCHAR(10) UNIQUE,
         referred_by_id INTEGER REFERENCES users(id),
         last_active TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-        last_family_feed_view_at TIMESTAMPTZ DEFAULT '2024-07-01 12:00:00+00'
+        last_family_feed_view_at TIMESTAMPTZ DEFAULT '2024-07-01 12:00:00+00',
+        timezone VARCHAR(50)
       );
     `;
     await initClient.query(createUsersTableQuery);
@@ -68,6 +70,16 @@ async function initializeDatabase(client: Pool | Client) {
         ADD COLUMN last_family_feed_view_at TIMESTAMPTZ DEFAULT '2024-07-01 12:00:00+00'
       `);
       console.log("Column 'last_family_feed_view_at' added successfully.");
+    }
+    
+    const timezoneColumnCheck = await initClient.query(`
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name='users' AND column_name='timezone'
+    `);
+    if(timezoneColumnCheck.rowCount === 0) {
+        console.log("Adding 'timezone' column to 'users' table...");
+        await initClient.query(`ALTER TABLE users ADD COLUMN timezone VARCHAR(50);`);
+        console.log("Column 'timezone' added.");
     }
 
     await initClient.query(`
@@ -228,10 +240,21 @@ async function initializeDatabase(client: Pool | Client) {
             start_time TIMESTAMPTZ NOT NULL,
             end_time TIMESTAMPTZ NOT NULL,
             status VARCHAR(50) NOT NULL DEFAULT 'confirmed', -- e.g., confirmed, completed, cancelled
-            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+            created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+            timezone VARCHAR(50)
         );
     `);
     console.log("Table 'appointments' checked/created.");
+
+    const appointmentTimezoneColCheck = await initClient.query(`
+      SELECT 1 FROM information_schema.columns 
+      WHERE table_name='appointments' AND column_name='timezone'
+    `);
+    if(appointmentTimezoneColCheck.rowCount === 0) {
+        console.log("Adding 'timezone' column to 'appointments' table...");
+        await initClient.query(`ALTER TABLE appointments ADD COLUMN timezone VARCHAR(50);`);
+        console.log("Column 'timezone' added.");
+    }
 
 
     console.log("All tables checked/created.");
@@ -355,7 +378,7 @@ const POST_COLUMNS_WITH_JOINS = `
 const USER_COLUMNS_SANITIZED = `
   id, email, name, role, status, createdat, profilepictureurl, mobilenumber, 
   business_category, business_other_category, latitude, longitude,
-  lp_points, referral_code, last_family_feed_view_at
+  lp_points, referral_code, last_family_feed_view_at, timezone
 `;
 
 export async function getPostsDb(
@@ -2313,7 +2336,7 @@ export async function getFamilyMembersForUserDb(userId: number): Promise<FamilyM
     try {
         const query = `
             SELECT
-                u.id, u.name, u.role, u.status, u.createdat, u.profilepictureurl, u.mobilenumber, u.business_category, u.business_other_category, u.lp_points, u.referral_code, u.last_family_feed_view_at,
+                u.id, u.name, u.role, u.status, u.createdat, u.profilepictureurl, u.mobilenumber, u.business_category, u.business_other_category, u.lp_points, u.referral_code, u.last_family_feed_view_at, u.timezone,
                 CASE
                     WHEN fr.user_id_1 = $1 THEN fr.share_location_from_1_to_2
                     ELSE fr.share_location_from_2_to_1
@@ -3480,7 +3503,7 @@ export async function getBusinessHoursDb(userId: number): Promise<BusinessHour[]
     }
 }
 
-export async function updateBusinessHoursDb(userId: number, hours: Omit<BusinessHour, 'id' | 'user_id'>[]): Promise<void> {
+export async function updateBusinessHoursDb(userId: number, hours: Omit<BusinessHour, 'id' | 'user_id'>[], timezone: string): Promise<User> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) throw new Error("Database not configured.");
@@ -3488,6 +3511,10 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
     const client = await dbPool.connect();
     try {
         await client.query('BEGIN');
+        
+        const userUpdateQuery = `UPDATE users SET timezone = $1 WHERE id = $2 RETURNING *`;
+        const userResult = await client.query(userUpdateQuery, [timezone, userId]);
+        if (userResult.rowCount === 0) throw new Error("User not found.");
 
         // It's safer and simpler to delete the old schedule and insert the new one.
         await client.query('DELETE FROM business_hours WHERE user_id = $1', [userId]);
@@ -3506,6 +3533,7 @@ export async function updateBusinessHoursDb(userId: number, hours: Omit<Business
         }
 
         await client.query('COMMIT');
+        return userResult.rows[0];
     } catch (error) {
         await client.query('ROLLBACK');
         console.error("Error updating business hours:", error);
@@ -3594,6 +3622,7 @@ export async function getAppointmentsForBusinessDb(businessId: number, date: str
             c.name as customer_name,
             c.profilepictureurl as customer_avatar,
             s.name as service_name,
+            s.price,
             s.duration_minutes as service_duration,
             r.name as resource_name
           FROM appointments a
@@ -3665,11 +3694,11 @@ export async function createAppointmentDb(appointment: Omit<Appointment, 'id' | 
     const client = await dbPool.connect();
     try {
         const query = `
-            INSERT INTO appointments (customer_id, business_id, service_id, resource_id, start_time, end_time)
-            VALUES ($1, $2, $3, $4, $5, $6)
+            INSERT INTO appointments (customer_id, business_id, service_id, resource_id, start_time, end_time, timezone)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *;
         `;
-        const values = [appointment.customer_id, appointment.business_id, appointment.service_id, appointment.resource_id, appointment.start_time, appointment.end_time];
+        const values = [appointment.customer_id, appointment.business_id, appointment.service_id, appointment.resource_id, appointment.start_time, appointment.end_time, appointment.timezone];
         const result = await client.query(query, values);
         return result.rows[0];
     } finally {

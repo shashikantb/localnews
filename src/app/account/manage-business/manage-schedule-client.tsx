@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -9,12 +10,13 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { Loader2, Save } from 'lucide-react';
-import type { BusinessHour } from '@/lib/db-types';
+import { Loader2, Save, AlertTriangle } from 'lucide-react';
+import type { BusinessHour, User } from '@/lib/db-types';
 import { useToast } from '@/hooks/use-toast';
 import { updateBusinessHours } from './actions';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
     const hours = Math.floor(i / 2);
@@ -24,7 +26,11 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
     return `${formattedHours}:${formattedMinutes}`;
 });
 
+const ALL_TIMEZONES = Intl.supportedValuesOf('timeZone');
+const INDIAN_SUBCONTINENT_TIMEZONES = ALL_TIMEZONES.filter(tz => tz.startsWith('Asia/Kolkata') || tz.startsWith('Asia/Dhaka') || tz.startsWith('Asia/Karachi') || tz.startsWith('Asia/Kathmandu'));
+
 const scheduleSchema = z.object({
+  timezone: z.string().min(1, "Timezone is required."),
   schedule: z.array(
     z.object({
       day_of_week: z.number(),
@@ -50,9 +56,10 @@ const DAYS_OF_WEEK = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'F
 
 interface ManageScheduleClientProps {
   initialHours: BusinessHour[];
+  businessUser: User;
 }
 
-const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHours }) => {
+const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHours, businessUser }) => {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
 
@@ -66,7 +73,10 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
             end_time: existing?.end_time ?? '18:00',
         };
     });
-    return { schedule: defaultSchedule };
+    return { 
+        schedule: defaultSchedule,
+        timezone: businessUser.timezone || 'Asia/Kolkata', // Default to IST
+    };
   };
 
   const form = useForm<ScheduleFormData>({
@@ -84,7 +94,7 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
 
   const onSubmit = (data: ScheduleFormData) => {
     startTransition(async () => {
-        const result = await updateBusinessHours(data.schedule);
+        const result = await updateBusinessHours(data.schedule, data.timezone);
         if (result.success) {
             toast({ title: 'Schedule Updated!', description: 'Your working hours have been saved.' });
         } else {
@@ -95,6 +105,38 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+        {!businessUser.timezone && (
+            <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Set Your Timezone</AlertTitle>
+                <AlertDescription>
+                    Please select your business's timezone below to ensure accurate booking times for customers.
+                </AlertDescription>
+            </Alert>
+        )}
+        <FormField
+            control={form.control}
+            name="timezone"
+            render={({ field }) => (
+                <FormItem>
+                    <FormLabel>Business Timezone</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select your timezone" />
+                            </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                             <Label className="px-2 py-1.5 text-sm font-semibold">Indian Subcontinent</Label>
+                             {INDIAN_SUBCONTINENT_TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+                             <Label className="px-2 py-1.5 text-sm font-semibold">All Timezones</Label>
+                             {ALL_TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+                        </SelectContent>
+                    </Select>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
         <div className="space-y-3 rounded-md border p-4">
         {fields.map((field, index) => {
           const isClosed = form.watch(`schedule.${index}.is_closed`);
