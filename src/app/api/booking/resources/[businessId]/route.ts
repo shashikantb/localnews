@@ -8,7 +8,6 @@ export async function GET(_: Request, { params }: { params: { businessId: string
     if (isNaN(businessId)) {
       return NextResponse.json({ error: "Invalid business ID" }, { status: 400 });
     }
-    // Directly use the businessId which is the user_id for businesses
     const resources = await getBusinessResourcesDb(businessId);
     return NextResponse.json({ resources });
   } catch (error) {
