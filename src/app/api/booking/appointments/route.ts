@@ -64,11 +64,10 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
     const totalResources = resources.length > 0 ? resources.length : 1;
     
-    // Correctly create a local Date object, then convert it to a UTC date object for the database.
-    const naiveDateTimeStr = `${body.date}T${body.time}:00`;
-    // This creates a Date object representing the LOCAL time of the server.
-    const slotStart = new Date(naiveDateTimeStr);
-    
+    // This creates a Date object interpreted as being in the SERVER's local time.
+    // For a Vercel server, this is UTC. This is the correct interpretation.
+    const slotStart = new Date(`${body.date}T${body.time}:00`);
+
     if (isBefore(slotStart, new Date())) {
         return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
     }
