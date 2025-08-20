@@ -1,4 +1,5 @@
 
+
 import { NextResponse } from "next/server";
 import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getAppointmentsForBusinessDb, getBusinessResourcesDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
@@ -28,8 +29,9 @@ function isSlotAvailable(
 }
 
 // Helper function to reliably convert local time in a given timezone to a UTC Date object
-// This replaces the faulty zonedTimeToUtc import.
 function convertToUtc(date: string, time: string, timeZone: string): Date {
+  // This helper creates a date string like '2025-08-20T09:00:00.000+05:30'
+  // which is correctly parsed by new Date() into a UTC Date object.
   const dtString = `${date}T${time}:00`;
   
   // Create a temporary date object to get the timezone offset string.
@@ -88,7 +90,8 @@ export async function POST(req: Request) {
     // Correctly convert the selected local time in the business's timezone to a UTC Date object.
     const slotStartUtc = convertToUtc(body.date, body.time, businessTimeZone);
 
-    if (isBefore(new Date(), slotStartUtc)) {
+    // CORRECTED: Check if the current time `new Date()` is BEFORE the selected slot start time.
+    if (isBefore(slotStartUtc, new Date())) {
         return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
     }
     
