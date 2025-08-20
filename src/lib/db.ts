@@ -1,7 +1,7 @@
 
 
 import { Pool, Client, type QueryResult } from 'pg';
-import type { Appointment, ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource } from '@/lib/db-types';
+import type { Appointment, BusinessAppointment, ConversationDetails, CustomerAppointment, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource, AppointmentStatus } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
 import {
@@ -246,6 +246,7 @@ async function initializeDatabase(client: Pool | Client) {
     await initClient.query(`CREATE INDEX IF NOT EXISTS business_resources_user_id_idx ON business_resources (user_id);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS appointments_business_time_idx ON appointments (business_id, start_time);`);
     await initClient.query(`CREATE INDEX IF NOT EXISTS appointments_resource_time_idx ON appointments (resource_id, start_time);`);
+    await initClient.query(`CREATE INDEX IF NOT EXISTS appointments_customer_id_idx ON appointments (customer_id);`);
 
 
     console.log("Indexes checked/created.");
@@ -3581,15 +3582,77 @@ export async function deleteBusinessResourceDb(resourceId: number, userId: numbe
 }
 
 // --- Appointment Functions ---
-export async function getAppointmentsForBusinessDb(businessId: number, date: string): Promise<Appointment[]> {
+export async function getAppointmentsForBusinessDb(businessId: number, date: string): Promise<BusinessAppointment[]> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
     if (!dbPool) return [];
     const client = await dbPool.connect();
     try {
-        const query = 'SELECT * FROM appointments WHERE business_id = $1 AND start_time::date = $2::date';
+        const query = `
+          SELECT 
+            a.*,
+            c.name as customer_name,
+            c.profilepictureurl as customer_avatar,
+            s.name as service_name,
+            s.duration_minutes as service_duration,
+            r.name as resource_name
+          FROM appointments a
+          JOIN users c ON a.customer_id = c.id
+          JOIN business_services s ON a.service_id = s.id
+          JOIN business_resources r ON a.resource_id = r.id
+          WHERE a.business_id = $1 AND a.start_time::date = $2::date
+        `;
         const result = await client.query(query, [businessId, date]);
         return result.rows;
+    } finally {
+        client.release();
+    }
+}
+
+export async function getAppointmentsForCustomerDb(customerId: number): Promise<CustomerAppointment[]> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return [];
+    const client = await dbPool.connect();
+    try {
+        const query = `
+          SELECT 
+            a.*,
+            b.name as business_name,
+            b.profilepictureurl as business_avatar,
+            s.name as service_name,
+            s.price
+          FROM appointments a
+          JOIN users b ON a.business_id = b.id
+          JOIN business_services s ON a.service_id = s.id
+          WHERE a.customer_id = $1
+          ORDER BY a.start_time DESC
+        `;
+        const result = await client.query(query, [customerId]);
+        return result.rows;
+    } finally {
+        client.release();
+    }
+}
+
+export async function updateAppointmentStatusDb(appointmentId: number, status: AppointmentStatus, userId: number, isCustomer: boolean = false): Promise<Appointment | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+    const client = await dbPool.connect();
+    try {
+        const whereClause = isCustomer
+            ? 'id = $1 AND customer_id = $2'
+            : 'id = $1 AND business_id = $2';
+
+        const query = `
+            UPDATE appointments
+            SET status = $3
+            WHERE ${whereClause}
+            RETURNING *;
+        `;
+        const result = await client.query(query, [appointmentId, userId, status]);
+        return result.rows[0] || null;
     } finally {
         client.release();
     }
@@ -3627,6 +3690,7 @@ export async function findFirstAvailableResourceDb(businessId: number, startTime
                 SELECT 1 FROM appointments a
                 WHERE a.resource_id = r.id
                 AND a.start_time < $3 AND a.end_time > $2
+                AND a.status = 'confirmed'
             )
             LIMIT 1;
         `;
@@ -3707,6 +3771,7 @@ export async function getAvailableSlotsDb(businessId: number, serviceId: number,
 
         // Find how many appointments overlap with this potential slot
         const overlappingAppointments = appointmentsRes.filter(appt => 
+            appt.status === 'confirmed' &&
             areIntervalsOverlapping(
                 { start: slotStart, end: slotEnd },
                 { start: new Date(appt.start_time), end: new Date(appt.end_time) },
