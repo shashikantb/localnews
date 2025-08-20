@@ -100,6 +100,12 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       setServices(s.services);
       setHours(h.hours);
       setResources(r.resources);
+      console.log({
+      businessIdUsed: businessId,
+      hoursCount: h.hours?.length,
+      resourcesCount: r.resources?.length,
+      firstHour: h.hours?.[0],
+      });
     } catch (e) {
       console.error(e);
       toast({ variant: 'destructive', title: 'Failed to load booking data' });
