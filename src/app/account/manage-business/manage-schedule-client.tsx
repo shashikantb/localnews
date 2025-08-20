@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useTransition } from 'react';
@@ -17,6 +16,7 @@ import { updateBusinessHours } from './actions';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
     const hours = Math.floor(i / 2);
@@ -104,99 +104,101 @@ const ManageScheduleClient: React.FC<ManageScheduleClientProps> = ({ initialHour
   };
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-        {!businessUser.timezone && (
-            <Alert variant="destructive">
-                <AlertTriangle className="h-4 w-4" />
-                <AlertTitle>Set Your Timezone</AlertTitle>
-                <AlertDescription>
-                    Please select your business's timezone below to ensure accurate booking times for customers.
-                </AlertDescription>
-            </Alert>
-        )}
-        <FormField
-            control={form.control}
-            name="timezone"
-            render={({ field }) => (
-                <FormItem>
-                    <FormLabel>Business Timezone</FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
-                        <FormControl>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select your timezone" />
-                            </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                             <Label className="px-2 py-1.5 text-sm font-semibold">Indian Subcontinent</Label>
-                             {INDIAN_SUBCONTINENT_TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
-                             <Label className="px-2 py-1.5 text-sm font-semibold">All Timezones</Label>
-                             {ALL_TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
-                        </SelectContent>
-                    </Select>
-                    <FormMessage />
-                </FormItem>
-            )}
-        />
-        <div className="space-y-3 rounded-md border p-4">
-        {fields.map((field, index) => {
-          const isClosed = form.watch(`schedule.${index}.is_closed`);
-          return (
-            <div key={field.id} className={cn("grid grid-cols-3 gap-3 items-center p-2 rounded-md", isClosed && 'opacity-60')}>
-              <Label className="font-semibold col-span-3 sm:col-span-1">{DAYS_OF_WEEK[index]}</Label>
-              <div className="flex items-center gap-4 col-span-3 sm:col-span-2">
-                <Controller
-                    control={form.control}
-                    name={`schedule.${index}.is_closed`}
-                    render={({ field: checkboxField }) => (
-                        <div className="flex items-center space-x-2">
-                            <Checkbox 
-                                id={`is_closed_${index}`} 
-                                checked={checkboxField.value}
-                                onCheckedChange={checkboxField.onChange}
-                            />
-                            <Label htmlFor={`is_closed_${index}`} className="text-sm">Closed</Label>
-                        </div>
-                    )}
-                 />
-                 {!isClosed && (
-                    <div className="flex items-center gap-2 flex-grow">
-                        <Controller
-                            name={`schedule.${index}.start_time`}
-                            control={form.control}
-                            render={({ field: timeField }) => (
-                                <Select onValueChange={timeField.onChange} value={timeField.value || '09:00'}>
-                                    <SelectTrigger><SelectValue/></SelectTrigger>
-                                    <SelectContent>{TIME_OPTIONS.map(t => <SelectItem key={`start-${t}`} value={t}>{t}</SelectItem>)}</SelectContent>
-                                </Select>
-                            )}
-                        />
-                         <span>to</span>
-                         <Controller
-                            name={`schedule.${index}.end_time`}
-                            control={form.control}
-                            render={({ field: timeField }) => (
-                                 <Select onValueChange={timeField.onChange} value={timeField.value || '18:00'}>
-                                    <SelectTrigger><SelectValue/></SelectTrigger>
-                                    <SelectContent>{TIME_OPTIONS.map(t => <SelectItem key={`end-${t}`} value={t}>{t}</SelectItem>)}</SelectContent>
-                                </Select>
-                            )}
-                        />
-                    </div>
-                 )}
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          {!businessUser.timezone && (
+              <Alert variant="destructive">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Set Your Timezone</AlertTitle>
+                  <AlertDescription>
+                      Please select your business's timezone below to ensure accurate booking times for customers.
+                  </AlertDescription>
+              </Alert>
+          )}
+          <FormField
+              control={form.control}
+              name="timezone"
+              render={({ field }) => (
+                  <FormItem>
+                      <FormLabel>Business Timezone</FormLabel>
+                      <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl>
+                              <SelectTrigger>
+                                  <SelectValue placeholder="Select your timezone" />
+                              </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                              <Label className="px-2 py-1.5 text-sm font-semibold">Indian Subcontinent</Label>
+                              {INDIAN_SUBCONTINENT_TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+                              <Label className="px-2 py-1.5 text-sm font-semibold">All Timezones</Label>
+                              {ALL_TIMEZONES.map(tz => <SelectItem key={tz} value={tz}>{tz}</SelectItem>)}
+                          </SelectContent>
+                      </Select>
+                      <FormMessage />
+                  </FormItem>
+              )}
+          />
+          <div className="space-y-3 rounded-md border p-4">
+          {fields.map((field, index) => {
+            const isClosed = form.watch(`schedule.${index}.is_closed`);
+            return (
+              <div key={field.id} className={cn("grid grid-cols-3 gap-3 items-center p-2 rounded-md", isClosed && 'opacity-60')}>
+                <Label className="font-semibold col-span-3 sm:col-span-1">{DAYS_OF_WEEK[index]}</Label>
+                <div className="flex items-center gap-4 col-span-3 sm:col-span-2">
+                  <Controller
+                      control={form.control}
+                      name={`schedule.${index}.is_closed`}
+                      render={({ field: checkboxField }) => (
+                          <div className="flex items-center space-x-2">
+                              <Checkbox 
+                                  id={`is_closed_${index}`} 
+                                  checked={checkboxField.value}
+                                  onCheckedChange={checkboxField.onChange}
+                              />
+                              <Label htmlFor={`is_closed_${index}`} className="text-sm">Closed</Label>
+                          </div>
+                      )}
+                  />
+                  {!isClosed && (
+                      <div className="flex items-center gap-2 flex-grow">
+                          <Controller
+                              name={`schedule.${index}.start_time`}
+                              control={form.control}
+                              render={({ field: timeField }) => (
+                                  <Select onValueChange={timeField.onChange} value={timeField.value || '09:00'}>
+                                      <SelectTrigger><SelectValue/></SelectTrigger>
+                                      <SelectContent>{TIME_OPTIONS.map(t => <SelectItem key={`start-${t}`} value={t}>{t}</SelectItem>)}</SelectContent>
+                                  </Select>
+                              )}
+                          />
+                          <span>to</span>
+                          <Controller
+                              name={`schedule.${index}.end_time`}
+                              control={form.control}
+                              render={({ field: timeField }) => (
+                                  <Select onValueChange={timeField.onChange} value={timeField.value || '18:00'}>
+                                      <SelectTrigger><SelectValue/></SelectTrigger>
+                                      <SelectContent>{TIME_OPTIONS.map(t => <SelectItem key={`end-${t}`} value={t}>{t}</SelectItem>)}</SelectContent>
+                                  </Select>
+                              )}
+                          />
+                      </div>
+                  )}
+                </div>
+                {errors.schedule?.[index]?.end_time && <p className="text-destructive text-xs col-span-3 text-right -mt-2">{errors.schedule[index]!.end_time!.message}</p>}
               </div>
-               {errors.schedule?.[index]?.end_time && <p className="text-destructive text-xs col-span-3 text-right -mt-2">{errors.schedule[index]!.end_time!.message}</p>}
-            </div>
-          )
-        })}
-      </div>
-      <div className="flex justify-end">
-        <Button type="submit" disabled={isPending}>
-            {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-            <Save className="mr-2 h-4 w-4"/>
-            Save Schedule
-        </Button>
-      </div>
-    </form>
+            )
+          })}
+        </div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={isPending}>
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+              <Save className="mr-2 h-4 w-4"/>
+              Save Schedule
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 };
 
