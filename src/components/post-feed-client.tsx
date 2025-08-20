@@ -10,7 +10,7 @@ import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, upd
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors, Map, List } from 'lucide-react';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors, Map, List, CalendarCheck } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -494,7 +494,16 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const renderServiceCategories = () => (
     <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-center text-primary tracking-tight">Select a Service</h2>
+        <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-primary tracking-tight">Select a Service</h2>
+            {sessionUser && (
+                <Button variant="outline" asChild>
+                    <Link href="/account/my-bookings">
+                        <CalendarCheck className="mr-2 h-4 w-4" /> My Bookings
+                    </Link>
+                </Button>
+            )}
+        </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Card onClick={() => { setSelectedService('Saloon / Barber Shop'); fetchBusinesses(1, 'Saloon / Barber Shop'); }} className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200">
                 <Scissors className="h-12 w-12 text-accent mb-3"/>

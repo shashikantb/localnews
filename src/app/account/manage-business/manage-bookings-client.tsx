@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useEffect, useTransition } from 'react';
@@ -14,6 +13,7 @@ import { Loader2, Check, User, Clock, Scissors, Tag } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const AppointmentCard: React.FC<{ appointment: BusinessAppointment, onStatusChange: (id: number, status: AppointmentStatus) => void; isUpdating: boolean; }> = ({ appointment, onStatusChange, isUpdating }) => {
     const { toast } = useToast();
