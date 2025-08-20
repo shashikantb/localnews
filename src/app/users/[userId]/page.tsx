@@ -6,7 +6,7 @@ import { getPostsByUserId, getPendingFamilyRequests, getFamilyRelationshipStatus
 import { getSession } from '@/app/auth/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building, ShieldCheck, Mail, Calendar, User as UserIcon, Edit, MessageSquare, Settings, Users, Briefcase, Phone, FileBarChart, Award, Share2, BadgeCheck, Wrench } from 'lucide-react';
+import { Building, ShieldCheck, Mail, Calendar, User as UserIcon, Edit, MessageSquare, Settings, Users, Briefcase, Phone, FileBarChart, Award, Share2, BadgeCheck, Wrench, CalendarCheck } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { PostCard } from '@/components/post-card';
@@ -311,7 +311,7 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
                         <Settings className="w-6 h-6 mr-3 text-primary" />
                         <div className="text-left">
                             <h2 className="text-lg font-semibold leading-none tracking-tight">Settings</h2>
-                            <p className="text-sm text-muted-foreground pt-1">Manage theme and account settings.</p>
+                            <p className="text-sm text-muted-foreground pt-1">Manage theme, bookings, and account settings.</p>
                         </div>
                     </div>
                 </AccordionTrigger>
@@ -321,6 +321,10 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
                       <Label className="text-base">Theme</Label>
                       <ThemeSwitcher />
                     </div>
+                    <Separator />
+                    <Button variant="outline" className="w-full justify-start" asChild>
+                        <Link href="/account/my-bookings"><CalendarCheck className="mr-2 h-4 w-4" /> My Bookings</Link>
+                    </Button>
                     <Separator />
                     <div className="space-y-2">
                       <Label className="text-base text-destructive">Danger Zone</Label>

@@ -8,9 +8,9 @@ import {
     addBusinessServiceDb, getBusinessServicesDb, updateBusinessServiceDb, deleteBusinessServiceDb, 
     getBusinessHoursDb, updateBusinessHoursDb,
     getBusinessResourcesDb, addBusinessResourceDb, updateBusinessResourceDb, deleteBusinessResourceDb,
-    getAppointmentsForBusinessDb, createAppointmentDb
+    getAppointmentsForBusinessDb, updateAppointmentStatusDb
 } from '@/lib/db';
-import type { NewBusinessService, BusinessHour, NewBusinessResource, Appointment } from '@/lib/db-types';
+import type { NewBusinessService, BusinessHour, NewBusinessResource, BusinessAppointment, AppointmentStatus } from '@/lib/db-types';
 
 export async function getBusinessServices(businessId: number) {
     return getBusinessServicesDb(businessId);
@@ -131,21 +131,26 @@ export async function deleteBusinessResource(resourceId: number) {
 }
 
 // --- Appointment Actions ---
-export async function getAppointmentsForBusiness(businessId: number, date: string): Promise<Appointment[]> {
-    return getAppointmentsForBusinessDb(businessId, date);
+export async function getAppointmentsForBusiness(date: string): Promise<BusinessAppointment[]> {
+    const { user } = await getSession();
+    if (!user || user.role !== 'Business') return [];
+    return getAppointmentsForBusinessDb(user.id, date);
 }
 
-export async function createAppointment(appointment: Omit<Appointment, 'id' | 'status' | 'created_at' | 'customer_id'>): Promise<{ success: boolean; error?: string; appointment?: Appointment }> {
+export async function updateAppointmentStatus(appointmentId: number, status: AppointmentStatus): Promise<{ success: boolean; error?: string }> {
     const { user } = await getSession();
-    if (!user) {
-        return { success: false, error: 'Authentication required.' };
+    if (!user || user.role !== 'Business') {
+        return { success: false, error: 'Permission denied.' };
     }
     
     try {
-        const newAppointment = await createAppointmentDb({ ...appointment, customer_id: user.id });
-        return { success: true, appointment: newAppointment };
+        const result = await updateAppointmentStatusDb(appointmentId, status, user.id);
+        if (!result) {
+            return { success: false, error: 'Appointment not found or permission denied.' };
+        }
+        revalidatePath('/account/manage-business');
+        return { success: true };
     } catch (error: any) {
-        console.error("Error creating appointment:", error);
         return { success: false, error: error.message };
     }
 }

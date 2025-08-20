@@ -426,6 +426,8 @@ export interface PendingRegistration extends Omit<NewUser, 'passwordplaintext'> 
     created_at: string;
 }
 
+export type AppointmentStatus = 'confirmed' | 'completed' | 'cancelled';
+
 // --- Business Booking Types ---
 export interface BusinessService {
   id: number;
@@ -462,8 +464,23 @@ export interface Appointment {
     resource_id: number;
     start_time: string;
     end_time: string;
-    status: 'confirmed' | 'completed' | 'cancelled';
+    status: AppointmentStatus;
     created_at: string;
+}
+
+// Enriched Appointment type for display
+export interface BusinessAppointment extends Appointment {
+    customer_name: string;
+    customer_avatar: string | null;
+    service_name: string;
+    service_duration: number;
+    resource_name: string;
+}
+
+export interface CustomerAppointment extends Appointment {
+    business_name: string;
+    business_avatar: string | null;
+    service_name: string;
 }
 
 
