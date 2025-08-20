@@ -101,6 +101,15 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       setServices(s.services);
       setHours(h.hours);
       setResources(r.resources);
+
+      // --- DEBUG LOG 1 ---
+      console.log("--- BOOKING DATA FETCHED ---", {
+        businessIdUsed: businessId,
+        hoursCount: h.hours?.length,
+        resourcesCount: r.resources?.length,
+        firstHour: h.hours?.[0],
+      });
+
     } catch (e) {
       console.error(e);
       toast({ variant: 'destructive', title: 'Failed to load booking data' });
@@ -129,10 +138,19 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
 
   useEffect(() => {
     if (!dateKey) return;
+    
+    // --- DEBUG LOG 2 ---
+    console.log(`--- FETCHING APPOINTMENTS for date: ${dateKey} ---`);
+
     api<{ appointments: any[] }>(
       `/api/booking/appointments?businessId=${businessId}&date=${dateKey}&_=${Date.now()}`
     )
-      .then((d) => setAppointments(Array.isArray(d.appointments) ? d.appointments : []))
+      .then((d) => {
+        const fetchedAppointments = Array.isArray(d.appointments) ? d.appointments : [];
+        setAppointments(fetchedAppointments);
+        // --- DEBUG LOG 3 ---
+        console.log(`--- APPOINTMENTS RECEIVED for ${dateKey} ---`, { count: fetchedAppointments.length, data: fetchedAppointments });
+      })
       .catch(() => setAppointments([]));
   }, [dateKey, businessId]);
 
@@ -152,7 +170,15 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     const jsDow = getDay(selectedDate);
     const dayHours = hours.find((h) => dowMatches(Number(h?.day_of_week), jsDow));
 
-    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) return [];
+    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
+        // --- DEBUG LOG 4 (No Slots Reason) ---
+        console.log("--- SLOT CALCULATION HALTED ---", {
+            reason: "Day is closed or hours are not defined",
+            jsDow,
+            dayHoursFound: dayHours
+        });
+        return [];
+    }
 
     const serviceDuration = safeDuration((selectedService as any).duration_minutes, 30);
 
@@ -171,13 +197,11 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       const slotEnd = addMinutes(cur, serviceDuration);
       if (slotEnd > end) break;
 
-      // Today: hide only slots that START in the past
       if (isToday(selectedDate) && isPast(cur)) {
         cur = addMinutes(cur, 15);
         continue;
       }
 
-      // Overlap check (non-inclusive so adjacent slots are OK)
       const appointmentsInSlot = appointments.filter((appt) => {
         const aStart = toValidDate(appt?.start_time);
         const aEnd = toValidDate(appt?.end_time);
@@ -201,6 +225,17 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       }
       cur = addMinutes(cur, 15);
     }
+    
+    // --- DEBUG LOG 5 (Final Result) ---
+    console.log("--- SLOT CALCULATION COMPLETE ---", {
+        forDate: selectedDate.toDateString(),
+        dayHours,
+        serviceDuration,
+        effectiveResourceCount: effectiveResources.length,
+        foundAppointments: appointments.length,
+        calculatedSlots: out
+    });
+
     return out;
   }, [selectedDate, selectedService, hours, appointments, effectiveResources]);
 
@@ -231,7 +266,7 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       return areIntervalsOverlapping(
         { start: startTime, end: endTime },
         { start: aStart, end: aEnd },
-        { inclusive: false }, // non-inclusive here too
+        { inclusive: false },
       );
     });
 
