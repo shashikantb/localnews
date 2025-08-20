@@ -15,6 +15,7 @@ import { format, isBefore, addMinutes } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface BookingDialogProps {
   business: User;
