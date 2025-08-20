@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getAppointmentsForBusinessDb, getBusinessResourcesDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
 import { addMinutes, isBefore } from "date-fns";
-import { zonedTimeToUtc } from "date-fns-tz";
+
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -66,7 +66,15 @@ export async function POST(req: Request) {
     
     // --- THIS IS THE FIX ---
     // Correctly convert the selected local time in the business's timezone to a UTC Date object.
-    const slotStartUtc = zonedTimeToUtc(`${body.date} ${body.time}`, businessTimeZone);
+    const localDateTimeString = `${body.date}T${body.time}:00`;
+    // Create a formatter for the business's timezone to get the offset
+    const formatter = new Intl.DateTimeFormat('en-US', { timeZone: businessTimeZone, timeZoneName: 'longOffset' });
+    const parts = formatter.formatToParts(new Date());
+    const timeZoneOffset = parts.find(part => part.type === 'timeZoneName')?.value.replace('GMT', '') || '+00:00';
+    
+    const isoStringWithOffset = `${localDateTimeString}${timeZoneOffset}`;
+    const slotStartUtc = new Date(isoStringWithOffset);
+
 
     if (isBefore(new Date(), slotStartUtc)) {
         return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
