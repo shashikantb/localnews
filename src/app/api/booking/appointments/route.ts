@@ -52,14 +52,17 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: "Invalid service selected." }, { status: 400 });
     }
 
+    // The date and time are combined into a single string that represents the local time of the event.
+    // E.g., '2024-08-15' and '14:30' become '2024-08-15T14:30:00'.
+    // new Date() will parse this as a local time string. toISOString() then correctly converts it to UTC for storage.
+    const localDateTimeString = `${body.date}T${body.time}:00`;
+    const startTime = new Date(localDateTimeString);
+    const endTime = addMinutes(startTime, service.duration_minutes);
+
     const availableSlots = await getAvailableSlotsDb(body.business_id, body.service_id, body.date);
     if (!availableSlots.includes(body.time)) {
         return NextResponse.json({ success: false, error: "The selected time slot is no longer available." }, { status: 409 }); // 409 Conflict
     }
-
-    const [hour, minute] = body.time.split(':').map(Number);
-    const startTime = setMinutes(setHours(new Date(body.date), hour), minute);
-    const endTime = addMinutes(startTime, service.duration_minutes);
 
     const resource = await findFirstAvailableResourceDb(body.business_id, startTime, endTime);
     if (!resource) {

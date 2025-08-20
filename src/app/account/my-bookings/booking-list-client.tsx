@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useTransition, useMemo } from 'react';
@@ -9,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { Loader2, Calendar, Clock, Tag, Building, XCircle, CheckCircle } from 'lucide-react';
 import {
   AlertDialog,
@@ -64,8 +63,8 @@ const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (i
                 </div>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(new Date(appointment.start_time), 'EEEE, MMMM d, yyyy')}</span></div>
-                <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(new Date(appointment.start_time), 'h:mm a')}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(parseISO(appointment.start_time), 'EEEE, MMMM d, yyyy')}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(parseISO(appointment.start_time), 'h:mm a')}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Tag className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">₹{appointment.price}</span></div>
             </CardContent>
             {isUpcoming && (
@@ -109,10 +108,10 @@ export default function BookingListClient({ initialBookings }: BookingListClient
 
     const { upcoming, past } = useMemo(() => {
         const now = new Date();
-        const upcomingBookings = bookings.filter(b => b.status === 'confirmed' && new Date(b.start_time) >= now)
-                                        .sort((a,b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
-        const pastBookings = bookings.filter(b => b.status !== 'confirmed' || new Date(b.start_time) < now)
-                                     .sort((a,b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+        const upcomingBookings = bookings.filter(b => b.status === 'confirmed' && parseISO(b.start_time) >= now)
+                                        .sort((a,b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime());
+        const pastBookings = bookings.filter(b => b.status !== 'confirmed' || parseISO(b.start_time) < now)
+                                     .sort((a,b) => parseISO(b.start_time).getTime() - parseISO(a.start_time).getTime());
         return { upcoming: upcomingBookings, past: pastBookings };
     }, [bookings]);
 
