@@ -5,7 +5,7 @@ import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirst
 import { getSession } from "@/app/auth/actions";
 import type { Appointment } from "@/lib/db-types";
 import { addMinutes } from "date-fns";
-import { zonedTimeToUtc } from 'date-fns-tz';
+import { toDate } from 'date-fns-tz';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -47,7 +47,8 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
 
     const localDateTimeString = `${body.date}T${body.time}:00`;
-    const startTimeInUtc = zonedTimeToUtc(localDateTimeString, businessTimeZone);
+    // Use toDate to correctly interpret the local time in the business's timezone
+    const startTimeInUtc = toDate(localDateTimeString, { timeZone: businessTimeZone });
     const endTimeInUtc = addMinutes(startTimeInUtc, service.duration_minutes);
     
     // Re-verify availability on the server to prevent race conditions
