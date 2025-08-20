@@ -4,6 +4,10 @@ import { getAppointmentsForBusinessDb, createAppointmentDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
 import type { Appointment } from "@/lib/db-types";
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);

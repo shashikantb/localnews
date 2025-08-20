@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -100,12 +101,6 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
       setServices(s.services);
       setHours(h.hours);
       setResources(r.resources);
-      console.log({
-      businessIdUsed: businessId,
-      hoursCount: h.hours?.length,
-      resourcesCount: r.resources?.length,
-      firstHour: h.hours?.[0],
-      });
     } catch (e) {
       console.error(e);
       toast({ variant: 'destructive', title: 'Failed to load booking data' });
@@ -127,14 +122,19 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     }
   }, [isOpen, fetchBusinessData]);
 
+  const dateKey = useMemo(
+    () => (selectedDate ? format(selectedDate, 'yyyy-MM-dd') : ''),
+    [selectedDate]
+  );
+
   useEffect(() => {
-    if (!selectedDate) return;
+    if (!dateKey) return;
     api<{ appointments: any[] }>(
-      `/api/booking/appointments?businessId=${businessId}&date=${format(selectedDate, 'yyyy-MM-dd')}`,
+      `/api/booking/appointments?businessId=${businessId}&date=${dateKey}&_=${Date.now()}`
     )
       .then((d) => setAppointments(Array.isArray(d.appointments) ? d.appointments : []))
       .catch(() => setAppointments([]));
-  }, [selectedDate, businessId]);
+  }, [dateKey, businessId]);
 
   // If no resources were configured, assume at least one seat
   const effectiveResources = useMemo(() => {
@@ -321,7 +321,8 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
               mode="single"
               selected={selectedDate}
               onSelect={(date) => {
-                setSelectedDate(date);
+                if (!date) return;
+                setSelectedDate(new Date(date));
                 setSelectedTime(null);
               }}
               disabled={(date) => isPast(date) && !isToday(date)}
