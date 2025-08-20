@@ -64,8 +64,7 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
     const totalResources = resources.length > 0 ? resources.length : 1;
     
-    // This creates a Date object interpreted as being in the SERVER's local time.
-    // For a Vercel server, this is UTC. This is the correct interpretation.
+    // Construct a naive date object representing the local time selected by the user
     const slotStart = new Date(`${body.date}T${body.time}:00`);
 
     if (isBefore(slotStart, new Date())) {
