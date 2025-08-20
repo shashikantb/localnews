@@ -279,16 +279,12 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     setIsFetchingLocation(true);
     setLocationPromptVisible(false);
     
-    const { dismiss } = toast({ title: "Getting your location...", description: "This may take a moment." });
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const newLocation = { latitude: position.coords.latitude, longitude: position.coords.longitude };
         setLocation(newLocation);
         setIsFetchingLocation(false);
-        dismiss();
-        toast({ title: "Location Found!", description: "Loading content for your area." });
-
+        
         if (!liveSeedingTriggered.current) {
           triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
           liveSeedingTriggered.current = true;
@@ -302,7 +298,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
       },
       (err) => {
         console.warn("Could not get user location:", err.message);
-        dismiss();
         toast({ variant: 'destructive', title: 'Location Error', description: 'Could not access your location. Please check your browser settings.' });
         setLocationPromptVisible(true);
         setIsFetchingLocation(false);
