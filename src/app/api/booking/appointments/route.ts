@@ -1,14 +1,33 @@
 
 
 import { NextResponse } from "next/server";
-import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getAvailableSlotsDb } from "@/lib/db";
+import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getBusinessHoursDb, getAppointmentsForBusinessDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
-import type { Appointment } from "@/lib/db-types";
-import { addMinutes } from "date-fns";
+import type { Appointment, BusinessHour } from "@/lib/db-types";
+import { addMinutes, areIntervalsOverlapping, isBefore } from "date-fns";
+import { format, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'default-no-store';
+
+// Helper to check for overlaps
+const overlaps = (aStart: Date, aEnd: Date, bStart: Date, bEnd: Date) =>
+  aStart < bEnd && aEnd > bStart;
+
+// Helper to check if a slot is valid
+function isSlotAvailable(
+  slotStartUtc: Date,
+  slotEndUtc: Date,
+  busySlots: {start_time: string, end_time: string}[],
+  totalResources: number,
+): boolean {
+    const conflictingAppointments = busySlots.filter(b =>
+      overlaps(slotStartUtc, slotEndUtc, new Date(b.start_time), new Date(b.end_time))
+    ).length;
+    
+    return conflictingAppointments < totalResources;
+}
 
 export async function POST(req: Request) {
   try {
@@ -24,15 +43,17 @@ export async function POST(req: Request) {
         time: string; // "HH:mm"
     } = await req.json();
     
-    // Basic validation
     if (!body.business_id || !body.service_id || !body.date || !body.time) {
         return NextResponse.json({ success: false, error: "Missing required fields for appointment" }, { status: 400 });
     }
 
     // Server-side validation
-    const [service, business] = await Promise.all([
+    const [service, business, resources, businessHours, existingAppointments] = await Promise.all([
         getBusinessServiceByIdDb(body.service_id),
         getUserByIdDb(body.business_id),
+        getBusinessResourcesDb(body.business_id),
+        getBusinessHoursDb(body.business_id),
+        getAppointmentsForBusinessDb(body.business_id, body.date),
     ]);
 
     if (!service || service.user_id !== body.business_id) {
@@ -44,25 +65,22 @@ export async function POST(req: Request) {
     }
     
     const businessTimeZone = business.timezone;
-    const dateInTz = new Date(`${body.date}T${body.time}:00`);
-
-    // The Date constructor interprets the string as local time.
-    // To get the correct UTC time, we need to find the offset between the business's timezone
-    // and the server's local timezone, and adjust.
-    const utcDate = new Date(dateInTz.toLocaleString('en-US', { timeZone: 'UTC' }));
-    const tzDate = new Date(dateInTz.toLocaleString('en-US', { timeZone: businessTimeZone }));
-    const offset = utcDate.getTime() - tzDate.getTime();
+    const totalResources = resources.length > 0 ? resources.length : 1;
     
-    const startTimeInUtc = new Date(dateInTz.getTime() + offset);
-    const endTimeInUtc = addMinutes(startTimeInUtc, service.duration_minutes);
+    const slotStartInTz = zonedTimeToUtc(`${body.date} ${body.time}`, businessTimeZone);
+    const slotEndInTz = addMinutes(slotStartInTz, service.duration_minutes);
+    
+    if (isBefore(slotStartInTz, new Date())) {
+        return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
+    }
     
     // Re-verify availability on the server to prevent race conditions
-    const availableSlots = await getAvailableSlotsDb(body.business_id, body.service_id, body.date);
-    if (!availableSlots.includes(body.time)) {
+    const isStillAvailable = isSlotAvailable(slotStartInTz, slotEndInTz, existingAppointments, totalResources);
+    if (!isStillAvailable) {
         return NextResponse.json({ success: false, error: "The selected time slot is no longer available." }, { status: 409 }); // 409 Conflict
     }
 
-    const resource = await findFirstAvailableResourceDb(body.business_id, startTimeInUtc, endTimeInUtc);
+    const resource = await findFirstAvailableResourceDb(body.business_id, slotStartInTz, slotEndInTz);
     if (!resource) {
         return NextResponse.json({ success: false, error: "No available resources for this time slot." }, { status: 409 });
     }
@@ -72,8 +90,8 @@ export async function POST(req: Request) {
         business_id: body.business_id,
         service_id: body.service_id,
         resource_id: resource.id,
-        start_time: startTimeInUtc.toISOString(),
-        end_time: endTimeInUtc.toISOString(),
+        start_time: slotStartInTz.toISOString(),
+        end_time: slotEndInTz.toISOString(),
         timezone: businessTimeZone,
      });
 

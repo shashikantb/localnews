@@ -1,25 +1,11 @@
 
+// This file is no longer used and can be deleted.
+// The new availability logic is handled by /api/booking/availability/route.ts
+// and the client-side booking-dialog.tsx.
 import { NextResponse } from 'next/server';
-import { getAvailableSlotsDb } from '@/lib/db';
-
-export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
-  try {
-    const { searchParams } = new URL(req.url);
-    const businessId = Number(searchParams.get('businessId'));
-    const serviceId = Number(searchParams.get('serviceId'));
-    const date = searchParams.get('date');
-
-    if (!businessId || !serviceId || !date) {
-      return NextResponse.json({ error: 'Missing required query parameters: businessId, serviceId, date' }, { status: 400 });
-    }
-
-    const slots = await getAvailableSlotsDb(businessId, serviceId, date);
-
-    return NextResponse.json({ slots });
-  } catch (error: any) {
-    console.error('[API/slots] Error fetching available slots:', error);
-    return NextResponse.json({ error: error.message || 'Failed to fetch available slots' }, { status: 500 });
-  }
+  return NextResponse.json({
+    error: 'This endpoint is deprecated. Please use /api/booking/availability.'
+  }, { status: 410 });
 }
