@@ -28,26 +28,21 @@ function isSlotAvailable(
 }
 
 // Helper function to reliably convert local time in a given timezone to a UTC Date object
+// This replaces the faulty zonedTimeToUtc import.
 function convertToUtc(date: string, time: string, timeZone: string): Date {
   const dtString = `${date}T${time}:00`;
-  // Create a formatter to get parts, including the offset
-  const formatter = new Intl.DateTimeFormat('en-US', {
+  
+  // Create a temporary date object to get the timezone offset string.
+  // This is a robust way to handle various timezones including those with 30-min offsets.
+  const tempDate = new Date();
+  const timeZoneOffset = new Intl.DateTimeFormat('en-US', {
     timeZone,
-    year: 'numeric',
-    month: 'numeric',
-    day: 'numeric',
-    hour: 'numeric',
-    minute: 'numeric',
-    second: 'numeric',
     timeZoneName: 'longOffset',
-  });
-  
-  const parts = formatter.formatToParts(new Date());
-  const offsetPart = parts.find((part) => part.type === 'timeZoneName');
-  
-  // Example offsetPart.value: "GMT-5" or "GMT+5:30"
-  const offsetString = offsetPart ? offsetPart.value.replace('GMT', '') : '+00:00';
+  }).formatToParts(tempDate).find(part => part.type === 'timeZoneName')?.value;
 
+  // e.g., "GMT+5:30" or "GMT-4"
+  const offsetString = timeZoneOffset ? timeZoneOffset.replace('GMT', '') : '+00:00';
+  
   const isoStringWithOffset = `${dtString}${offsetString}`;
   return new Date(isoStringWithOffset);
 }
