@@ -8,7 +8,7 @@ import {
   format, setHours, setMinutes, startOfDay, getDay,
   addMinutes, isPast, isToday, areIntervalsOverlapping
 } from 'date-fns';
-import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
+import { utcToZonedTime } from 'date-fns-tz';
 
 // Re-export db-types
 export * from './db-types';
