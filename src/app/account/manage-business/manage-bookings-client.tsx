@@ -92,8 +92,12 @@ export default function ManageBookingsClient() {
         ));
     };
 
-    const upcomingAppointments = appointments.filter(a => a.status === 'confirmed').sort((a,b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime());
-    const pastAppointments = appointments.filter(a => a.status !== 'confirmed').sort((a,b) => parseISO(b.start_time).getTime() - parseISO(a.start_time).getTime());
+    const upcomingAppointments = appointments
+        .filter(a => a.status === 'confirmed')
+        .sort((a,b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime());
+    const pastAppointments = appointments
+        .filter(a => a.status !== 'confirmed')
+        .sort((a,b) => parseISO(b.start_time).getTime() - parseISO(a.start_time).getTime());
 
     return (
         <div className="flex flex-col lg:flex-row gap-6">
