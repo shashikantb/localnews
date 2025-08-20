@@ -1,8 +1,9 @@
 
 import { NextResponse } from "next/server";
-import { getAppointmentsForBusinessDb, createAppointmentDb } from "@/lib/db";
+import { getAppointmentsForBusinessDb, createAppointmentDb, getBusinessServiceByIdDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
 import type { Appointment } from "@/lib/db-types";
+import { addMinutes, setHours, setMinutes } from "date-fns";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -33,17 +34,64 @@ export async function POST(req: Request) {
       return NextResponse.json({ success:false, error:"Authentication required" }, { status:401 });
     }
 
-    const body: Omit<Appointment, 'id' | 'status' | 'created_at' | 'customer_id'> = await req.json();
+    const body: {
+        business_id: number;
+        service_id: number;
+        date: string; // "yyyy-MM-dd"
+        time: string; // "HH:mm"
+    } = await req.json();
     
     // Basic validation
-    if (!body.business_id || !body.service_id || !body.resource_id || !body.start_time || !body.end_time) {
+    if (!body.business_id || !body.service_id || !body.date || !body.time) {
         return NextResponse.json({ success: false, error: "Missing required fields for appointment" }, { status: 400 });
     }
 
-    const appt = await createAppointmentDb({ ...body, customer_id: user.id });
+    // Server-side validation
+    const service = await getBusinessServiceByIdDb(body.service_id);
+    if (!service || service.user_id !== body.business_id) {
+        return NextResponse.json({ success: false, error: "Invalid service selected." }, { status: 400 });
+    }
+
+    const availableSlots = await getAvailableSlotsDb(body.business_id, body.service_id, body.date);
+    if (!availableSlots.includes(body.time)) {
+        return NextResponse.json({ success: false, error: "The selected time slot is no longer available." }, { status: 409 }); // 409 Conflict
+    }
+
+    const [hour, minute] = body.time.split(':').map(Number);
+    const startTime = setMinutes(setHours(new Date(body.date), hour), minute);
+    const endTime = addMinutes(startTime, service.duration_minutes);
+
+    const resource = await findFirstAvailableResourceDb(body.business_id, startTime, endTime);
+    if (!resource) {
+        return NextResponse.json({ success: false, error: "No available resources for this time slot." }, { status: 409 });
+    }
+
+    const appt = await createAppointmentDb({ 
+        customer_id: user.id,
+        business_id: body.business_id,
+        service_id: body.service_id,
+        resource_id: resource.id,
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString()
+     });
+
     return NextResponse.json({ success:true, appointment: appt });
   } catch (error: any) {
     console.error('Error creating appointment:', error);
     return NextResponse.json({ success: false, error: error.message || "Failed to create appointment" }, { status: 500 });
   }
+}
+
+// These functions would need to be added to db.ts
+async function getAvailableSlotsDb(businessId: number, serviceId: number, date: string): Promise<string[]> {
+    // This is a placeholder for the real logic which you should have in db.ts
+    // For now, let's just return a few slots to test the flow
+    // In a real implementation, you'd call your `getAvailableSlotsDb` from `db.ts`
+    const { getAvailableSlotsDb: getSlots } = await import('@/lib/db');
+    return getSlots(businessId, serviceId, date);
+}
+
+async function findFirstAvailableResourceDb(businessId: number, startTime: Date, endTime: Date): Promise<{id: number} | null> {
+     const { findFirstAvailableResourceDb: findResource } = await import('@/lib/db');
+    return findResource(businessId, startTime, endTime);
 }

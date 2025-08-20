@@ -1,8 +1,13 @@
 
+
 import { Pool, Client, type QueryResult } from 'pg';
 import type { Appointment, ConversationDetails, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
 import { customAlphabet } from 'nanoid';
+import {
+  format, setHours, setMinutes, startOfDay, getDay,
+  addMinutes, isPast, isToday, areIntervalsOverlapping
+} from 'date-fns';
 
 // Re-export db-types
 export * from './db-types';
@@ -3593,4 +3598,99 @@ export async function createAppointmentDb(appointment: Omit<Appointment, 'id' | 
     } finally {
         client.release();
     }
+}
+
+// --- NEW SERVER-SIDE SLOT CALCULATION ---
+
+// Helper function to safely parse a time string "HH:MM"
+function parseTime(timeStr: string, date: Date): Date | null {
+  if (!/^\d{2}:\d{2}$/.test(timeStr)) return null;
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  if (hours > 23 || minutes > 59) return null;
+  return setMinutes(setHours(startOfDay(date), hours), minutes);
+}
+
+// DOW tolerant match
+const dowMatches = (dbDow: number, jsDow: number) => {
+  if (dbDow >= 0 && dbDow <= 6) return dbDow === jsDow; // 0..6 Sun..Sat
+  if (dbDow === 7) return jsDow === 0;                  // Sun=7
+  return (dbDow - 1) === jsDow;                         // 1..7 Mon..Sun
+};
+
+export async function getAvailableSlotsDb(businessId: number, serviceId: number, dateStr: string): Promise<string[]> {
+  await ensureDbInitialized();
+  const dbPool = getDbPool();
+  if (!dbPool) throw new Error("Database not configured.");
+  const client = await dbPool.connect();
+
+  try {
+    const selectedDate = new Date(dateStr);
+    const jsDow = getDay(selectedDate); // 0 = Sunday, 1 = Monday...
+
+    // 1. Fetch all necessary data in parallel
+    const [serviceRes, hoursRes, resourcesRes, appointmentsRes] = await Promise.all([
+      client.query('SELECT duration_minutes FROM business_services WHERE id = $1 AND user_id = $2', [serviceId, businessId]),
+      getBusinessHoursDb(businessId), // Use existing function
+      getBusinessResourcesDb(businessId), // Use existing function
+      getAppointmentsForBusinessDb(businessId, dateStr), // Use existing function
+    ]);
+
+    // 2. Validate data
+    const serviceDuration = serviceRes.rows[0]?.duration_minutes;
+    if (!serviceDuration) throw new Error("Service not found or has no duration.");
+
+    const dayHours = hoursRes.find((h: BusinessHour) => dowMatches(h.day_of_week, jsDow));
+    if (!dayHours || dayHours.is_closed || !dayHours.start_time || !dayHours.end_time) {
+      return []; // Business is closed on this day
+    }
+
+    const resources = resourcesRes.length > 0 ? resourcesRes : [{ id: 'auto-1', name: 'Seat 1' }];
+
+    // 3. Generate slots
+    const startTime = parseTime(dayHours.start_time, selectedDate);
+    const endTime = parseTime(dayHours.end_time, selectedDate);
+    if (!startTime || !endTime || !(startTime < endTime)) {
+        return []; // Invalid hours
+    }
+
+    const availableSlots: string[] = [];
+    let currentTime = startTime;
+    const bufferMinutes = 5; // 5 minute buffer
+
+    while (addMinutes(currentTime, serviceDuration) <= endTime) {
+        const slotStart = currentTime;
+        const slotEnd = addMinutes(slotStart, serviceDuration);
+
+        // Skip slots that have already passed for today
+        if (isToday(selectedDate) && isPast(slotStart)) {
+            currentTime = addMinutes(currentTime, bufferMinutes);
+            continue;
+        }
+
+        // Find how many appointments overlap with this potential slot
+        const overlappingAppointments = appointmentsRes.filter(appt => 
+            areIntervalsOverlapping(
+                { start: slotStart, end: slotEnd },
+                { start: new Date(appt.start_time), end: new Date(appt.end_time) },
+                { inclusive: false }
+            )
+        );
+
+        // If the number of overlapping appointments is less than the number of available resources, the slot is available
+        if (overlappingAppointments.length < resources.length) {
+            availableSlots.push(format(slotStart, 'HH:mm'));
+        }
+
+        // Move to the next potential slot
+        currentTime = addMinutes(currentTime, bufferMinutes);
+    }
+
+    return availableSlots;
+
+  } catch (error) {
+    console.error("Error calculating available slots:", error);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
