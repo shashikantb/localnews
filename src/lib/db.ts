@@ -3385,6 +3385,20 @@ export async function getBusinessServicesDb(userId: number): Promise<BusinessSer
   }
 }
 
+export async function getBusinessServiceByIdDb(serviceId: number): Promise<BusinessService | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+    const client = await dbPool.connect();
+    try {
+      const query = 'SELECT * FROM business_services WHERE id = $1';
+      const result = await client.query(query, [serviceId]);
+      return result.rows[0] || null;
+    } finally {
+      client.release();
+    }
+}
+
 export async function addBusinessServiceDb(userId: number, service: NewBusinessService): Promise<BusinessService> {
   await ensureDbInitialized();
   const dbPool = getDbPool();
@@ -3599,6 +3613,30 @@ export async function createAppointmentDb(appointment: Omit<Appointment, 'id' | 
         client.release();
     }
 }
+
+export async function findFirstAvailableResourceDb(businessId: number, startTime: Date, endTime: Date): Promise<{id: number} | null> {
+    await ensureDbInitialized();
+    const dbPool = getDbPool();
+    if (!dbPool) return null;
+    const client = await dbPool.connect();
+    try {
+        const query = `
+            SELECT r.id FROM business_resources r
+            WHERE r.user_id = $1
+            AND NOT EXISTS (
+                SELECT 1 FROM appointments a
+                WHERE a.resource_id = r.id
+                AND a.start_time < $3 AND a.end_time > $2
+            )
+            LIMIT 1;
+        `;
+        const result = await client.query(query, [businessId, startTime, endTime]);
+        return result.rows[0] || null;
+    } finally {
+        client.release();
+    }
+}
+
 
 // --- NEW SERVER-SIDE SLOT CALCULATION ---
 
