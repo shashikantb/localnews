@@ -1,9 +1,9 @@
 
-
 import { NextResponse } from "next/server";
-import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getBusinessHoursDb, getAppointmentsForBusinessDb, getBusinessResourcesDb } from "@/lib/db";
+import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirstAvailableResourceDb, getAppointmentsForBusinessDb, getBusinessResourcesDb } from "@/lib/db";
 import { getSession } from "@/app/auth/actions";
 import { addMinutes, isBefore } from "date-fns";
+import { zonedTimeToUtc } from "date-fns-tz";
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -64,23 +64,23 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
     const totalResources = resources.length > 0 ? resources.length : 1;
     
-    // Construct a naive date object representing the local time selected by the user
-    // IMPORTANT: This creates a Date object in the SERVER's timezone.
-    const slotStart = new Date(`${body.date}T${body.time}:00`);
+    // --- THIS IS THE FIX ---
+    // Correctly convert the selected local time in the business's timezone to a UTC Date object.
+    const slotStartUtc = zonedTimeToUtc(`${body.date} ${body.time}`, businessTimeZone);
 
-    if (isBefore(slotStart, new Date())) {
+    if (isBefore(new Date(), slotStartUtc)) {
         return NextResponse.json({ success: false, error: "Cannot book an appointment in the past." }, { status: 409 });
     }
     
-    const slotEnd = addMinutes(slotStart, service.duration_minutes);
+    const slotEndUtc = addMinutes(slotStartUtc, service.duration_minutes);
 
     // Re-verify availability on the server to prevent race conditions
-    const isStillAvailable = isSlotAvailable(slotStart, slotEnd, existingAppointments, totalResources);
+    const isStillAvailable = isSlotAvailable(slotStartUtc, slotEndUtc, existingAppointments, totalResources);
     if (!isStillAvailable) {
         return NextResponse.json({ success: false, error: "The selected time slot is no longer available." }, { status: 409 }); // 409 Conflict
     }
 
-    const resource = await findFirstAvailableResourceDb(body.business_id, slotStart, slotEnd);
+    const resource = await findFirstAvailableResourceDb(body.business_id, slotStartUtc, slotEndUtc);
     if (!resource) {
         return NextResponse.json({ success: false, error: "No available resources for this time slot." }, { status: 409 });
     }
@@ -90,8 +90,8 @@ export async function POST(req: Request) {
         business_id: body.business_id,
         service_id: body.service_id,
         resource_id: resource.id,
-        start_time: slotStart.toISOString(),
-        end_time: slotEnd.toISOString(),
+        start_time: slotStartUtc.toISOString(),
+        end_time: slotEndUtc.toISOString(),
         timezone: businessTimeZone,
      });
 
