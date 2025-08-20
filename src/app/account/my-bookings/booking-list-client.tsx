@@ -116,10 +116,14 @@ export default function BookingListClient({ initialBookings }: BookingListClient
 
     const { upcoming, past } = useMemo(() => {
         const now = Date.now();
-        const upcomingBookings = normalizedBookings.filter(b => b.status === 'confirmed' && b.__startMs >= now)
-                                        .sort((a,b) => a.__startMs - b.__startMs);
-        const pastBookings = normalizedBookings.filter(b => b.status !== 'confirmed' || b.__startMs < now)
-                                     .sort((a,b) => b.__startMs - a.__startMs);
+        const upcomingBookings = normalizedBookings
+            .filter(b => b.status === 'confirmed' && b.__startMs >= now)
+            .sort((a,b) => a.__startMs - b.__startMs);
+            
+        const pastBookings = normalizedBookings
+            .filter(b => b.status !== 'confirmed' || b.__startMs < now)
+            .sort((a,b) => b.__startMs - a.__startMs);
+
         return { upcoming: upcomingBookings, past: pastBookings };
     }, [normalizedBookings]);
 
