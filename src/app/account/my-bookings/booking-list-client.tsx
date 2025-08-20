@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { toMs } from '@/lib/toMs';
 
 const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (id: number) => void }> = ({ appointment, onCancel }) => {
     const [isCancelling, startTransition] = useTransition();
@@ -106,14 +107,21 @@ export default function BookingListClient({ initialBookings }: BookingListClient
         setBookings(prev => prev.map(b => b.id === appointmentId ? { ...b, status: 'cancelled' } : b));
     };
 
+    const normalizedBookings = useMemo(() => 
+        (bookings ?? []).map((b) => ({
+            ...b,
+            __startMs: toMs(b.start_time),
+        })), 
+    [bookings]);
+
     const { upcoming, past } = useMemo(() => {
-        const now = new Date();
-        const upcomingBookings = bookings.filter(b => b.status === 'confirmed' && parseISO(b.start_time) >= now)
-                                        .sort((a,b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime());
-        const pastBookings = bookings.filter(b => b.status !== 'confirmed' || parseISO(b.start_time) < now)
-                                     .sort((a,b) => parseISO(b.start_time).getTime() - parseISO(a.start_time).getTime());
+        const now = Date.now();
+        const upcomingBookings = normalizedBookings.filter(b => b.status === 'confirmed' && b.__startMs >= now)
+                                        .sort((a,b) => a.__startMs - b.__startMs);
+        const pastBookings = normalizedBookings.filter(b => b.status !== 'confirmed' || b.__startMs < now)
+                                     .sort((a,b) => b.__startMs - a.__startMs);
         return { upcoming: upcomingBookings, past: pastBookings };
-    }, [bookings]);
+    }, [normalizedBookings]);
 
 
     if (bookings.length === 0) {

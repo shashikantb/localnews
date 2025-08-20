@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useTransition } from 'react';
+import React, { useState, useEffect, useTransition, useMemo } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { getAppointmentsForBusiness, updateAppointmentStatus } from './actions';
 import type { BusinessAppointment, AppointmentStatus } from '@/lib/db-types';
@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toMs } from '@/lib/toMs';
 
 const AppointmentCard: React.FC<{ appointment: BusinessAppointment, onStatusChange: (id: number, status: AppointmentStatus) => void; isUpdating: boolean; }> = ({ appointment, onStatusChange, isUpdating }) => {
     const { toast } = useToast();
@@ -93,12 +94,25 @@ export default function ManageBookingsClient() {
         ));
     };
 
-    const upcomingAppointments = appointments
-        .filter(a => a.status === 'confirmed')
-        .sort((a,b) => parseISO(a.start_time).getTime() - parseISO(b.start_time).getTime());
-    const pastAppointments = appointments
-        .filter(a => a.status !== 'confirmed')
-        .sort((a,b) => parseISO(b.start_time).getTime() - parseISO(a.start_time).getTime());
+    const normalizedAppointments = useMemo(() => {
+        return (appointments ?? []).map((appt) => ({
+            ...appt,
+            __startMs: toMs(appt.start_time),
+        }));
+    }, [appointments]);
+
+    const upcomingAppointments = useMemo(() => 
+        normalizedAppointments
+            .filter(a => a.status === 'confirmed')
+            .sort((a,b) => a.__startMs - b.__startMs),
+        [normalizedAppointments]
+    );
+    const pastAppointments = useMemo(() =>
+        normalizedAppointments
+            .filter(a => a.status !== 'confirmed')
+            .sort((a,b) => b.__startMs - a.__startMs),
+        [normalizedAppointments]
+    );
 
     return (
         <div className="flex flex-col lg:flex-row gap-6">
