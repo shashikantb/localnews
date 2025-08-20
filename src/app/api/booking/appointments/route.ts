@@ -5,7 +5,6 @@ import { createAppointmentDb, getBusinessServiceByIdDb, getUserByIdDb, findFirst
 import { getSession } from "@/app/auth/actions";
 import type { Appointment, BusinessHour } from "@/lib/db-types";
 import { addMinutes, areIntervalsOverlapping, isBefore } from "date-fns";
-import { format, zonedTimeToUtc, utcToZonedTime } from 'date-fns-tz';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -67,7 +66,8 @@ export async function POST(req: Request) {
     const businessTimeZone = business.timezone;
     const totalResources = resources.length > 0 ? resources.length : 1;
     
-    const slotStartInTz = zonedTimeToUtc(`${body.date} ${body.time}`, businessTimeZone);
+    // Correctly create a UTC date object from the local time string and timezone.
+    const slotStartInTz = new Date(`${body.date}T${body.time}:00`);
     const slotEndInTz = addMinutes(slotStartInTz, service.duration_minutes);
     
     if (isBefore(slotStartInTz, new Date())) {

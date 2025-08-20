@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -11,7 +12,6 @@ import {
 import { Loader2, Calendar as CalendarIcon, ChevronLeft, Check, ArrowRight } from 'lucide-react';
 import { Calendar } from '@/components/ui/calendar';
 import { format, isBefore, addMinutes } from 'date-fns';
-import { utcToZonedTime, zonedTimeToUtc } from 'date-fns-tz';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
@@ -48,15 +48,16 @@ function buildSlotsForWindow(
   durationMin: number,
   stepMin: number
 ): Date[] {
-  const startUtc = zonedTimeToUtc(`${dateISO} ${windowStartHHmm}`, tz);
-  const endUtc = zonedTimeToUtc(`${dateISO} ${windowEndHHmm}`, tz);
-
   const slots: Date[] = [];
-  for (let s = startUtc; addMinutes(s, durationMin) <= endUtc; s = addMinutes(s, stepMin)) {
+  const startLocal = new Date(`${dateISO}T${windowStartHHmm}:00`);
+  const endLocal = new Date(`${dateISO}T${windowEndHHmm}:00`);
+
+  for (let s = startLocal; addMinutes(s, durationMin) <= endLocal; s = addMinutes(s, stepMin)) {
     slots.push(new Date(s));
   }
   return slots;
 }
+
 
 // Filters out past and conflicting slots
 function filterAvailable(
@@ -66,12 +67,11 @@ function filterAvailable(
   busySlots: BusySlot[],
   totalResources: number,
 ) {
-  const nowInTz = utcToZonedTime(new Date(), tz);
+  const now = new Date();
 
   return slotsUtc.filter((slotStartUtc) => {
-    // 1) Hide past slots in the business's timezone
-    const slotStartInTz = utcToZonedTime(slotStartUtc, tz);
-    if (isBefore(slotStartInTz, nowInTz)) {
+    // 1) Hide past slots
+    if (isBefore(slotStartUtc, now)) {
       return false;
     }
 

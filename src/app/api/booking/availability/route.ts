@@ -1,7 +1,11 @@
 
+
 import { NextRequest, NextResponse } from 'next/server';
 import { Pool } from 'pg';
-import { zonedTimeToUtc } from 'date-fns-tz';
+
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const fetchCache = 'default-no-store';
 
 // This is a simplified connection setup. In your actual app, you'd reuse the db connection logic from @/lib/db.ts
 const pool = new Pool({
@@ -26,8 +30,10 @@ export async function GET(req: NextRequest) {
     // day window in UTC for DB query
     const dayStartTz = `${date} 00:00:00`;
     const dayEndTz   = `${date} 23:59:59`;
-    const dayStartUtc = zonedTimeToUtc(dayStartTz, tz);
-    const dayEndUtc   = zonedTimeToUtc(dayEndTz, tz);
+
+    // Correctly create a UTC date object from the local time string and timezone.
+    const dayStartUtc = new Date(dayStartTz);
+    const dayEndUtc   = new Date(dayEndTz);
 
     // get all confirmed bookings overlapping that day
     const q = `
