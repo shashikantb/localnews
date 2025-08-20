@@ -52,11 +52,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ success: false, error: "Invalid service selected." }, { status: 400 });
     }
 
-    // The date and time are combined into a single string that represents the local time of the event.
-    // E.g., '2024-08-15' and '14:30' become '2024-08-15T14:30:00'.
-    // new Date() will parse this as a local time string. toISOString() then correctly converts it to UTC for storage.
-    const localDateTimeString = `${body.date}T${body.time}:00`;
-    const startTime = new Date(localDateTimeString);
+    // The date and time are combined into a single string that represents the UTC time of the event.
+    // Appending 'Z' tells the Date constructor to parse this as UTC, not local time.
+    // E.g., '2024-08-15' and '14:30' become '2024-08-15T14:30:00Z'.
+    // toISOString() then correctly formats it for storage.
+    const utcDateTimeString = `${body.date}T${body.time}:00Z`;
+    const startTime = new Date(utcDateTimeString);
     const endTime = addMinutes(startTime, service.duration_minutes);
 
     const availableSlots = await getAvailableSlotsDb(body.business_id, body.service_id, body.date);
