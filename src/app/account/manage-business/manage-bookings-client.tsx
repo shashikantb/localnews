@@ -5,7 +5,7 @@ import React, { useState, useEffect, useTransition, useMemo } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { getAppointmentsForBusiness, updateAppointmentStatus } from './actions';
 import type { BusinessAppointment, AppointmentStatus } from '@/lib/db-types';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -56,7 +56,7 @@ const AppointmentCard: React.FC<{ appointment: BusinessAppointment, onStatusChan
             <div className="flex flex-col items-start sm:items-end gap-2">
                  <div className="text-sm font-medium flex items-center gap-2">
                     <Clock className="w-4 h-4 text-primary"/>
-                    {format(parseISO(appointment.start_time), 'h:mm a')} - {format(parseISO(appointment.end_time), 'h:mm a')}
+                    {format(new Date(toMs(appointment.start_time)), 'h:mm a')} - {format(new Date(toMs(appointment.end_time)), 'h:mm a')}
                  </div>
                  <div className="flex items-center gap-2">
                     <Badge variant={getStatusVariant(appointment.status)} className="capitalize">{appointment.status}</Badge>

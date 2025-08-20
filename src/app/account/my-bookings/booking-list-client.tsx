@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Loader2, Calendar, Clock, Tag, Building, XCircle, CheckCircle } from 'lucide-react';
 import {
   AlertDialog,
@@ -41,7 +41,8 @@ const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (i
         });
     };
     
-    const isUpcoming = appointment.status === 'confirmed' && new Date(appointment.start_time) > new Date();
+    const isUpcoming = appointment.status === 'confirmed' && toMs(appointment.start_time) > Date.now();
+    const startDate = new Date(toMs(appointment.start_time));
 
     return (
         <Card className="shadow-lg border-border/60">
@@ -64,8 +65,8 @@ const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (i
                 </div>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
-                <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(parseISO(appointment.start_time), 'EEEE, MMMM d, yyyy')}</span></div>
-                <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(parseISO(appointment.start_time), 'h:mm a')}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Calendar className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(startDate, 'EEEE, MMMM d, yyyy')}</span></div>
+                <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(startDate, 'h:mm a')}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Tag className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">₹{appointment.price}</span></div>
             </CardContent>
             {isUpcoming && (
