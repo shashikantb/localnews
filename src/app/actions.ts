@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import * as db from '@/lib/db';
@@ -10,7 +9,6 @@ import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
 import admin, { getAi } from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
-import { seedContent } from '@/ai/flows/seed-content-flow';
 import ngeohash from "ngeohash";
 import { z } from 'zod';
 
@@ -1537,38 +1535,6 @@ export async function markFamilyFeedAsRead() {
         }
     } catch (error: any) {
         console.error("Server action error marking family feed as read:", error);
-    }
-}
-
-// --- Live Seeding Action ---
-export async function triggerLiveSeeding(latitude: number, longitude: number): Promise<void> {
-    try {
-        const liveSeedingEnabled = await db.getAppSettingDb('live_seeding_enabled');
-        if (liveSeedingEnabled !== 'true') {
-            return;
-        }
-
-        const seedKey = ngeohash.encode(latitude, longitude, 6);
-        const lastSeedTime = await db.getLastSeedTimeDb(seedKey);
-        const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
-        
-        const lowContent = (await db.countRecentPostsNearbyDb(latitude, longitude, 12, 6)) < 3;
-        
-        if (!lastSeedTime || new Date(lastSeedTime) < twoHoursAgo || lowContent) {
-            console.log(`[seed] trigger ${seedKey} lat=${latitude} lon=${longitude} lowContent=${lowContent}`);
-            
-            const result = await seedContent({ latitude, longitude });
-            
-            if (result.success) {
-                await db.updateLastSeedTimeDb(seedKey);
-                console.log(`[seed] success ${seedKey} city=${result.cityName} count=${result.postCount}`);
-                revalidatePath('/'); // Revalidate after successful seeding
-            } else {
-                console.error(`[seed] failed ${seedKey}: ${result.message}`);
-            }
-        }
-    } catch (error) {
-        console.error('Error in triggerLiveSeeding action:', error);
     }
 }
 

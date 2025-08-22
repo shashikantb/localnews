@@ -43,11 +43,6 @@ GOOGLE_GENAI_API_KEY=your_google_genai_api_key
 FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ...}'
 
 
-# --- SerpApi API Key (MANDATORY for AI Content Seeding) ---
-# This key is required for the content seeding feature to perform live web searches for news.
-# Get your key from https://serpapi.com/
-SERPAPI_API_KEY=your_serpapi_api_key
-
 # --- SendGrid API Key (MANDATORY for OTP Emails) ---
 # This is required to send transactional emails for user registration.
 # Get your key from https://sendgrid.com/

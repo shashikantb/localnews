@@ -17,7 +17,6 @@ const navItems = [
   { href: '/admin/approvals', label: 'Manual Approvals', icon: UserCheckIcon },
   { href: '/admin/verification', label: 'Business Verification', icon: BadgeCheck },
   { href: '/admin/notifications', label: 'Notifications', icon: Bell },
-  { href: '/admin/seeding', label: 'Content Seeding', icon: DatabaseZap },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
