@@ -1,3 +1,4 @@
+
 # Firebase Studio (LocalPulse)
 
 This is a NextJS starter application, configured to use PostgreSQL as its database.
@@ -31,39 +32,43 @@ POSTGRES_SSL=true
 # You can generate a strong secret with the command: openssl rand -hex 32
 JWT_SECRET=your_super_secret_jwt_key_here
 
-# --- Genkit AI Helper (MANDATORY for AI features) ---
-# This key is required to power the "AI Local Helper" feature.
-# It allows the app to connect to Google's Gemini models.
+# --- Genkit & Firebase Admin (MANDATORY for AI & Notification features) ---
+# This key is required to power AI features and to send push notifications.
 # Get your key from Google AI Studio: https://aistudio.google.com/app/apikey
-#
-# COST: The Gemini API has a generous free tier. For many apps, especially
-# during development and early stages, usage will likely fall within this
-# free tier, meaning there is no cost. You only pay for what you use
-# above the free limit, and this requires setting up a billing account.
 GOOGLE_GENAI_API_KEY=your_google_genai_api_key
 
-# SerpApi API Key (MANDATORY for AI Content Seeding)
-# This key is required for the content seeding feature to perform live web searches for news.
-# Get your key from https://serpapi.com/
-SERPAPI_API_KEY=your_serpapi_api_key
+# This is the full JSON content of the service account key from your Firebase project.
+# It's used by the server to send push notifications securely.
+# Go to Firebase Console > Project Settings > Service accounts > Generate new private key
+# Store this as a single-line string in your .env.local file or a secret manager.
+FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ...}'
 
-# Admin Credentials (change these for production)
+
+# --- SendGrid API Key (MANDATORY for OTP Emails) ---
+# This is required to send transactional emails for user registration.
+# Get your key from https://sendgrid.com/
+SENDGRID_API_KEY=your_sendgrid_api_key
+# This should be an email address you have verified as a "Single Sender" in SendGrid.
+SENDGRID_FROM_EMAIL=your_verified_sender@example.com
+
+
+# --- Admin Credentials (change these for production) ---
 ADMIN_USERNAME=admin
 ADMIN_PASSWORD=password123
 
-# Official User Password (Optional)
+# --- Official User Password (Optional) ---
 # Set this if you want to be able to log in as the official@localpulse.in user.
 # If not set, the account will be locked and cannot be logged into.
 OFFICIAL_USER_PASSWORD=your_official_user_password
 
 # --- Firebase Configuration (for Web Push Notifications) ---
-# This is required for handling notification clicks on the web.
+# This is required for handling notification clicks on the web and in the WebView.
 # To find these values:
 # 1. Go to your Firebase project: https://console.firebase.google.com/
 # 2. Go to Project Settings (click the gear icon).
 # 3. Under the "General" tab, scroll down to "Your apps".
 # 4. If you haven't already, add a "Web" app.
-# 5. In the app's configuration, you will find these values.
+# 5. In the app's configuration (select 'Config'), you will find these values.
 NEXT_PUBLIC_FIREBASE_API_KEY="your-api-key"
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN="your-auth-domain"
 NEXT_PUBLIC_FIREBASE_PROJECT_ID="your-project-id"
@@ -72,6 +77,18 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID="your-messaging-sender-id"
 NEXT_PUBLIC_FIREBASE_APP_ID="your-app-id"
 # Add this key for web push notifications. Find it in Firebase Console > Project Settings > Cloud Messaging > Web configuration > Key pair
 NEXT_PUBLIC_FIREBASE_VAPID_KEY="your-web-push-certificate-key-pair"
+
+# --- Google Cloud Storage (for File Uploads) ---
+# The name of your GCS bucket for storing uploads.
+GCS_BUCKET_NAME=your-gcs-bucket-name
+
+# For local development ONLY: Path to the service account key file for GCS.
+# In production on Cloud Run, use GCS_SERVICE_ACCOUNT_JSON instead.
+# GOOGLE_APPLICATION_CREDENTIALS=/path/to/your/gcs-service-account.json
+
+# For production on Cloud Run: The full JSON content of your GCS service account key.
+# This should be stored as a secret in your deployment environment.
+GCS_SERVICE_ACCOUNT_JSON='{"type": "service_account", ...}'
 ```
 
 **Important Notes:**
@@ -206,3 +223,13 @@ The solution is to force your browser to load the latest version of the applicat
 - On Mac: Press `Cmd+Shift+R`.
 
 This will clear the cache for the page and resolve the mismatch.
+
+## Developer Notes
+
+Remember, the XML structure you generate is the only mechanism for applying changes to the user's code. Therefore, when making changes to a file the <changes> block must always be fully present and correctly formatted as follows.
+
+<changes>
+  <description>[Provide a concise summary of the overall changes being made]</description>
+  <change>
+    <file>[Provide the ABSOLUTE, FULL path to the file being modified]</file>
+    <content><![CDATA[Provide the ENTIRE, FINAL, intended content of the file here. Do NOT provide diffs or partial snippets. Ensure all code is properly escaped within the CDATA section.

@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { adminLogout } from '@/app/admin/actions';
-import { LayoutDashboard, FileText, Users, LogOut, Settings, ShieldCheck, Bell, BadgeCheck, DatabaseZap, UserCheck as UserCheckIcon } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, LogOut, Settings, ShieldCheck, Bell, BadgeCheck, UserCheck as UserCheckIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
