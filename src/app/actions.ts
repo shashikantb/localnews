@@ -7,12 +7,10 @@ import { revalidatePath } from 'next/cache';
 import { getSession, encrypt } from '@/app/auth/actions';
 import { redirect } from 'next/navigation';
 import { cookies } from 'next/headers';
-import admin, { getAi } from '@/utils/firebaseAdmin';
+import admin from '@/utils/firebaseAdmin';
 import { getGcsBucketName, getGcsClient } from '@/lib/gcs';
 import ngeohash from "ngeohash";
 import { z } from 'zod';
-
-const ai = getAi();
 
 type NominatimAddr = {
   neighbourhood?: string;
@@ -1667,4 +1665,9 @@ export async function createAppointment(appointment: Omit<Appointment, 'id' | 's
         console.error("Error creating appointment:", error);
         return { success: false, error: error.message };
     }
+}
+
+// Dummy function to prevent tree-shaking from removing AI-related code if no flows are present.
+export function _keepAI() {
+    return null;
 }

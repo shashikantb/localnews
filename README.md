@@ -31,17 +31,15 @@ POSTGRES_SSL=true
 # You can generate a strong secret with the command: openssl rand -hex 32
 JWT_SECRET=your_super_secret_jwt_key_here
 
-# --- Genkit & Firebase Admin (MANDATORY for AI & Notification features) ---
-# This key is required to power AI features and to send push notifications.
-# Get your key from Google AI Studio: https://aistudio.google.com/app/apikey
-GOOGLE_GENAI_API_KEY=your_google_genai_api_key
-
-# This is the full JSON content of the service account key from your Firebase project.
+# --- Firebase Admin (MANDATORY for Notification features) ---
+# This is the full JSON content of the service account key from your Firebase project, encoded in Base64.
 # It's used by the server to send push notifications securely.
-# Go to Firebase Console > Project Settings > Service accounts > Generate new private key
-# Store this as a single-line string in your .env.local file or a secret manager.
-FIREBASE_SERVICE_ACCOUNT_JSON='{"type": "service_account", "project_id": ...}'
-
+# 1. Go to Firebase Console > Project Settings > Service accounts > Generate new private key
+# 2. Open the downloaded JSON file.
+# 3. Copy the ENTIRE JSON content.
+# 4. Use an online tool or command line to Base64-encode the content.
+# 5. Paste the resulting single-line Base64 string here.
+LP_FIREBASE_SERVICE_ACCOUNT_B64=ey...
 
 # --- SendGrid API Key (MANDATORY for OTP Emails) ---
 # This is required to send transactional emails for user registration.
