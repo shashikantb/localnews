@@ -19,7 +19,7 @@ const BusinessCard: FC<BusinessCardProps> = ({ business, sessionUser, userLocati
     return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
   };
 
-  const distanceInKm = business.distance ? (business.distance / 1000).toFixed(1) : null;
+  const distanceInMeters = business.distance;
   const isVerified = business.status === 'verified';
 
   return (
@@ -32,7 +32,7 @@ const BusinessCard: FC<BusinessCardProps> = ({ business, sessionUser, userLocati
               <AvatarFallback className="text-2xl bg-muted">{getInitials(business.name)}</AvatarFallback>
             </Avatar>
           </Link>
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 space-y-1">
             <Link href={`/users/${business.id}`}>
               <CardTitle className="flex items-center gap-2 text-primary text-xl">
                   {business.name}
@@ -41,16 +41,23 @@ const BusinessCard: FC<BusinessCardProps> = ({ business, sessionUser, userLocati
                   )}
               </CardTitle>
             </Link>
-            <CardDescription className="flex items-center gap-1.5 mt-1">
+            <CardDescription className="flex items-center gap-1.5">
               <Briefcase className="w-4 h-4" />
               {business.business_category === 'Any Other' ? business.business_other_category : business.business_category}
             </CardDescription>
-            {distanceInKm !== null && (
-                <p className="text-xs text-accent font-semibold flex items-center gap-1.5 mt-1">
-                    <MapPin className="w-3 h-3"/>
-                    Approx. {distanceInKm} km away
-                </p>
-            )}
+             {business.latitude && business.longitude && (
+              <a href={`https://www.google.com/maps?q=${business.latitude},${business.longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground hover:text-primary group">
+                 <MapPin className="w-4 h-4 text-primary/70 flex-shrink-0 transition-colors group-hover:text-primary" />
+                 <span className="font-medium transition-colors group-hover:underline">
+                    Location: {business.latitude.toFixed(3)}, {business.longitude.toFixed(3)}
+                 </span>
+                 {distanceInMeters !== null && distanceInMeters !== undefined && (
+                     <span className="ml-1 text-accent font-semibold transition-colors group-hover:underline">
+                        (approx. {distanceInMeters < 100 ? '<100m' : `${(distanceInMeters / 1000).toFixed(1)} km`} away)
+                     </span>
+                 )}
+              </a>
+             )}
           </div>
         </div>
       </CardHeader>
