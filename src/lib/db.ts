@@ -2488,8 +2488,10 @@ export async function getNearbyBusinessesDb(options: {
 
     let categoryFilter = '';
     if (category) {
-        queryParams.push(category);
-        categoryFilter = `AND business_category = $${queryParams.length}`;
+        // The category might be a comma-separated list of subcategories
+        const categories = category.split(',');
+        categoryFilter = `AND business_category = ANY($${queryParams.length + 1}::text[])`;
+        queryParams.push(categories);
     }
 
     const distanceCalc = `earth_distance(ll_to_earth(latitude, longitude), ll_to_earth($1, $2))`;

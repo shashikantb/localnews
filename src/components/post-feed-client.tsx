@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { type FC } from 'react';
@@ -10,7 +9,7 @@ import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, upd
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors, Map, List, CalendarCheck } from 'lucide-react';
+import { Zap, Loader2, Bell, BellOff, BellRing, AlertTriangle, Users, Rss, Filter, Briefcase, PartyPopper, LocateFixed, HandPlatter, ArrowLeft, Wind, Scissors, Map, List, CalendarCheck, Wrench, Car, Home as HomeIcon } from 'lucide-react';
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { useSwipeable } from 'react-swipeable';
@@ -165,6 +164,13 @@ interface PostFeedClientProps {
   initialPosts: Post[];
 }
 
+const serviceCategories = [
+    { name: 'Personal Care', icon: Scissors, description: "Saloons, Barbers, Spas", subcategories: ["Saloon / Barber Shop", "Beauty Parlour", "Spa / Massage Center", "Mehendi / Tattoo Artist"] },
+    { name: 'Vehicle Services', icon: Car, description: "Washing, Detailing", subcategories: ["Car/Bike Washing"] },
+    { name: 'Home Services', icon: HomeIcon, description: "Electricians, Plumbers", subcategories: ["Electrician", "Plumber", "Carpenter", "Painter", "Civil Worker / Mason", "AC / Refrigerator Mechanic", "CCTV Installer", "RO / Water Purifier Service", "Gas Stove Repair"] },
+    { name: 'Professional Services', icon: Wrench, description: "Repairs, Laundry, etc.", subcategories: ["Computer Repair & Service", "Laundry / Dry Cleaning", "Courier Service"] }
+];
+
 const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) => {
   const { toast } = useToast();
   const searchParams = useSearchParams();
@@ -187,9 +193,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const [locationPromptVisible, setLocationPromptVisible] = useState(false);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   
-  const [selectedService, setSelectedService] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-
   const businessInitialLoad = useRef(false);
 
 
@@ -316,7 +321,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchPosts('family', 1, sortBy, location);
       }
     } else if (newTab === 'services') {
-        setSelectedService(null);
+        setSelectedCategory(null);
         setBusinessFeed(initialBusinessFeedState); 
         if (!location) {
             setLocationPromptVisible(true);
@@ -485,7 +490,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const renderServiceCategories = () => (
     <div className="space-y-6">
         <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold text-primary tracking-tight">Select a Service</h2>
+            <h2 className="text-2xl font-bold text-primary tracking-tight">Book a Service</h2>
             {sessionUser && (
                 <Button variant="outline" asChild>
                     <Link href="/account/my-bookings">
@@ -495,16 +500,21 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             )}
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Card onClick={() => { setSelectedService('Saloon / Barber Shop'); fetchBusinesses(1, 'Saloon / Barber Shop'); }} className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200">
-                <Scissors className="h-12 w-12 text-accent mb-3"/>
-                <p className="font-semibold text-lg">Saloon</p>
-                <p className="text-sm text-muted-foreground">Haircuts, Shaving, Styling</p>
-            </Card>
-            <Card onClick={() => { setSelectedService('Car/Bike Washing'); fetchBusinesses(1, 'Car/Bike Washing'); }} className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200">
-                <Wind className="h-12 w-12 text-accent mb-3"/>
-                <p className="font-semibold text-lg">Car/Bike Washing</p>
-                <p className="text-sm text-muted-foreground">Cleaning, Polishing, Detailing</p>
-            </Card>
+            {serviceCategories.map((category) => (
+                <Card
+                    key={category.name}
+                    onClick={() => {
+                        const categoryString = category.subcategories.join(',');
+                        setSelectedCategory(categoryString);
+                        fetchBusinesses(1, categoryString);
+                    }}
+                    className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200"
+                >
+                    <category.icon className="h-12 w-12 text-accent mb-3"/>
+                    <p className="font-semibold text-lg">{category.name}</p>
+                    <p className="text-sm text-muted-foreground">{category.description}</p>
+                </Card>
+            ))}
         </div>
     </div>
   );
@@ -515,7 +525,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     }
 
     if (activeTab === 'services') {
-        if (!selectedService) {
+        if (!selectedCategory) {
             return renderServiceCategories();
         }
 
@@ -542,9 +552,9 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         return (
             <div className="space-y-6">
                 <div className="flex justify-between items-center mb-2">
-                    <Button variant="ghost" onClick={() => setSelectedService(null)}>
+                    <Button variant="ghost" onClick={() => setSelectedCategory(null)}>
                         <ArrowLeft className="mr-2 h-4 w-4"/>
-                        Back to Services
+                        Back to Categories
                     </Button>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm" asChild>
                       <Link href="/map">
@@ -654,7 +664,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                 activeKey={activeTab}
             />
             <div className="flex items-center gap-2">
-              {activeTab === 'services' && selectedService && (
+              {activeTab === 'services' && selectedCategory && (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">
