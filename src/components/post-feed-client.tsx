@@ -6,7 +6,7 @@ import React, { type FC } from 'react';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import type { Post, User, SortOption, BusinessUser } from '@/lib/db-types';
-import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, updateUserLocation, getUnreadFamilyPostCount, markFamilyFeedAsRead, triggerLiveSeeding } from '@/app/actions';
+import { getPosts, getFamilyPosts, getNearbyBusinesses, registerDeviceToken, updateUserLocation, getUnreadFamilyPostCount, markFamilyFeedAsRead } from '@/app/actions';
 import { PostCard } from '@/components/post-card';
 import { PostFeedSkeleton } from '@/components/post-feed-skeleton';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -189,7 +189,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   
   const [selectedService, setSelectedService] = useState<string | null>(null);
   
-  const liveSeedingTriggered = useRef(false);
+
   const businessInitialLoad = useRef(false);
 
 
@@ -285,11 +285,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         setLocation(newLocation);
         setIsFetchingLocation(false);
         
-        if (!liveSeedingTriggered.current) {
-          triggerLiveSeeding(newLocation.latitude, newLocation.longitude);
-          liveSeedingTriggered.current = true;
-        }
-
         if (sessionUser) {
           updateUserLocation(newLocation.latitude, newLocation.longitude).catch(err => console.warn("Silent location update failed:", err));
         }
