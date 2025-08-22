@@ -1,5 +1,4 @@
 
-
 import { z } from 'zod';
 
 export type UserRole = 'Business' | 'Gorakshak' | 'Gorakshak Admin' | 'Admin' | 'Public(जनता)';
@@ -483,6 +482,8 @@ export interface BusinessAppointment extends Appointment {
 export interface CustomerAppointment extends Appointment {
     business_name: string;
     business_avatar: string | null;
+    business_latitude: number | null;
+    business_longitude: number | null;
     service_name: string;
     price: number;
     resource_name: string;

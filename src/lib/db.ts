@@ -1,5 +1,4 @@
 
-
 import { Pool, Client, type QueryResult } from 'pg';
 import type { Appointment, BusinessAppointment, ConversationDetails, CustomerAppointment, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource, AppointmentStatus } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
@@ -3647,6 +3646,8 @@ export async function getAppointmentsForCustomerDb(customerId: number): Promise<
             a.*,
             b.name as business_name,
             b.profilepictureurl as business_avatar,
+            b.latitude as business_latitude,
+            b.longitude as business_longitude,
             s.name as service_name,
             s.price,
             r.name as resource_name

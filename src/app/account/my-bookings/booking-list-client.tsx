@@ -10,7 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { format } from 'date-fns';
-import { Loader2, Calendar, Clock, Tag, Building, XCircle, CheckCircle, Armchair } from 'lucide-react';
+import { Loader2, Calendar, Clock, Tag, Building, XCircle, CheckCircle, Armchair, MapPin } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -69,6 +69,14 @@ const AppointmentCard: React.FC<{ appointment: CustomerAppointment, onCancel: (i
                 <div className="flex items-center gap-2 text-muted-foreground"><Clock className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{format(startDate, 'h:mm a')}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Armchair className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">{appointment.resource_name}</span></div>
                 <div className="flex items-center gap-2 text-muted-foreground"><Tag className="w-4 h-4 text-primary" /> <span className="font-semibold text-foreground">₹{appointment.price}</span></div>
+                {appointment.business_latitude && appointment.business_longitude && (
+                     <a href={`https://www.google.com/maps?q=${appointment.business_latitude},${appointment.business_longitude}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 text-muted-foreground pt-1 group">
+                        <MapPin className="w-4 h-4 text-primary group-hover:text-accent" /> 
+                        <span className="font-semibold text-foreground group-hover:underline group-hover:text-accent">
+                            View Directions
+                        </span>
+                    </a>
+                )}
             </CardContent>
             {isUpcoming && (
                  <CardFooter className="bg-muted/30 p-3">
