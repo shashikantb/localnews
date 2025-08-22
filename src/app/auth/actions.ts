@@ -10,8 +10,7 @@ import { createUserDb, getUserByEmailDb, getUserByIdDb, updateUserProfilePicture
 import type { NewUser, User, UserStatus, PendingRegistration } from '@/lib/db-types';
 import { revalidatePath } from 'next/cache';
 import { cache } from 'react';
-import { sendOtp } from '@/ai/flows/send-otp-flow';
-import { sendPasswordResetOtp } from '@/ai/flows/send-password-reset-flow';
+import sgMail from '@sendgrid/mail';
 import { customAlphabet } from 'nanoid';
 
 const USER_COOKIE_NAME = 'user-auth-token';
@@ -32,6 +31,62 @@ if (!process.env.JWT_SECRET && process.env.NODE_ENV !== 'production') {
   console.warn('WARNING: JWT_SECRET environment variable is not set. Using a temporary, insecure fallback secret.');
   console.warn('THIS IS NOT SAFE FOR PRODUCTION. Please set a secure secret in your .env.local file.');
   console.warn('----------------------------------------------------------------');
+}
+
+/**
+ * Creates the HTML content for the OTP email.
+ * @param name The user's name.
+ * @param otp The 6-digit one-time password.
+ * @returns The HTML string for the email body.
+ */
+function createOtpEmailHtml(name: string, otp: string): string {
+    return `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #18053c;">Welcome to LocalPulse!</h2>
+            <p>Hi ${name},</p>
+            <p>Thank you for signing up. Please use the following One-Time Password (OTP) to verify your account:</p>
+            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #ff6f00;">${otp}</p>
+            <p>This code is valid for 10 minutes.</p>
+            <p>If you did not sign up for LocalPulse, please ignore this email.</p>
+            <br/>
+            <p>Thanks,</p>
+            <p>The LocalPulse Team</p>
+        </div>
+    `;
+}
+
+/**
+ * Creates the HTML content for the password reset OTP email.
+ * @param name The user's name.
+ * @param otp The 6-digit one-time password.
+ * @returns The HTML string for the email body.
+ */
+function createPasswordResetEmailHtml(name: string, otp: string): string {
+    return `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #18053c;">LocalPulse Password Reset</h2>
+            <p>Hi ${name},</p>
+            <p>A password reset was requested for your account. Please use the following One-Time Password (OTP) to set a new password:</p>
+            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #ff6f00;">${otp}</p>
+            <p>This code is valid for 10 minutes.</p>
+            <p>If you did not request a password reset, you can safely ignore this email.</p>
+            <br/>
+            <p>Thanks,</p>
+            <p>The LocalPulse Team</p>
+        </div>
+    `;
+}
+
+async function sendEmail(to: string, subject: string, html: string) {
+    const apiKey = process.env.SENDGRID_API_KEY;
+    const fromEmail = process.env.SENDGRID_FROM_EMAIL;
+
+    if (!apiKey || !fromEmail) {
+        throw new Error('SendGrid API Key or From Email is not configured in environment variables.');
+    }
+    sgMail.setApiKey(apiKey);
+    const msg = { to, from: fromEmail, subject, html };
+    await sgMail.send(msg);
 }
 
 
@@ -76,11 +131,10 @@ export async function signUp(newUser: NewUser): Promise<{ success: boolean; erro
     await createPendingRegistration({ ...newUser, email: emailLower, passwordhash }, otp);
 
     // Send OTP email
-    await sendOtp({
-      name: newUser.name,
-      email: emailLower,
-      otp: otp,
-    });
+    const subject = `Your LocalPulse Verification Code`;
+    const htmlBody = createOtpEmailHtml(newUser.name, otp);
+    await sendEmail(emailLower, subject, htmlBody);
+
 
     return { success: true };
 
@@ -279,11 +333,9 @@ export async function requestPasswordReset(email: string): Promise<{ success: bo
 
     await createPasswordResetToken(emailLower, otp);
 
-    await sendPasswordResetOtp({
-      name: user.name,
-      email: emailLower,
-      otp: otp,
-    });
+    const subject = `Your LocalPulse Password Reset Code`;
+    const htmlBody = createPasswordResetEmailHtml(user.name, otp);
+    await sendEmail(emailLower, subject, htmlBody);
 
     return { success: true };
   } catch (error: any) {
