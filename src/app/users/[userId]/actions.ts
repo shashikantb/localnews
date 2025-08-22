@@ -1,9 +1,10 @@
 
+
 'use server';
 
 import { revalidatePath } from 'next/cache';
 import { getSession } from '@/app/auth/actions';
-import { updateUserMobileDb, updateUserBusinessCategoryDb, updateUserStatusDb } from '@/lib/db';
+import { updateUserMobileDb, updateUserBusinessCategoryDb, updateUserStatusDb, updateUserLocationDb } from '@/lib/db';
 import { z } from 'zod';
 import type { UpdateBusinessCategory } from '@/lib/db-types';
 
@@ -65,4 +66,19 @@ export async function requestBusinessVerification(): Promise<{ success: boolean;
   } catch (error: any) {
     return { success: false, error: error.message };
   }
+}
+
+export async function updateUserLocationAction(latitude: number, longitude: number): Promise<{ success: boolean; error?: string; }> {
+    const { user } = await getSession();
+    if (!user) {
+        return { success: false, error: 'Authentication required.' };
+    }
+
+    try {
+        await updateUserLocationDb(user.id, latitude, longitude);
+        revalidatePath(`/users/${user.id}`);
+        return { success: true };
+    } catch (error: any) {
+        return { success: false, error: 'Failed to update location.' };
+    }
 }

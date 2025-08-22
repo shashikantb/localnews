@@ -33,6 +33,7 @@ import ReferralSharer from '@/components/referral-sharer';
 import LpPointsHistoryDialog from '@/components/lp-points-history-dialog';
 import RequestVerificationButton from '@/components/request-verification-button';
 import AddFamilyMemberSearch from '@/components/add-family-member-search';
+import UpdateLocationButton from '@/components/update-location-button';
 
 interface UserProfilePageProps {
   params: {
@@ -230,10 +231,11 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
                 Update your services, schedule, and view bookings.
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="flex flex-col sm:flex-row gap-4 items-center">
                 <Button asChild>
                     <Link href="/account/manage-business">Manage Services & Schedule</Link>
                 </Button>
+                <UpdateLocationButton />
             </CardContent>
           </Card>
         )}
