@@ -14,11 +14,6 @@ import type { SendOtpInput } from '@/lib/db-types';
 
 const ai = getAi();
 
-const EmailContentSchema = z.object({
-    subject: z.string().describe("The subject line of the email."),
-    body: z.string().describe("The HTML body of the email. It should be professional and include the user's name and the OTP clearly.")
-});
-
 /**
  * A tool for sending an email using SendGrid.
  */
@@ -70,27 +65,27 @@ const sendEmail = ai.defineTool(
     }
 );
 
-
-const generateEmailPrompt = ai.definePrompt({
-    name: 'generatePasswordResetEmailPrompt',
-    input: { schema: SendOtpInputSchema },
-    output: { schema: EmailContentSchema },
-    model: 'googleai/gemini-1.5-flash',
-    prompt: `
-        You are an AI assistant for an app called "LocalPulse".
-        Your task is to generate a professional and friendly email to send a One-Time Password (OTP) to a user for a password reset request.
-
-        The email should:
-        - Have a clear subject line like "Your LocalPulse Password Reset Code".
-        - Greet the user by their name: {{{name}}}.
-        - Clearly state the purpose of the email (password reset).
-        - Display the OTP prominently: {{{otp}}}.
-        - Mention that the code is valid for 10 minutes.
-        - Mention that if they did not request this reset, they can safely ignore the email.
-        - Do not include any unsubscribe links or marketing content.
-        - The entire email body must be valid HTML.
-    `,
-});
+/**
+ * Creates the HTML content for the password reset OTP email.
+ * @param name The user's name.
+ * @param otp The 6-digit one-time password.
+ * @returns The HTML string for the email body.
+ */
+function createPasswordResetEmailHtml(name: string, otp: string): string {
+    return `
+        <div style="font-family: Arial, sans-serif; color: #333;">
+            <h2 style="color: #18053c;">LocalPulse Password Reset</h2>
+            <p>Hi ${name},</p>
+            <p>A password reset was requested for your account. Please use the following One-Time Password (OTP) to set a new password:</p>
+            <p style="font-size: 24px; font-weight: bold; letter-spacing: 2px; color: #ff6f00;">${otp}</p>
+            <p>This code is valid for 10 minutes.</p>
+            <p>If you did not request a password reset, you can safely ignore this email.</p>
+            <br/>
+            <p>Thanks,</p>
+            <p>The LocalPulse Team</p>
+        </div>
+    `;
+}
 
 
 const sendPasswordResetOtpFlow = ai.defineFlow(
@@ -100,18 +95,15 @@ const sendPasswordResetOtpFlow = ai.defineFlow(
     outputSchema: z.custom<void>(),
   },
   async (input) => {
-    // 1. Generate the email content using the AI prompt.
-    const { output } = await generateEmailPrompt(input);
+    // 1. Generate the email content using the hardcoded template.
+    const subject = `Your LocalPulse Password Reset Code`;
+    const htmlBody = createPasswordResetEmailHtml(input.name, input.otp);
     
-    if (!output?.subject || !output?.body) {
-      throw new Error('AI failed to generate email content.');
-    }
-
     // 2. Use the sendEmail tool to dispatch the generated email.
     const sendResult = await sendEmail({
         to: input.email,
-        subject: output.subject,
-        htmlBody: output.body,
+        subject: subject,
+        htmlBody: htmlBody,
     });
 
     if (!sendResult.success) {
