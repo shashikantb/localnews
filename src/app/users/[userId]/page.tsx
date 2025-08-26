@@ -34,6 +34,7 @@ import LpPointsHistoryDialog from '@/components/lp-points-history-dialog';
 import AddFamilyMemberSearch from '@/components/add-family-member-search';
 import UpdateLocationButton from '@/components/update-location-button';
 import BookingDialog from '@/components/booking-dialog';
+import RequestVerificationButton from '@/components/request-verification-button';
 
 interface UserProfilePageProps {
   params: {
@@ -222,6 +223,10 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
         </Card>
 
         {isOwnProfile && profileUser.referral_code && <ReferralSharer code={profileUser.referral_code} />}
+        
+        {isOwnProfile && isBusiness && profileUser.status === 'approved' && (
+          <RequestVerificationButton />
+        )}
 
         {isOwnProfile && isBusiness && (
           <Card className="shadow-xl border border-border/60 rounded-xl bg-card/80 backdrop-blur-sm">

@@ -53,7 +53,7 @@ export default function ManageBusinessTabs({ initialServices, initialHours, init
                         <CardDescription>Define the bookable services you offer to customers.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                       <ManageServicesClient initialServices={initialServices} />
+                       <ManageServicesClient initialServices={initialServices} businessUserId={businessUser.id} />
                     </CardContent>
                 </Card>
             </TabsContent>
@@ -83,7 +83,7 @@ export default function ManageBusinessTabs({ initialServices, initialHours, init
                         <CardDescription>Manage your bookable resources (e.g., salon chairs, washing bays).</CardDescription>
                     </CardHeader>
                      <CardContent>
-                        <ManageResourcesClient initialResources={initialResources} />
+                        <ManageResourcesClient initialResources={initialResources} businessUserId={businessUser.id} />
                     </CardContent>
                 </Card>
             </TabsContent>

@@ -6,7 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { getSession } from '@/app/auth/actions';
 import { updateUserMobileDb, updateUserBusinessCategoryDb, updateUserStatusDb, updateUserLocationDb } from '@/lib/db';
 import { z } from 'zod';
-import type { UpdateBusinessCategory } from '@/lib/db-types';
+import type { UpdateBusinessCategory, UserStatus } from '@/lib/db-types';
 
 const mobileSchema = z.object({
     countryCode: z.string().min(1, 'Country code is required.'),

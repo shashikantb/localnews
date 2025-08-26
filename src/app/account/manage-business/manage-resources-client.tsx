@@ -20,8 +20,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { addBusinessResource, updateBusinessResource, deleteBusinessResource } from './actions';
+import { addBusinessResource, updateBusinessResource, deleteBusinessResource, getBusinessResources } from './actions';
 import type { BusinessResource } from '@/lib/db-types';
+import { getSession } from '@/app/auth/actions';
 
 const resourceSchema = z.object({
   name: z.string().min(2, 'Resource name must be at least 2 characters.'),
@@ -102,17 +103,17 @@ const ResourceFormDialog: React.FC<ResourceFormDialogProps> = ({ resource, onSuc
 
 interface ManageResourcesClientProps {
   initialResources: BusinessResource[];
+  businessUserId: number;
 }
 
-const ManageResourcesClient: React.FC<ManageResourcesClientProps> = ({ initialResources }) => {
+const ManageResourcesClient: React.FC<ManageResourcesClientProps> = ({ initialResources, businessUserId }) => {
   const [resources, setResources] = useState(initialResources);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const fetchResources = async () => {
     setIsLoading(true);
-    const { getBusinessResources } = await import('./actions');
-    const updatedResources = await getBusinessResources();
+    const updatedResources = await getBusinessResources(businessUserId);
     setResources(updatedResources);
     setIsLoading(false);
   };

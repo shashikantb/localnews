@@ -21,7 +21,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { addBusinessService, updateBusinessService, deleteBusinessService } from './actions';
+import { addBusinessService, updateBusinessService, deleteBusinessService, getBusinessServices } from './actions';
 import type { BusinessService } from '@/lib/db-types';
 
 const serviceSchema = z.object({
@@ -137,19 +137,17 @@ const ServiceFormDialog: React.FC<ServiceFormDialogProps> = ({ service, onSucces
 
 interface ManageServicesClientProps {
   initialServices: BusinessService[];
+  businessUserId: number;
 }
 
-const ManageServicesClient: React.FC<ManageServicesClientProps> = ({ initialServices }) => {
+const ManageServicesClient: React.FC<ManageServicesClientProps> = ({ initialServices, businessUserId }) => {
   const [services, setServices] = useState(initialServices);
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
   const fetchServices = async () => {
     setIsLoading(true);
-    // In a real app, this would be a server action call, e.g., getBusinessServices()
-    // For now, we just simulate the refresh from a potential state update.
-    const { getBusinessServices } = await import('./actions');
-    const updatedServices = await getBusinessServices();
+    const updatedServices = await getBusinessServices(businessUserId);
     setServices(updatedServices);
     setIsLoading(false);
   };
@@ -165,25 +163,21 @@ const ManageServicesClient: React.FC<ManageServicesClientProps> = ({ initialServ
   }
 
   return (
-    <Card className="shadow-lg border-border/60">
-      <CardHeader className="flex flex-row justify-between items-center">
-        <div>
-          <CardTitle>Your Services</CardTitle>
-          <CardDescription>The list of bookable services you offer to customers.</CardDescription>
+    <div>
+        <div className="flex justify-end mb-4">
+            <ServiceFormDialog onSuccess={fetchServices}>
+                <Button>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add Service
+                </Button>
+            </ServiceFormDialog>
         </div>
-        <ServiceFormDialog onSuccess={fetchServices}>
-            <Button>
-                <PlusCircle className="mr-2 h-4 w-4" /> Add Service
-            </Button>
-        </ServiceFormDialog>
-      </CardHeader>
-      <CardContent>
+
         {isLoading ? (
             <div className="text-center py-8">
                 <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
             </div>
         ) : services.length === 0 ? (
-          <div className="text-center py-10 text-muted-foreground">
+          <div className="text-center py-10 text-muted-foreground border rounded-lg">
             <p>You haven't added any services yet.</p>
             <p className="text-sm">Click "Add Service" to get started.</p>
           </div>
@@ -210,8 +204,7 @@ const ManageServicesClient: React.FC<ManageServicesClientProps> = ({ initialServ
             ))}
           </div>
         )}
-      </CardContent>
-    </Card>
+    </div>
   );
 };
 
