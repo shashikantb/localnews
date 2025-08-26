@@ -1,4 +1,5 @@
 
+
 import { Pool, Client, type QueryResult } from 'pg';
 import type { Appointment, BusinessAppointment, ConversationDetails, CustomerAppointment, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource, AppointmentStatus } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
@@ -358,7 +359,7 @@ export function earthDistance(lat1: number, lon1: number, lat2: number, lon2: nu
     const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
               Math.cos(φ1) * Math.cos(φ2) *
               Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // in metres
 }
@@ -2500,7 +2501,7 @@ export async function getNearbyBusinessesDb(options: {
         SELECT ${USER_COLUMNS_SANITIZED}, ${distanceCalc} as distance
         FROM users
         WHERE role = 'Business'
-          AND status IN ('approved', 'verified')
+          AND status IN ('approved', 'verified', 'pending_verification')
           AND latitude IS NOT NULL AND longitude IS NOT NULL
           AND ${distanceCalc} <= $3
           ${categoryFilter}
