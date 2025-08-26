@@ -164,7 +164,7 @@ export async function verifyOtpAndCreateUser(email: string, otp: string): Promis
         passwordplaintext: '' // Not needed, we already have the hash
     };
     
-    // Pass the pre-hashed password to createUserDb
+    // Auto-approve all users, including businesses, upon successful OTP verification.
     const user = await createUserDb({ ...userData, passwordplaintext: pendingUser.passwordhash }, 'approved');
 
     if (!user) {
@@ -195,6 +195,10 @@ export async function login(email: string, password?: string, isVerified = false
     
     if (user.status === 'rejected') {
         return { success: false, error: 'Your account has been rejected.' };
+    }
+    
+    if (user.status === 'pending') {
+        return { success: false, error: 'Your account is pending approval. Please check back later.' };
     }
 
     // If coming from OTP verification, we trust the hash. Otherwise, compare passwords.

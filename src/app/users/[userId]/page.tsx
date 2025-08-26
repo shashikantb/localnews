@@ -31,7 +31,6 @@ import UpdateUserDetailsModal from '@/components/update-user-details-modal';
 import Link from 'next/link';
 import ReferralSharer from '@/components/referral-sharer';
 import LpPointsHistoryDialog from '@/components/lp-points-history-dialog';
-import RequestVerificationButton from '@/components/request-verification-button';
 import AddFamilyMemberSearch from '@/components/add-family-member-search';
 import UpdateLocationButton from '@/components/update-location-button';
 import BookingDialog from '@/components/booking-dialog';
@@ -221,10 +220,6 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
             </div>
           </CardHeader>
         </Card>
-        
-        {isOwnProfile && isBusiness && profileUser.status === 'approved' && (
-          <RequestVerificationButton />
-        )}
 
         {isOwnProfile && profileUser.referral_code && <ReferralSharer code={profileUser.referral_code} />}
 

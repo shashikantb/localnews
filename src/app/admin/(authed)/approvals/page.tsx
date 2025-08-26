@@ -10,7 +10,7 @@ const AdminApprovalsPage: FC = async () => {
     <div className="space-y-8">
       <header>
         <h1 className="text-4xl font-bold tracking-tight text-foreground">User Approvals</h1>
-        <p className="text-lg text-muted-foreground">This page is no longer used. User accounts are now verified via email OTP.</p>
+        <p className="text-lg text-muted-foreground">This page is no longer used. All users are now auto-approved upon email verification.</p>
       </header>
       
       <Card className="shadow-lg">
