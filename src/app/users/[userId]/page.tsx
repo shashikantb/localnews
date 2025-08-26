@@ -6,7 +6,7 @@ import { getPostsByUserId, getPendingFamilyRequests, getFamilyRelationshipStatus
 import { getSession } from '@/app/auth/actions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardHeader, CardContent, CardTitle, CardDescription } from '@/components/ui/card';
-import { Building, ShieldCheck, Mail, Calendar, User as UserIcon, Edit, MessageSquare, Settings, Users, Briefcase, Phone, FileBarChart, Award, Share2, BadgeCheck, Wrench, CalendarCheck } from 'lucide-react';
+import { Building, ShieldCheck, Mail, Calendar, User as UserIcon, Edit, MessageSquare, Settings, Users, Briefcase, Phone, FileBarChart, Award, Share2, BadgeCheck, Wrench, CalendarCheck, CalendarPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { PostCard } from '@/components/post-card';
@@ -34,6 +34,7 @@ import LpPointsHistoryDialog from '@/components/lp-points-history-dialog';
 import RequestVerificationButton from '@/components/request-verification-button';
 import AddFamilyMemberSearch from '@/components/add-family-member-search';
 import UpdateLocationButton from '@/components/update-location-button';
+import BookingDialog from '@/components/booking-dialog';
 
 interface UserProfilePageProps {
   params: {
@@ -149,7 +150,14 @@ const UserProfilePage: FC<UserProfilePageProps> = async ({ params }) => {
                                 </Button>
                             </form>
                         )}
-                        {sessionUser && !isOwnProfile && (
+                        {sessionUser && isBusiness && (
+                          <BookingDialog business={profileUser} sessionUser={sessionUser}>
+                            <Button size="sm">
+                                <CalendarPlus className="mr-2 h-4 w-4" /> Book Now
+                            </Button>
+                          </BookingDialog>
+                        )}
+                        {sessionUser && !isOwnProfile && !isBusiness && (
                           <FamilyActionButton
                             initialStatus={familyStatusResult.status}
                             targetUserId={profileUser.id}
