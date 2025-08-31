@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { type FC } from 'react';
@@ -37,7 +38,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { getMessaging, getToken } from 'firebase/messaging';
 import { getApp, getApps, initializeApp } from 'firebase/app';
-import MandalList from './mandal-list';
 import Link from 'next/link';
 
 
