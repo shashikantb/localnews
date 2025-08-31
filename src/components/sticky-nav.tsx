@@ -1,114 +1,104 @@
-
 'use client';
 
-import type { FC } from 'react';
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { Home, Film, User as UserIcon, MessageSquare } from 'lucide-react';
+import { Home, Film, MessageSquare, User as UserIcon } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { getUnreadMessageCount } from '@/app/actions';
 import type { User } from '@/lib/db-types';
 import SosButton from './sos-button';
 
-const UNREAD_POLL_INTERVAL = 15000; // 15 seconds
+const UNREAD_POLL_INTERVAL = 15_000;
 
-interface StickyNavProps {
-  user: User | null;
-}
+type Props = { user?: User | null };
 
-const StickyNav: FC<StickyNavProps> = ({ user }) => {
+export default function StickyNav({ user }: Props) {
+  const router = useRouter();
   const pathname = usePathname();
-  const [unreadCount, setUnreadCount] = useState(0);
 
-  // Poll for unread messages only if the user is logged in
+  // figure current tab by route
+  const current =
+    pathname.startsWith('/reels') ? '/reels' :
+    pathname.startsWith('/chat') ? '/chat' :
+    pathname.startsWith('/users') ? '/profile' :
+    '/';
+
+  // unread chat indicator
+  const [unread, setUnread] = useState<number>(0);
   useEffect(() => {
-    if (!user) {
-      setUnreadCount(0); // Reset count if user logs out
-      return;
-    }
-    
-    // Fetch immediately on component mount/user change
-    getUnreadMessageCount().then(setUnreadCount);
+    let active = true;
+    const tick = async () => {
+      try {
+        const n = await getUnreadMessageCount();
+        if (active) setUnread(n ?? 0);
+      } catch {}
+    };
+    tick();
+    const t = setInterval(tick, UNREAD_POLL_INTERVAL);
+    return () => { active = false; clearInterval(t); };
+  }, []);
 
-    const intervalId = setInterval(() => {
-        getUnreadMessageCount().then(setUnreadCount);
-    }, UNREAD_POLL_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [user]); // Depend on the user prop
-
-  const navItems = [
-    { name: 'Home', href: '/', icon: Home, current: pathname === '/' },
-    { name: 'Reels', href: '/reels', icon: Film, current: pathname === '/reels' },
+  // routes for tabs
+  const profileHref = user ? `/users/${user.id}` : '/login';
+  const tabs = [
+    { value: '/',       label: 'Home',   icon: Home,          href: '/' },
+    { value: '/reels',  label: 'Reels',  icon: Film,          href: '/reels' },
+    { value: '/chat',   label: 'Chat',   icon: MessageSquare, href: '/chat' },
+    { value: '/profile',label: 'Profile',icon: UserIcon,      href: profileHref },
   ];
-
-  const authNavItems = [
-    { name: 'Chat', href: '/chat', icon: MessageSquare, current: pathname.startsWith('/chat'), badgeCount: unreadCount },
-    { 
-      name: 'Profile', 
-      href: user ? `/users/${user.id}` : '/login', 
-      icon: UserIcon, 
-      current: user ? pathname.startsWith(`/users/${user.id}`) : pathname === '/login' 
-    }
-  ];
-
-  const renderNavItem = (item: any) => (
-    <div key={item.name} className="flex-1 flex h-full">
-        <Link
-            href={item.href}
-            className={cn(
-                'relative flex h-full w-full flex-col items-center justify-center space-y-1 border-b-2 px-2 pt-1 text-sm font-medium transition-colors',
-                item.current
-                ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:text-foreground'
-            )}
-            aria-current={item.current ? 'page' : undefined}
-        >
-            <item.icon className="h-6 w-6" />
-            <span className="text-xs">{item.name}</span>
-            {item.badgeCount > 0 && (
-                <span className="absolute top-1 right-2 sm:right-auto sm:left-1/2 sm:ml-4 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
-                    {item.badgeCount > 9 ? '9+' : item.badgeCount}
-                </span>
-            )}
-        </Link>
-    </div>
-  );
 
   return (
-    <nav className="sticky top-14 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-14 max-w-2xl items-center justify-around px-0 sm:px-2">
-          {navItems.map(renderNavItem)}
-
-          {user && (
-            <>
-                <div className="flex h-full flex-col items-center justify-center flex-1">
-                    <SosButton />
-                </div>
-                {authNavItems.map(renderNavItem)}
-            </>
-          )}
-
-          {!user && (
-            <div className="flex-1 flex h-full">
-                <Link
-                    href="/login"
+    <nav className="sticky top-[64px] z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto w-full max-w-screen-md px-3 py-2">
+        <div className="relative">
+          {/* Segmented / pill tabs */}
+          <Tabs value={current} onValueChange={(v) => {
+            const target = tabs.find(t => t.value === v)?.href ?? '/';
+            router.push(target);
+          }}>
+            <TabsList
+              className={cn(
+                'w-full h-12 rounded-full bg-muted p-1 text-muted-foreground',
+                'flex justify-between'
+              )}
+            >
+              {tabs.map(t => {
+                const Icon = t.icon;
+                const isChat = t.value === '/chat';
+                return (
+                  <TabsTrigger
+                    key={t.value}
+                    value={t.value}
                     className={cn(
-                        'relative flex h-full w-full flex-col items-center justify-center space-y-1 border-b-2 px-2 pt-1 text-sm font-medium transition-colors',
-                        pathname.startsWith('/login') || pathname.startsWith('/signup')
-                        ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                      'relative flex-1 h-10 rounded-full gap-2',
+                      'data-[state=active]:bg-foreground data-[state=active]:text-background'
                     )}
-                >
-                    <UserIcon className="h-6 w-6" />
-                    <span className="text-xs">Profile</span>
-                </Link>
+                    // allow middle-click / open in new tab via Link
+                    asChild
+                  >
+                    <Link href={t.href}>
+                      <Icon className="h-5 w-5" />
+                      <span className="hidden sm:inline">{t.label}</span>
+                      {isChat && unread > 0 && (
+                        <span className="absolute -top-1 right-3 inline-flex h-2.5 w-2.5 rounded-full bg-red-500" />
+                      )}
+                    </Link>
+                  </TabsTrigger>
+                );
+              })}
+            </TabsList>
+          </Tabs>
+
+          {/* Center floating SOS button */}
+          <div className="pointer-events-none absolute -top-4 left-1/2 -translate-x-1/2">
+            <div className="pointer-events-auto">
+              <SosButton />
             </div>
-          )}
+          </div>
+        </div>
       </div>
     </nav>
   );
-};
-
-export default StickyNav;
+}
