@@ -15,7 +15,6 @@ import { Map, Sparkles, Trophy, HandPlatter } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import TopPerformersList from '@/components/top-performers-list';
 import TopPerformerMarquee from '@/components/top-performer-marquee';
-import TopMandalMarquee from '@/components/top-mandal-marquee';
 
 async function PostComposerWithSession() {
   const { user } = await getSession();
@@ -68,9 +67,6 @@ const HomePage: FC = () => {
         <div className="space-y-2">
           <Suspense fallback={<div className="h-10" />}>
               <TopPerformerMarquee />
-          </Suspense>
-          <Suspense fallback={<div className="h-10" />}>
-            <TopMandalMarquee />
           </Suspense>
         </div>
 

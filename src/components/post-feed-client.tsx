@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { type FC } from 'react';
@@ -54,7 +55,7 @@ declare global {
 
 const POSTS_PER_PAGE = 5;
 
-type FeedType = 'nearby' | 'family' | 'services' | 'festival';
+type FeedType = 'nearby' | 'family' | 'services';
 
 type FeedState = {
     posts: Post[];
@@ -128,7 +129,7 @@ export function NoPostsContent({ feedType, radiusKm, onRadiusChange, category }:
   return (
     <Card className="text-center py-16 rounded-xl shadow-xl border border-border/40 bg-card/80 backdrop-blur-sm">
       <CardContent className="flex flex-col items-center">
-        {feedType === 'services' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : feedType === 'festival' ? <PartyPopper className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
+        {feedType === 'services' ? <Briefcase className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" /> : <Zap className="mx-auto h-20 w-20 text-muted-foreground/30 mb-6" />}
         <p className="text-2xl text-muted-foreground font-semibold">{currentMessage.title}</p>
         <p className="text-md text-muted-foreground/80 mt-2">{currentMessage.description}</p>
         {feedType === 'services' && onRadiusChange && (
@@ -326,8 +327,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         if (!location) {
             setLocationPromptVisible(true);
         }
-    } else if (newTab === 'festival') {
-        setLocationPromptVisible(false);
     } else { 
         setLocationPromptVisible(false);
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
@@ -433,8 +432,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if (activeTab === 'services') {
         if (businessFeed.isLoading || !businessFeed.hasMore) return;
         fetchBusinesses(businessFeed.page + 1, businessFeed.category);
-    } else if (activeTab === 'festival') {
-        // MandalList handles its own loading
     } else {
         const currentFeed = feeds[activeTab];
         if (currentFeed.isLoading || !currentFeed.hasMore) return;
@@ -451,8 +448,11 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         isLoading = businessFeed.isLoading;
         hasMore = businessFeed.hasMore;
     } else if (activeTab !== 'festival') {
-        isLoading = feeds[activeTab].isLoading;
-        hasMore = feeds[activeTab].hasMore;
+        const currentFeed = feeds[activeTab];
+        if(currentFeed){
+            isLoading = currentFeed.isLoading;
+            hasMore = currentFeed.hasMore;
+        }
     }
     
     if (isLoading) return;
@@ -520,9 +520,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   );
 
   const renderFeedContent = () => {
-    if (activeTab === 'festival') {
-        return <MandalList sessionUser={sessionUser} userLocation={location} />;
-    }
 
     if (activeTab === 'services') {
         if (!selectedCategory) {
@@ -623,7 +620,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 
   const TABS = [
       { key: "nearby", label: "Nearby" },
-      { key: "festival", label: "Festival" },
       ...(sessionUser ? [{ key: "family", label: "Family", badge: unreadFamilyPostCount }] : []),
       { key: "services", label: "Services" },
   ];
@@ -680,7 +676,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                   </DropdownMenuContent>
                 </DropdownMenu>
               )}
-              {activeTab !== 'services' && activeTab !== 'festival' ? (
+              {activeTab !== 'services' ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" className="h-9 shadow-sm">

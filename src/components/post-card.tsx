@@ -468,7 +468,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
       )}
 
       <Card ref={cardRef} className={cn(
-          "overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-300 ease-out border border-border/60 rounded-xl bg-card/80 backdrop-blur-sm hover:border-primary/50 transform hover:scale-[1.005]",
+          "overflow-hidden shadow-lg transition-all duration-300 ease-out border border-border/60 rounded-xl bg-card/90 backdrop-blur-sm hover:border-primary/30",
           isAnnouncement && "bg-primary/5 border-primary/20",
           isRadarPost && "border-accent/50 bg-gradient-to-br from-accent/5 to-card"
       )}>
@@ -508,7 +508,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
           )}
         <CardHeader className={cn(
             "pb-3 pt-5 px-5 flex flex-row items-start space-x-4",
-            isAnnouncement ? "bg-primary/10" : "bg-gradient-to-br from-card to-muted/10",
+            isAnnouncement ? "bg-primary/10" : "bg-card",
             isRadarPost && "bg-transparent"
         )}>
           <Avatar className="h-12 w-12 border-2 border-primary/60 shadow-md">
