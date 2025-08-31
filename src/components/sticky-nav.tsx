@@ -58,16 +58,15 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
         <Link
             href={item.href}
             className={cn(
-                'relative flex h-full w-full flex-row items-center justify-center space-x-2 border-b-2 px-2 text-sm font-medium transition-colors sm:flex-col sm:space-x-0 sm:space-y-1 sm:pt-2',
+                'relative flex h-full w-full flex-col items-center justify-center space-y-1 border-b-2 px-2 pt-1 text-sm font-medium transition-colors',
                 item.current
                 ? 'border-primary text-primary'
-                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                : 'border-transparent text-muted-foreground hover:text-foreground'
             )}
             aria-current={item.current ? 'page' : undefined}
         >
-            <item.icon className="h-5 w-5" />
-            <span className="text-[10px] leading-3 mt-1 sm:hidden">{item.name}</span>
-            <span className="hidden sm:inline">{item.name}</span>
+            <item.icon className="h-6 w-6" />
+            <span className="text-xs">{item.name}</span>
             {item.badgeCount > 0 && (
                 <span className="absolute top-1 right-2 sm:right-auto sm:left-1/2 sm:ml-4 flex h-5 w-5 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold ring-2 ring-background">
                     {item.badgeCount > 9 ? '9+' : item.badgeCount}
@@ -79,7 +78,7 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
 
   return (
     <nav className="sticky top-14 z-40 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-14 max-w-2xl items-center justify-around px-2">
+      <div className="container mx-auto flex h-14 max-w-2xl items-center justify-around px-0 sm:px-2">
           {navItems.map(renderNavItem)}
 
           {user && (
@@ -96,15 +95,14 @@ const StickyNav: FC<StickyNavProps> = ({ user }) => {
                 <Link
                     href="/login"
                     className={cn(
-                        'relative flex h-full w-full flex-row items-center justify-center space-x-2 border-b-2 px-2 text-sm font-medium transition-colors sm:flex-col sm:space-x-0 sm:space-y-1 sm:pt-2',
+                        'relative flex h-full w-full flex-col items-center justify-center space-y-1 border-b-2 px-2 pt-1 text-sm font-medium transition-colors',
                         pathname.startsWith('/login') || pathname.startsWith('/signup')
                         ? 'border-primary text-primary'
-                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
                     )}
                 >
-                    <UserIcon className="h-5 w-5" />
-                    <span className="text-[10px] leading-3 mt-1 sm:hidden">Profile</span>
-                    <span className="hidden sm:inline">Profile</span>
+                    <UserIcon className="h-6 w-6" />
+                    <span className="text-xs">Profile</span>
                 </Link>
             </div>
           )}

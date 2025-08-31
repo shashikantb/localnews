@@ -23,7 +23,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import EqualWidthTabs from '@/components/EqualWidthTabs';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -170,6 +169,14 @@ const serviceCategories = [
 const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) => {
   const { toast } = useToast();
   const searchParams = useSearchParams();
+  const router = useRouter();
+
+  const handleTabChangeRouter = (newTab: string) => {
+    const usp = new URLSearchParams(window.location.search);
+    usp.set('tab', newTab);
+    router.replace(`?${usp.toString()}`, { scroll: false });
+  };
+  
   const activeTab = (searchParams.get('tab') as FeedType) || 'nearby';
   
   const [feeds, setFeeds] = useState<{ [key in 'nearby' | 'family']: FeedState }>({
@@ -644,61 +651,44 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         </AlertDialogContent>
       </AlertDialog>
 
-      <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
-            <EqualWidthTabs
-                tabs={TABS}
-                param="tab"
-                activeKey={activeTab}
-            />
-            <div className="flex items-center gap-2">
-              {activeTab === 'services' && selectedCategory && (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 shadow-sm">
-                      <Filter className="w-4 h-4 mr-2" />
-                      <span>{radiusKm} km</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Search Radius</DropdownMenuLabel>
-                    <DropdownMenuRadioGroup value={String(radiusKm)} onValueChange={(v) => handleRadiusChange(Number(v))}>
-                      {[5, 10, 15, 30].map(r => <DropdownMenuRadioItem key={r} value={String(r)}>{r} km</DropdownMenuRadioItem>)}
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+      <div className="flex items-center justify-between gap-4 rounded-lg bg-muted p-1">
+          {TABS.map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => handleTabChangeRouter(tab.key)}
+              className={cn(
+                'relative w-full rounded-md py-1.5 text-sm font-medium transition-colors',
+                activeTab === tab.key
+                  ? 'bg-background text-primary shadow-sm'
+                  : 'text-muted-foreground hover:bg-background/50'
               )}
-              {activeTab !== 'services' ? (
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" className="h-9 shadow-sm">
-                      <Filter className="w-4 h-4 mr-2" />
-                      <span>Sort</span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <DropdownMenuLabel>Sort By</DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => handleSortChange(v as SortOption)}>
-                      <DropdownMenuRadioItem value="nearby">Nearby</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="newest">Newest</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="likes">Most Popular</DropdownMenuRadioItem>
-                      <DropdownMenuRadioItem value="comments">Most Discussed</DropdownMenuRadioItem>
-                    </DropdownMenuRadioGroup>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+            >
+              {tab.label}
+              {tab.badge && tab.badge > 0 ? (
+                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-accent text-accent-foreground text-[10px] font-bold">
+                    {tab.badge > 9 ? '9+' : tab.badge}
+                </span>
               ) : null}
-
-              <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shadow-sm"
-                  onClick={handleNotificationRegistration}
-                  disabled={notificationPermissionStatus === 'loading'}
-                  aria-label="Toggle Notifications"
-              >
-                  <NotificationButtonContent notificationPermissionStatus={notificationPermissionStatus} />
-              </Button>
-            </div>
+            </button>
+          ))}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-9 shadow-sm">
+                    <Filter className="w-4 h-4 mr-2" />
+                    <span>Sort</span>
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Sort By</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => handleSortChange(v as SortOption)}>
+                    <DropdownMenuRadioItem value="nearby">Nearby</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="newest">Newest</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="likes">Most Popular</DropdownMenuRadioItem>
+                    <DropdownMenuRadioItem value="comments">Most Discussed</DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="mt-4">
           {renderFeedContent()}
