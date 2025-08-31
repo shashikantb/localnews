@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -59,7 +60,7 @@ export default function ReferralSharer({ code }: ReferralSharerProps) {
                         <p className="text-sm text-muted-foreground">Share your code and earn <span className="font-bold text-accent">50 LP Points</span>! New users get <span className="font-bold text-accent">20 LP Points</span>.</p>
                         <p className="text-lg font-bold tracking-wider text-foreground mt-1">Your Code: {code}</p>
                     </div>
-                    <Button onClick={handleShare} className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                    <Button onClick={handleShare} className="w-full sm:w-auto bg-primary hover:bg-primary/90 text-primary-foreground">
                         <Share2 className="mr-2 h-4 w-4" />
                         Share Referral
                     </Button>

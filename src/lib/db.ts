@@ -379,6 +379,12 @@ const USER_COLUMNS_SANITIZED = `
   lp_points, referral_code, last_family_feed_view_at, timezone
 `;
 
+// Helper for getPostsDb to construct and run the query
+async function executePostsQuery(client: Client | Pool, baseQuery: string, params: any[]): Promise<Post[]> {
+    const result = await client.query(baseQuery, params);
+    return result.rows;
+}
+
 export async function getPostsDb(
   options: { 
     limit: number; 
@@ -396,121 +402,94 @@ export async function getPostsDb(
 
   const client = await dbPool.connect();
   try {
-    let orderByClause: string;
-    let whereClause = `
-      p.is_family_post = false 
-      AND (p.authorid IS NULL OR p.authorid != (SELECT id FROM users WHERE email = '${OFFICIAL_USER_EMAIL}'))
-      AND (p.expires_at IS NULL OR p.expires_at > NOW())
-      AND (p.max_viewers IS NULL OR p.viewcount < p.max_viewers)
-    `;
-    const queryParams: (string | number | null)[] = [];
-    let paramIndex = 1;
-
-    const currentUserIdParam = options.currentUserId || null;
-    queryParams.push(currentUserIdParam);
-    const userIdParamIndex = paramIndex++;
-
-    const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $${userIdParamIndex}::int)`;
-    const followCheck = `p.authorid IS NOT NULL AND EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $${userIdParamIndex}::int)`;
-
+    const { limit, offset, latitude, longitude, currentUserId } = options;
     const sortBy = options.sortBy || 'newest';
 
+    const userIdParam = currentUserId || null;
+    const likeCheck = `EXISTS(SELECT 1 FROM post_likes pl WHERE pl.post_id = p.id AND pl.user_id = $1::int)`;
+    const followCheck = `p.authorid IS NOT NULL AND EXISTS(SELECT 1 FROM user_followers uf WHERE uf.following_id = p.authorid AND uf.follower_id = $1::int)`;
+
+    const baseSelect = `
+        SELECT 
+            ${POST_COLUMNS_WITH_JOINS},
+            ${likeCheck} as "isLikedByCurrentUser",
+            ${followCheck} as "isAuthorFollowedByCurrentUser"
+        FROM posts p
+        LEFT JOIN users u ON p.authorid = u.id
+    `;
+    const baseWhere = `
+        WHERE p.is_family_post = false 
+        AND (p.authorid IS NULL OR p.authorid != (SELECT id FROM users WHERE email = '${OFFICIAL_USER_EMAIL}'))
+        AND (p.expires_at IS NULL OR p.expires_at > NOW())
+        AND (p.max_viewers IS NULL OR p.viewcount < p.max_viewers)
+    `;
+
+    if (sortBy === 'nearby' && latitude != null && longitude != null && !isAdminView) {
+        const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($2, $3))`;
+        
+        // Strategy 1: Find posts within 20km
+        const nearbyQuery = `
+            ${baseSelect}
+            ${baseWhere} AND ${distanceCalc} <= 20000
+            ORDER BY ${distanceCalc}, p.createdat DESC
+            LIMIT $4 OFFSET $5
+        `;
+        let posts = await executePostsQuery(client, nearbyQuery, [userIdParam, latitude, longitude, limit, offset]);
+        if (posts.length > 0) return posts;
+
+        // Strategy 2: If no posts in 20km, expand to 200km
+        const regionalQuery = `
+            ${baseSelect}
+            ${baseWhere} AND ${distanceCalc} <= 200000
+            ORDER BY ${distanceCalc}, p.createdat DESC
+            LIMIT $4 OFFSET $5
+        `;
+        posts = await executePostsQuery(client, regionalQuery, [userIdParam, latitude, longitude, limit, offset]);
+        if (posts.length > 0) return posts;
+    }
+
+    // Fallback strategy for all other sorts or if nearby searches yield nothing
+    let orderByClause: string;
     switch(sortBy) {
-      case 'likes':
-        orderByClause = 'p.likecount DESC, p.createdat DESC';
-        break;
-      case 'comments':
-        orderByClause = 'p.commentcount DESC, p.createdat DESC';
-        break;
-      case 'nearby':
-        if (options.latitude != null && options.longitude != null && !isAdminView) {
-            queryParams.push(options.latitude, options.longitude);
-            const latParamIndex = paramIndex++;
-            const lonParamIndex = paramIndex++;
-            const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($${latParamIndex}, $${lonParamIndex}))`;
-            
-            // Add a hard radius filter for the "nearby" feed to avoid showing distant posts.
-            const RADIUS_METERS = 20000; // 20km
-            queryParams.push(RADIUS_METERS);
-            const radiusParamIndex = paramIndex++;
-            whereClause += ` AND ${distanceCalc} <= $${radiusParamIndex}`;
-
-            orderByClause = `
-              CASE
-                WHEN ${distanceCalc} <= 5000 THEN 1   -- within 5km
-                WHEN ${distanceCalc} <= 20000 THEN 2  -- within 20km
-                ELSE 3
-              END,
-              p.createdat DESC
-            `;
-        } else {
-             orderByClause = 'p.createdat DESC';
-        }
-        break;
-      case 'newest':
-      default:
-        orderByClause = 'p.createdat DESC';
-        break;
+        case 'likes':
+            orderByClause = 'p.likecount DESC, p.createdat DESC';
+            break;
+        case 'comments':
+            orderByClause = 'p.commentcount DESC, p.createdat DESC';
+            break;
+        case 'newest':
+        default:
+            orderByClause = 'p.createdat DESC';
+            break;
     }
     
-    let allPosts: Post[] = [];
-    
-    const sortingNearby = (sortBy === 'nearby');
-    // Only prepend announcement if it's the first page and NOT sorting by nearby (unless it's actually nearby)
-    if (options.offset === 0 && !isAdminView) {
-        if (!sortingNearby || (sortingNearby && options.latitude != null && options.longitude != null)) {
-            const announcementParams: any[] = [currentUserIdParam, OFFICIAL_USER_EMAIL];
-            let announcementQuery = `
-              SELECT 
-                ${POST_COLUMNS_WITH_JOINS},
-                ${likeCheck} as "isLikedByCurrentUser",
-                ${followCheck} as "isAuthorFollowedByCurrentUser"
-              FROM posts p
-              LEFT JOIN users u ON p.authorid = u.id
-              WHERE u.email = $2
-            `;
-            
-            // If sorting by nearby, only include announcement if it's within 30km
-            if (sortingNearby && options.latitude != null && options.longitude != null) {
-                announcementQuery += ` AND earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($3, $4)) <= 30000`;
-                announcementParams.push(options.latitude, options.longitude);
-            }
-            
-            announcementQuery += ` ORDER BY p.createdat DESC LIMIT 1`;
-            
-            const announcementResult = await client.query(announcementQuery, announcementParams);
-            if (announcementResult.rows.length > 0) {
-                allPosts = announcementResult.rows;
-            }
-        }
-    }
-
-
-    queryParams.push(options.limit, options.offset);
-    const limitParamIndex = queryParams.length - 1;
-    const offsetParamIndex = queryParams.length;
-
-    const postsQuery = `
-      SELECT 
-        ${POST_COLUMNS_WITH_JOINS},
-        ${likeCheck} as "isLikedByCurrentUser",
-        ${followCheck} as "isAuthorFollowedByCurrentUser"
-      FROM posts p
-      LEFT JOIN users u ON p.authorid = u.id
-      WHERE ${whereClause}
-      ORDER BY ${orderByClause}
-      LIMIT $${limitParamIndex} OFFSET $${offsetParamIndex}
+    const fallbackQuery = `
+        ${baseSelect}
+        ${baseWhere}
+        ORDER BY ${orderByClause}
+        LIMIT $2 OFFSET $3
     `;
     
-    const postsResult = await client.query(postsQuery, queryParams);
-    
-    const announcementId = allPosts.length > 0 ? allPosts[0].id : null;
-    const regularPosts = postsResult.rows.filter(p => p.id !== announcementId);
+    const finalPosts = await executePostsQuery(client, fallbackQuery, [userIdParam, limit, offset]);
 
-    const combined = [...allPosts, ...regularPosts];
-    
-    return combined.slice(0, options.limit);
-    
+    // Prepend announcement on the first page of a non-nearby feed
+    if (offset === 0 && sortBy !== 'nearby' && !isAdminView) {
+        const announcementQuery = `
+            ${baseSelect}
+            WHERE u.email = $2
+            ORDER BY p.createdat DESC LIMIT 1
+        `;
+        const announcementResult = await executePostsQuery(client, announcementQuery, [userIdParam, OFFICIAL_USER_EMAIL]);
+        if (announcementResult.length > 0) {
+            const announcementId = announcementResult[0].id;
+            // Remove announcement from main list if it exists to prevent duplicates
+            const filteredPosts = finalPosts.filter(p => p.id !== announcementId);
+            return [...announcementResult, ...filteredPosts].slice(0, limit);
+        }
+    }
+
+    return finalPosts;
+
   } finally {
     client.release();
   }
