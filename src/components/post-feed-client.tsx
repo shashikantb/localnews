@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { type FC } from 'react';
@@ -159,10 +160,10 @@ interface PostFeedClientProps {
 }
 
 const serviceCategories = [
-    { name: 'Personal Care', icon: Scissors, description: "Saloons, Barbers, Spas", subcategories: ["Saloon / Barber Shop", "Beauty Parlour", "Spa / Massage Center", "Mehendi / Tattoo Artist"] },
-    { name: 'Vehicle Services', icon: Car, description: "Washing, Detailing", subcategories: ["Car/Bike Washing"] },
-    { name: 'Home Services', icon: HomeIcon, description: "Electricians, Plumbers", subcategories: ["Electrician", "Plumber", "Carpenter", "Painter", "Civil Worker / Mason", "AC / Refrigerator Mechanic", "CCTV Installer", "RO / Water Purifier Service", "Gas Stove Repair"] },
-    { name: 'Professional Services', icon: Wrench, description: "Repairs, Laundry, etc.", subcategories: ["Computer Repair & Service", "Laundry / Dry Cleaning", "Courier Service"] }
+    { name: 'Personal Care', icon: Scissors, description: "Saloons, Barbers, Spas", subcategories: ["Saloon / Barber Shop", "Beauty Parlour", "Spa / Massage Center", "Mehendi / Tattoo Artist"], color: 'bg-pink-100 dark:bg-pink-900/30 border-pink-200 dark:border-pink-800/50', iconColor: 'text-pink-500' },
+    { name: 'Vehicle Services', icon: Car, description: "Washing, Detailing", subcategories: ["Car/Bike Washing"], color: 'bg-blue-100 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800/50', iconColor: 'text-blue-500' },
+    { name: 'Home Services', icon: HomeIcon, description: "Electricians, Plumbers", subcategories: ["Electrician", "Plumber", "Carpenter", "Painter", "Civil Worker / Mason", "AC / Refrigerator Mechanic", "CCTV Installer", "RO / Water Purifier Service", "Gas Stove Repair"], color: 'bg-green-100 dark:bg-green-900/30 border-green-200 dark:border-green-800/50', iconColor: 'text-green-500' },
+    { name: 'Professional Services', icon: Wrench, description: "Repairs, Laundry, etc.", subcategories: ["Computer Repair & Service", "Laundry / Dry Cleaning", "Courier Service"], color: 'bg-indigo-100 dark:bg-indigo-900/30 border-indigo-200 dark:border-indigo-800/50', iconColor: 'text-indigo-500' }
 ];
 
 const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) => {
@@ -435,7 +436,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         fetchBusinesses(businessFeed.page + 1, businessFeed.category);
     } else {
         const currentFeed = feeds[activeTab];
-        if (currentFeed.isLoading || !currentFeed.hasMore) return;
+        if(currentFeed.isLoading || !currentFeed.hasMore) return;
         fetchPosts(activeTab, currentFeed.page + 1, sortBy, location);
     }
   }, [feeds, activeTab, fetchPosts, sortBy, businessFeed, fetchBusinesses, location]);
@@ -472,7 +473,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     onSwipedDown: () => {
       if (window.scrollY === 0) refreshFeed();
     },
-    trackMouse: true,
+    trackMouse: true
   });
 
   const handleSortChange = (newSortBy: SortOption) => {
@@ -509,9 +510,9 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
                         setSelectedCategory(categoryString);
                         fetchBusinesses(1, categoryString);
                     }}
-                    className="p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-primary/20 hover:border-primary/50 transition-all duration-200"
+                    className={cn("p-6 flex flex-col items-center justify-center text-center cursor-pointer hover:shadow-lg transition-all duration-200 border", category.color)}
                 >
-                    <category.icon className="h-12 w-12 text-accent mb-3"/>
+                    <category.icon className={cn("h-12 w-12 mb-3", category.iconColor)}/>
                     <p className="font-semibold text-lg">{category.name}</p>
                     <p className="text-sm text-muted-foreground">{category.description}</p>
                 </Card>

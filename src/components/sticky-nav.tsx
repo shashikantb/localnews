@@ -46,12 +46,15 @@ export default function StickyNav({ user }: Props) {
 
   // routes for tabs
   const profileHref = user ? `/users/${user.id}` : '/login';
-  const tabs = [
+  
+  const allTabs = [
     { value: '/',       label: 'Home',   icon: Home,          href: '/' },
     { value: '/reels',  label: 'Reels',  icon: Film,          href: '/reels' },
     { value: '/chat',   label: 'Chat',   icon: MessageSquare, href: '/chat' },
     { value: '/profile',label: 'Profile',icon: UserIcon,      href: profileHref },
   ];
+
+  const tabs = user ? allTabs : allTabs.filter(t => t.value !== '/chat');
 
   return (
     <nav className="sticky top-[56px] sm:top-[64px] z-40 border-b bg-background/80 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -108,3 +111,4 @@ export default function StickyNav({ user }: Props) {
     </nav>
   );
 }
+
