@@ -321,7 +321,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             setUnreadFamilyPostCount(0);
         }
         const familyFeed = feeds.family;
-        // Only fetch if it's the first time (no posts) and not already loading
         if (familyFeed.posts.length === 0 && !familyFeed.isLoading) {
             fetchPosts('family', 1, sortBy, location);
         }
@@ -331,8 +330,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
         if (!location) {
             setLocationPromptVisible(true);
         }
-    } else { 
-        setLocationPromptVisible(false);
+    } else { // 'nearby'
+        setLocationPromptVisible(false); // Hide location prompt if switching away from services
         if (feeds.nearby.posts.length === 0 && !feeds.nearby.isLoading) {
             fetchPosts('nearby', 1, sortBy, location);
         }
