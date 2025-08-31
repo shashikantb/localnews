@@ -23,9 +23,9 @@ export default async function MyBookingsPage() {
         <div className="flex flex-col items-center p-4 sm:p-6 md:p-8">
             <div className="container mx-auto w-full max-w-2xl space-y-6">
                 <Button variant="outline" size="sm" asChild>
-                    <Link href={`/users/${user.id}`}>
+                    <Link href="/?tab=services">
                         <ArrowLeft className="mr-2 h-4 w-4" />
-                        Back to Profile
+                        Back to Services
                     </Link>
                 </Button>
 
