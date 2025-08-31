@@ -12,9 +12,8 @@ import { StatusFeedSkeleton } from '@/components/status-feed-skeleton';
 import { getPosts } from './actions';
 import { Button } from '@/components/ui/button';
 import { Map, Sparkles, Trophy, HandPlatter } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import TopPerformersList from '@/components/top-performers-list';
 import TopPerformerMarquee from '@/components/top-performer-marquee';
+import FeatureTabs from '@/components/feature-tabs';
 
 async function PostComposerWithSession() {
   const { user } = await getSession();
@@ -64,6 +63,8 @@ const HomePage: FC = () => {
            </div>
         </div>
         
+        <FeatureTabs />
+
         <div className="space-y-2">
           <Suspense fallback={<div className="h-10" />}>
               <TopPerformerMarquee />
