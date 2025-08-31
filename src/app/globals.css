@@ -48,7 +48,7 @@
     --background: 223 47% 11%;
     --foreground: 210 40% 98%;
  
-    --card: 222 84% 5%;
+    --card: 224 10% 15%; /* Lighter gray for cards */
     --card-foreground: 210 40% 98%;
  
     --popover: 222.2 84% 4.9%;
@@ -69,7 +69,7 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
  
-    --border: 217.2 32.6% 17.5%;
+    --border: 217.2 20% 22%; /* Lighter border color */
     --input: 217.2 32.6% 17.5%;
     --ring: 263.4 95.2% 66.3%;
   }
