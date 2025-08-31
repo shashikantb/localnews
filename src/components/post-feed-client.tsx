@@ -198,7 +198,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   
-  const businessInitialLoad = useRef(false);
+  const familyFeedLoaded = useRef(false);
 
 
   useEffect(() => {
@@ -320,9 +320,9 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             markFamilyFeedAsRead();
             setUnreadFamilyPostCount(0);
         }
-        const familyFeed = feeds.family;
-        if (familyFeed.posts.length === 0 && !familyFeed.isLoading) {
+        if (!familyFeedLoaded.current) {
             fetchPosts('family', 1, sortBy, location);
+            familyFeedLoaded.current = true;
         }
     } else if (newTab === 'services') {
         setSelectedCategory(null);
@@ -336,7 +336,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             fetchPosts('nearby', 1, sortBy, location);
         }
     }
-  }, [unreadFamilyPostCount, feeds, fetchPosts, sortBy, location]);
+  }, [unreadFamilyPostCount, feeds.nearby.posts.length, feeds.nearby.isLoading, fetchPosts, sortBy, location]);
 
 
   // This effect now only runs when the active tab changes from the URL
