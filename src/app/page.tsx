@@ -1,5 +1,4 @@
 
-
 import type { FC } from 'react';
 import { Suspense } from 'react';
 import Link from 'next/link';
@@ -13,7 +12,7 @@ import { getPosts } from './actions';
 import { Button } from '@/components/ui/button';
 import { Map, Sparkles, Trophy, HandPlatter } from 'lucide-react';
 import TopPerformerMarquee from '@/components/top-performer-marquee';
-import FeatureTabs from '@/components/feature-tabs';
+
 
 async function PostComposerWithSession() {
   const { user } = await getSession();
@@ -63,8 +62,6 @@ const HomePage: FC = () => {
            </div>
         </div>
         
-        <FeatureTabs />
-
         <div className="space-y-2">
           <Suspense fallback={<div className="h-10" />}>
               <TopPerformerMarquee />

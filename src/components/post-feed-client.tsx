@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { type FC } from 'react';
@@ -119,10 +118,6 @@ export function NoPostsContent({ feedType, radiusKm, onRadiusChange, category }:
       title: `No ${category || 'Businesses'} Found`,
       description: radiusKm ? `We looked within ${radiusKm} km. Want to try a wider radius?` : 'No businesses found in your area for the selected category. Try a different filter!'
     },
-    festival: {
-        title: 'The Festivities Await!',
-        description: 'No mandals have been registered for the selected city yet.'
-    }
   }
   const currentMessage = messages[feedType];
 
@@ -414,10 +409,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     setIsRefreshing(true);
     if(activeTab === 'services') {
         await fetchBusinesses(1, businessFeed.category);
-    } else if (activeTab === 'festival') {
-        // MandalList will handle its own refresh
-    }
-     else {
+    } else {
         if (activeTab === 'family') {
             setUnreadFamilyPostCount(0);
             markFamilyFeedAsRead();
@@ -447,7 +439,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if (activeTab === 'services') {
         isLoading = businessFeed.isLoading;
         hasMore = businessFeed.hasMore;
-    } else if (activeTab !== 'festival') {
+    } else {
         const currentFeed = feeds[activeTab];
         if(currentFeed){
             isLoading = currentFeed.isLoading;
@@ -477,7 +469,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   const handleSortChange = (newSortBy: SortOption) => {
     if (newSortBy === sortBy) return;
     setSortBy(newSortBy);
-    if(activeTab !== 'services' && activeTab !== 'festival') {
+    if(activeTab !== 'services' ) {
         fetchPosts(activeTab, 1, newSortBy, location);
     }
   };
@@ -520,7 +512,6 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   );
 
   const renderFeedContent = () => {
-
     if (activeTab === 'services') {
         if (!selectedCategory) {
             return renderServiceCategories();

@@ -2,6 +2,7 @@
 import type { FC } from 'react';
 import Link from 'next/link';
 import { Rss } from 'lucide-react';
+import HeaderUserNav from './header-user-nav';
 
 const Header: FC = () => {
   return (
@@ -16,7 +17,7 @@ const Header: FC = () => {
           </Link>
         </div>
         <div className="flex flex-1 items-center justify-end space-x-2">
-          {/* User navigation has been moved to the sticky nav bar below */}
+          <HeaderUserNav />
         </div>
       </div>
     </header>

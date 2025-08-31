@@ -12,6 +12,5 @@ const UserNav = dynamic(() => import('./user-nav').then((mod) => mod.UserNav), {
 });
 
 export default function HeaderUserNav() {
-  // Always render the UserNav component, which will now appear in the header for both mobile and desktop.
   return <UserNav />;
 }
