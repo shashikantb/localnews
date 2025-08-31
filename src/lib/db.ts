@@ -424,53 +424,43 @@ export async function getPostsDb(
         AND (p.max_viewers IS NULL OR p.viewcount < p.max_viewers)
     `;
 
-    if (sortBy === 'nearby' && latitude != null && longitude != null && !isAdminView) {
-        const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($2, $3))`;
-        
-        // Strategy 1: Find posts within 20km
-        const nearbyQuery = `
-            ${baseSelect}
-            ${baseWhere} AND ${distanceCalc} <= 20000
-            ORDER BY ${distanceCalc}, p.createdat DESC
-            LIMIT $4 OFFSET $5
-        `;
-        let posts = await executePostsQuery(client, nearbyQuery, [userIdParam, latitude, longitude, limit, offset]);
-        if (posts.length > 0) return posts;
-
-        // Strategy 2: If no posts in 20km, expand to 200km
-        const regionalQuery = `
-            ${baseSelect}
-            ${baseWhere} AND ${distanceCalc} <= 200000
-            ORDER BY ${distanceCalc}, p.createdat DESC
-            LIMIT $4 OFFSET $5
-        `;
-        posts = await executePostsQuery(client, regionalQuery, [userIdParam, latitude, longitude, limit, offset]);
-        if (posts.length > 0) return posts;
-    }
-
-    // Fallback strategy for all other sorts or if nearby searches yield nothing
     let orderByClause: string;
-    switch(sortBy) {
-        case 'likes':
-            orderByClause = 'p.likecount DESC, p.createdat DESC';
-            break;
-        case 'comments':
-            orderByClause = 'p.commentcount DESC, p.createdat DESC';
-            break;
-        case 'newest':
-        default:
-            orderByClause = 'p.createdat DESC';
-            break;
+    let queryParams: any[] = [userIdParam, limit, offset];
+
+    if (sortBy === 'nearby' && latitude != null && longitude != null && !isAdminView) {
+        const distanceCalc = `earth_distance(ll_to_earth(p.latitude, p.longitude), ll_to_earth($4, $5))`;
+        orderByClause = `
+          CASE
+            WHEN ${distanceCalc} <= 20000 THEN 1 -- Tier 1: Local (20km)
+            WHEN ${distanceCalc} <= 200000 THEN 2 -- Tier 2: Regional (200km)
+            ELSE 3 -- Tier 3: Everywhere else
+          END,
+          p.createdat DESC
+        `;
+        queryParams.push(latitude, longitude);
+    } else {
+      switch(sortBy) {
+          case 'likes':
+              orderByClause = 'p.likecount DESC, p.createdat DESC';
+              break;
+          case 'comments':
+              orderByClause = 'p.commentcount DESC, p.createdat DESC';
+              break;
+          case 'newest':
+          default:
+              orderByClause = 'p.createdat DESC';
+              break;
+      }
     }
     
-    const fallbackQuery = `
+    const postsQuery = `
         ${baseSelect}
         ${baseWhere}
         ORDER BY ${orderByClause}
         LIMIT $2 OFFSET $3
     `;
     
-    const finalPosts = await executePostsQuery(client, fallbackQuery, [userIdParam, limit, offset]);
+    const finalPosts = await executePostsQuery(client, postsQuery, queryParams);
 
     // Prepend announcement on the first page of a non-nearby feed
     if (offset === 0 && sortBy !== 'nearby' && !isAdminView) {
