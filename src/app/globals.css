@@ -14,8 +14,8 @@
     --popover: 0 0% 100%;
     --popover-foreground: 224 71.4% 4.1%;
  
-    --primary: 210 40% 98%;
-    --primary-foreground: 224 71.4% 4.1%;
+    --primary: 224 71.4% 4.1%;
+    --primary-foreground: 210 20% 98%;
  
     --secondary: 220 14.3% 95.9%;
     --secondary-foreground: 220.9 39.3% 11%;
@@ -80,8 +80,8 @@
    - For example, --primary-colorful is the variable that will be updated.
   */
   .colorful {
-    --primary-colorful: 48 96.1% 51%; /* Default: Yellow */
-    --accent-colorful: 35 91.7% 54.1%;  /* Default: Orange-Yellow */
+    --primary-colorful: 262 84% 59%; /* Default: Purple */
+    --accent-colorful: 340 86% 60%;  /* Default: Pink */
     
     --background: 210 20% 98%;
     --foreground: 224 71.4% 4.1%;
