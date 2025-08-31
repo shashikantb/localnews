@@ -80,7 +80,8 @@ export default function StickyNav({ user }: Props) {
                     value={t.value}
                     className={cn(
                       'relative flex-1 h-10 rounded-full gap-2',
-                      'data-[state=active]:bg-background data-[state=active]:text-primary data-[state=active]:shadow-sm'
+                      'data-[state=active]:bg-sky-100 data-[state=active]:text-sky-700 data-[state=active]:shadow-inner',
+                      'dark:data-[state=active]:bg-sky-900/50 dark:data-[state=active]:text-sky-200'
                     )}
                     // allow middle-click / open in new tab via Link
                     asChild
@@ -111,4 +112,5 @@ export default function StickyNav({ user }: Props) {
     </nav>
   );
 }
+
 
