@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { type FC } from 'react';
@@ -316,13 +315,15 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   
   const handleTabChange = useCallback((newTab: FeedType) => {
     if (newTab === 'family') {
-      if (unreadFamilyPostCount > 0) {
-        markFamilyFeedAsRead();
-        setUnreadFamilyPostCount(0);
-      }
-      if (feeds.family.posts.length === 0 && !feeds.family.isLoading) {
-        fetchPosts('family', 1, sortBy, location);
-      }
+        if (unreadFamilyPostCount > 0) {
+            markFamilyFeedAsRead();
+            setUnreadFamilyPostCount(0);
+        }
+        const familyFeed = feeds.family;
+        // Only fetch if it's the first time (no posts) and not already loading
+        if (familyFeed.posts.length === 0 && !familyFeed.isLoading) {
+            fetchPosts('family', 1, sortBy, location);
+        }
     } else if (newTab === 'services') {
         setSelectedCategory(null);
         setBusinessFeed(initialBusinessFeedState); 
@@ -335,7 +336,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
             fetchPosts('nearby', 1, sortBy, location);
         }
     }
-  }, [unreadFamilyPostCount, feeds.family.posts.length, feeds.family.isLoading, fetchPosts, sortBy, location, feeds.nearby.posts.length, feeds.nearby.isLoading]);
+  }, [unreadFamilyPostCount, feeds, fetchPosts, sortBy, location]);
+
 
   // This effect now only runs when the active tab changes from the URL
   useEffect(() => {
@@ -698,3 +700,5 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
 };
 
 export default PostFeedClient;
+
+    
