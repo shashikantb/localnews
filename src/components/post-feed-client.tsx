@@ -661,7 +661,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
               className={cn(
                 'relative w-full rounded-md py-1.5 text-sm font-medium transition-colors',
                 activeTab === tab.key
-                  ? 'bg-background text-primary shadow-sm'
+                  ? 'bg-sky-100 text-sky-700 shadow-inner dark:bg-sky-900/50 dark:text-sky-200'
                   : 'text-muted-foreground hover:bg-background/50'
               )}
             >
