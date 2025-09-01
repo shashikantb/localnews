@@ -6,6 +6,8 @@ import { customAlphabet } from 'nanoid';
 import {
   format,
 } from 'date-fns';
+import admin from '@/utils/firebaseAdmin';
+import { encrypt } from '@/app/auth/actions';
 
 // Re-export db-types
 export * from './db-types';
@@ -1188,7 +1190,7 @@ async function setupDefaultBusinessData(client: Client | Pool, user: User) {
         const isClosed = scheduleIsAllWeek ? false : (i === 0);
         const startTime = isClosed ? null : '09:00';
         const endTime = isClosed ? null : '18:00';
-        await client.query(hoursInsertQuery, [user.id, i, startTime, endTime, isClosed]);
+        await client.query(hoursInsertQuery, [userId, i, startTime, endTime, isClosed]);
     }
     
     // Set timezone from the user object if available, otherwise default.
@@ -3774,9 +3776,10 @@ export async function updateAppointmentStatusDb(appointmentId: number, status: A
     if (!dbPool) return null;
     const client = await dbPool.connect();
     try {
+        await client.query('BEGIN');
+        
         let whereClause = 'id = $1 AND business_id = $2';
         if (isCustomer) {
-            // Customers can only cancel their own confirmed appointments.
             whereClause = `id = $1 AND customer_id = $2 AND status = 'confirmed'`;
         }
 
@@ -3786,10 +3789,83 @@ export async function updateAppointmentStatusDb(appointmentId: number, status: A
             WHERE ${whereClause}
             RETURNING *;
         `;
-        const result = await client.query(query, [appointmentId, userId, status]);
-        return result.rows[0] || null;
+        const result: QueryResult<Appointment> = await client.query(query, [appointmentId, userId, status]);
+        const appointment = result.rows[0] || null;
+
+        if (appointment && status === 'completed') {
+            const customer = await getUserByIdDb(appointment.customer_id);
+            const business = await getUserByIdDb(appointment.business_id);
+            if (customer && business) {
+                // Background task, don't await
+                sendAppointmentCompletedNotification(customer, business).catch(err => console.error("Completion notification failed:", err));
+            }
+        }
+        
+        await client.query('COMMIT');
+        return appointment;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
     } finally {
         client.release();
+    }
+}
+
+
+async function sendNewBookingNotification(appt: Appointment, service: BusinessService, customer: User) {
+    if (!admin.apps.length) return;
+    try {
+        const tokens = await getDeviceTokensForUsersDb([appt.business_id]);
+        if (tokens.length === 0) return;
+
+        const date = new Date(appt.start_time);
+        const notification = {
+            title: `New Booking: ${service.name}`,
+            body: `${customer.name} has booked an appointment for ${format(date, 'MMM d, h:mm a')}.`,
+        };
+        
+        const messages = await Promise.all(tokens.map(async ({ token, user_id }) => {
+            const freshToken = await encrypt({ userId: user_id });
+            return {
+                token: token,
+                notification,
+                data: { user_auth_token: freshToken },
+                android: { priority: 'high' as const, notification: { channelId: 'new_bookings' } },
+                apns: { payload: { aps: { 'content-available': 1, sound: 'default' } } }
+            }
+        }));
+        
+        await admin.messaging().sendEach(messages as any[]);
+    } catch (error) {
+        console.error('Error sending new booking notification:', error);
+    }
+}
+
+async function sendAppointmentCompletedNotification(customer: User, business: User) {
+    if (!admin.apps.length) return;
+    try {
+        const tokens = await getDeviceTokensForUsersDb([customer.id]);
+        if (tokens.length === 0) return;
+        
+        const notification = {
+            title: 'Appointment Completed!',
+            body: `Your appointment with ${business.name} has been marked as complete. Thank you!`,
+        };
+
+        const messages = await Promise.all(tokens.map(async ({ token, user_id }) => {
+            const freshToken = await encrypt({ userId: user_id });
+            return {
+                token: token,
+                notification,
+                data: { user_auth_token: freshToken },
+                android: { priority: 'high' as const, notification: { channelId: 'reminders' } },
+                apns: { payload: { aps: { 'content-available': 1, sound: 'default' } } }
+            }
+        }));
+        
+        await admin.messaging().sendEach(messages as any[]);
+    } catch (error) {
+        console.error('Error sending completion notification:', error);
     }
 }
 
@@ -3799,18 +3875,36 @@ export async function createAppointmentDb(appointment: Omit<Appointment, 'id' | 
     if (!dbPool) throw new Error("Database not configured.");
     const client = await dbPool.connect();
     try {
+        await client.query('BEGIN');
         const query = `
             INSERT INTO appointments (customer_id, business_id, service_id, resource_id, start_time, end_time, timezone)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
             RETURNING *;
         `;
         const values = [appointment.customer_id, appointment.business_id, appointment.service_id, appointment.resource_id, appointment.start_time, appointment.end_time, appointment.timezone];
-        const result = await client.query(query, values);
-        return result.rows[0];
+        const result: QueryResult<Appointment> = await client.query(query, values);
+        const newAppointment = result.rows[0];
+        
+        const [service, customer] = await Promise.all([
+            getBusinessServiceByIdDb(newAppointment.service_id),
+            getUserByIdDb(newAppointment.customer_id)
+        ]);
+
+        if(service && customer) {
+            // Send notification in the background
+            sendNewBookingNotification(newAppointment, service, customer).catch(err => console.error("New booking notification failed:", err));
+        }
+        
+        await client.query('COMMIT');
+        return newAppointment;
+    } catch (e) {
+        await client.query('ROLLBACK');
+        throw e;
     } finally {
         client.release();
     }
 }
+
 
 export async function findFirstAvailableResourceDb(businessId: number, startTime: Date, endTime: Date): Promise<{id: number} | null> {
     await ensureDbInitialized();
