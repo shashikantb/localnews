@@ -34,6 +34,7 @@ const signupSchema = z.object({
   business_category: z.string().optional(),
   business_other_category: z.string().optional(),
   referral_code: z.string().optional(),
+  timezone: z.string().optional(),
 }).superRefine((data, ctx) => {
   if (data.role === 'Business' && !data.business_category) {
     ctx.addIssue({
@@ -104,6 +105,7 @@ const SignupPage: FC = () => {
       countryCode: '+91',
       mobilenumber: '',
       referral_code: refCodeFromUrl,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     },
   });
   
@@ -267,6 +269,7 @@ const SignupPage: FC = () => {
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSignupSubmit)} className="space-y-4">
+              <input type="hidden" {...form.register('timezone')} />
               {error && (
                 <Alert variant="destructive">
                   <ShieldAlert className="h-4 w-4" />

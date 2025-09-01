@@ -1,5 +1,4 @@
 
-
 import { Pool, Client, type QueryResult } from 'pg';
 import type { Appointment, BusinessAppointment, ConversationDetails, CustomerAppointment, PointTransaction, UserForNotification, PointTransactionReason, User as DbUser, Post, DbNewPost, Comment, NewComment, VisitorCounts, DeviceToken, User, UserWithPassword, NewUser, UserRole, UpdatableUserFields, UserFollowStats, FollowUser, NewStatus, UserWithStatuses, Conversation, Message, NewMessage, ConversationParticipant, FamilyRelationship, PendingFamilyRequest, FamilyMember, FamilyMemberLocation, SortOption, UpdateBusinessCategory, BusinessUser, GorakshakReportUser, UserStatus, Poll, MessageReaction, GanpatiMandal, NewGanpatiMandal, PendingRegistration, BusinessService, NewBusinessService, BusinessHour, BusinessResource, NewBusinessResource, AppointmentStatus } from '@/lib/db-types';
 import bcrypt from 'bcryptjs';
@@ -178,9 +177,20 @@ async function initializeDatabase(client: Pool | Client) {
         referral_code VARCHAR(20),
         otp VARCHAR(6) NOT NULL,
         otp_expires_at TIMESTAMPTZ NOT NULL,
-        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+        timezone VARCHAR(50)
       );
     `);
+    
+    const timezoneColumnCheckPending = await initClient.query(`
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name='pending_registrations' AND column_name='timezone'
+    `);
+    if(timezoneColumnCheckPending.rowCount === 0) {
+        console.log("Adding 'timezone' column to 'pending_registrations' table...");
+        await initClient.query(`ALTER TABLE pending_registrations ADD COLUMN timezone VARCHAR(50);`);
+        console.log("Column 'timezone' added to pending_registrations.");
+    }
     
     // Table for Password Reset
     await initClient.query(`
@@ -1123,7 +1133,7 @@ const DEFAULT_SALOON_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
     { name: 'Haircut – Men', price: 0, duration_minutes: 30 },
     { name: 'Haircut – Women', price: 0, duration_minutes: 45 },
     { name: 'Beard trim / shave', price: 0, duration_minutes: 20 },
-    { name: 'Hair coloring (global)', price: 0, duration_minutes: 120 },
+    { name: 'Hair coloring (global)', price: 0, duration_minutes: 135 },
     { name: 'Facial – basic cleanup', price: 0, duration_minutes: 35 },
     { name: 'Facial – advanced (detan, anti-aging)', price: 0, duration_minutes: 75 },
     { name: 'Other grooming (eyebrows, threading, etc.)', price: 0, duration_minutes: 15 },
@@ -1181,8 +1191,9 @@ async function setupDefaultBusinessData(client: Client | Pool, user: User) {
         await client.query(hoursInsertQuery, [user.id, i, startTime, endTime, isClosed]);
     }
     
-    // Set timezone
-    await client.query(`UPDATE users SET timezone = 'Asia/Calcutta' WHERE id = $1`, [user.id]);
+    // Set timezone from the user object if available, otherwise default.
+    const userTimezone = user.timezone || 'Asia/Calcutta';
+    await client.query(`UPDATE users SET timezone = $1 WHERE id = $2`, [userTimezone, user.id]);
     
     console.log(`Default data setup complete for user ID ${user.id}.`);
 }
@@ -1239,12 +1250,12 @@ export async function createUserDb(newUser: NewUser, status: UserStatus): Promis
       }
       
       const insertQuery = `
-          INSERT INTO users(name, email, passwordhash, role, status, mobilenumber, business_category, business_other_category, referred_by_id, lp_points, referral_code)
-          VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+          INSERT INTO users(name, email, passwordhash, role, status, mobilenumber, business_category, business_other_category, referred_by_id, lp_points, referral_code, timezone)
+          VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
           RETURNING ${USER_COLUMNS_SANITIZED};
       `;
       
-      const values = [newUser.name, newUser.email.toLowerCase(), passwordhash, newUser.role, status, fullMobileNumber, newUser.business_category, newUser.business_other_category, referredById, initialPoints, referralCode];
+      const values = [newUser.name, newUser.email.toLowerCase(), passwordhash, newUser.role, status, fullMobileNumber, newUser.business_category, newUser.business_other_category, referredById, initialPoints, referralCode, newUser.timezone];
       const result: QueryResult<User> = await client.query(insertQuery, values);
       const createdUser = result.rows[0];
 
@@ -3360,8 +3371,8 @@ export async function createPendingRegistration(data: Omit<NewUser, 'passwordpla
     try {
         const fullMobileNumber = `${data.countryCode}${data.mobilenumber}`;
         const query = `
-            INSERT INTO pending_registrations (email, name, passwordhash, role, mobilenumber, business_category, business_other_category, referral_code, otp, otp_expires_at)
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + INTERVAL '10 minutes')
+            INSERT INTO pending_registrations (email, name, passwordhash, role, mobilenumber, business_category, business_other_category, referral_code, otp, otp_expires_at, timezone)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW() + INTERVAL '10 minutes', $10)
             ON CONFLICT (email) DO UPDATE
             SET name = EXCLUDED.name,
                 passwordhash = EXCLUDED.passwordhash,
@@ -3371,7 +3382,8 @@ export async function createPendingRegistration(data: Omit<NewUser, 'passwordpla
                 business_other_category = EXCLUDED.business_other_category,
                 referral_code = EXCLUDED.referral_code,
                 otp = EXCLUDED.otp,
-                otp_expires_at = NOW() + INTERVAL '10 minutes';
+                otp_expires_at = NOW() + INTERVAL '10 minutes',
+                timezone = EXCLUDED.timezone;
         `;
         const values = [
             data.email.toLowerCase(),
@@ -3382,7 +3394,8 @@ export async function createPendingRegistration(data: Omit<NewUser, 'passwordpla
             data.business_category,
             data.business_other_category,
             data.referral_code,
-            otp
+            otp,
+            data.timezone
         ];
         await client.query(query, values);
     } finally {

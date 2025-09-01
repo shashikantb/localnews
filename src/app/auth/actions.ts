@@ -1,5 +1,4 @@
 
-
 'use server';
 
 import { cookies } from 'next/headers';
@@ -161,7 +160,8 @@ export async function verifyOtpAndCreateUser(email: string, otp: string): Promis
         business_category: pendingUser.business_category,
         business_other_category: pendingUser.business_other_category,
         referral_code: pendingUser.referral_code,
-        passwordplaintext: '' // Not needed, we already have the hash
+        passwordplaintext: '', // Not needed, we already have the hash
+        timezone: pendingUser.timezone,
     };
     
     // Auto-approve all users, including businesses, upon successful OTP verification.

@@ -107,6 +107,7 @@ export type NewUser = {
   business_category?: string;
   business_other_category?: string;
   referral_code?: string;
+  timezone?: string;
 };
 
 // For updating a user from the admin panel
@@ -424,6 +425,7 @@ export interface PendingRegistration extends Omit<NewUser, 'passwordplaintext'> 
     otp: string;
     otp_expires_at: string;
     created_at: string;
+    timezone?: string;
 }
 
 export type AppointmentStatus = 'confirmed' | 'completed' | 'cancelled';
