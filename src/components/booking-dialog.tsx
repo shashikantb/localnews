@@ -210,23 +210,25 @@ export default function BookingDialog({ business, sessionUser, children }: Booki
     switch (currentStep) {
       case 0: // Select Service
         return (
-          <div className="space-y-3">
-            {services.map((service) => (
-              <Button
-                key={service.id}
-                variant="outline"
-                className="w-full justify-between h-auto p-4"
-                onClick={() => { setSelectedService(service); setCurrentStep(1); }}
-              >
-                <div>
-                  <p className="font-semibold text-left">{service.name}</p>
-                  <p className="text-sm text-muted-foreground text-left">{service.duration_minutes} min</p>
-                </div>
-                <p className="font-bold text-primary">₹{service.price}</p>
-              </Button>
-            ))}
-            {services.length === 0 && <p className="text-center text-muted-foreground py-8">This business has not listed any services yet.</p>}
-          </div>
+          <ScrollArea className="h-72 pr-4 -mr-4">
+            <div className="space-y-3">
+              {services.map((service) => (
+                <Button
+                  key={service.id}
+                  variant="outline"
+                  className="w-full justify-between h-auto p-4"
+                  onClick={() => { setSelectedService(service); setCurrentStep(1); }}
+                >
+                  <div>
+                    <p className="font-semibold text-left">{service.name}</p>
+                    <p className="text-sm text-muted-foreground text-left">{service.duration_minutes} min</p>
+                  </div>
+                  <p className="font-bold text-primary">₹{service.price}</p>
+                </Button>
+              ))}
+              {services.length === 0 && <p className="text-center text-muted-foreground py-8">This business has not listed any services yet.</p>}
+            </div>
+          </ScrollArea>
         );
 
       case 1: // Select Date & Time

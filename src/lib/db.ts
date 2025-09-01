@@ -1190,7 +1190,7 @@ async function setupDefaultBusinessData(client: Client | Pool, user: User) {
         const isClosed = scheduleIsAllWeek ? false : (i === 0);
         const startTime = isClosed ? null : '09:00';
         const endTime = isClosed ? null : '18:00';
-        await client.query(hoursInsertQuery, [userId, i, startTime, endTime, isClosed]);
+        await client.query(hoursInsertQuery, [user.id, i, startTime, endTime, isClosed]);
     }
     
     // Set timezone from the user object if available, otherwise default.
@@ -2601,7 +2601,7 @@ export async function getNearbyBusinessesDb(options: {
         SELECT ${USER_COLUMNS_SANITIZED}, ${distanceCalc} as distance
         FROM users
         WHERE role = 'Business'
-          AND status IN ('approved', 'verified', 'pending_verification')
+          AND status IN ('approved', 'verified')
           AND latitude IS NOT NULL AND longitude IS NOT NULL
           AND ${distanceCalc} <= $3
           ${categoryFilter}
