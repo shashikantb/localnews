@@ -1076,57 +1076,87 @@ export async function getLikedPostIdsForUserDb(userId: number, postIds: number[]
 }
 
 const DEFAULT_ELECTRICIAN_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
-    { name: 'Electrical inspection & fault finding', price: 0, duration_minutes: 20 },
-    { name: 'Switch / socket repair (per point)', price: 0, duration_minutes: 15 },
-    { name: 'Fuse / MCB / RCCB replacement', price: 0, duration_minutes: 20 },
-    { name: 'Earthing / grounding check', price: 0, duration_minutes: 30 },
-    { name: 'Ceiling fan install / replacement', price: 0, duration_minutes: 30 },
-    { name: 'Tube light / LED batten install', price: 0, duration_minutes: 20 },
-    { name: 'LED panel light install', price: 0, duration_minutes: 30 },
-    { name: 'Chandelier install', price: 0, duration_minutes: 60 },
-    { name: 'Doorbell install - wireless', price: 0, duration_minutes: 10 },
-    { name: 'Doorbell install - wired', price: 0, duration_minutes: 20 },
-    { name: 'Inverter/UPS install & wiring', price: 0, duration_minutes: 60 },
-    { name: 'Geyser electrical connection', price: 0, duration_minutes: 20 },
-    { name: 'Smart bulb setup (per bulb)', price: 0, duration_minutes: 5 },
-    { name: 'Smart switch module (per gang/panel)', price: 0, duration_minutes: 20 },
-    { name: 'New power point creation', price: 0, duration_minutes: 45 },
-    { name: 'Loose connection / overheating fix', price: 0, duration_minutes: 15 },
-    { name: 'Wiring repair - single room (minor)', price: 0, duration_minutes: 60 },
-    { name: 'Other (assessment first)', price: 0, duration_minutes: 30 },
+    { name: 'Electrical inspection & fault finding', price: 0, duration_minutes: 30 },
+    { name: 'Switch / socket repair (per point)', price: 0, duration_minutes: 20 },
+    { name: 'Fuse / MCB / RCCB replacement', price: 0, duration_minutes: 30 },
+    { name: 'Earthing / grounding check', price: 0, duration_minutes: 45 },
+    { name: 'Ceiling fan install / replacement', price: 0, duration_minutes: 45 },
+    { name: 'Tube light / LED batten install', price: 0, duration_minutes: 25 },
+    { name: 'LED panel light install', price: 0, duration_minutes: 40 },
+    { name: 'Chandelier install', price: 0, duration_minutes: 90 },
+    { name: 'Doorbell install - wireless', price: 0, duration_minutes: 15 },
+    { name: 'Doorbell install - wired', price: 0, duration_minutes: 30 },
+    { name: 'Inverter/UPS install & wiring', price: 0, duration_minutes: 90 },
+    { name: 'Geyser electrical connection', price: 0, duration_minutes: 30 },
+    { name: 'Smart bulb setup (per bulb)', price: 0, duration_minutes: 10 },
+    { name: 'Smart switch module (per gang/panel)', price: 0, duration_minutes: 30 },
+    { name: 'New power point creation', price: 0, duration_minutes: 80 },
+    { name: 'Loose connection / overheating fix', price: 0, duration_minutes: 20 },
+    { name: 'Wiring repair - single room (minor)', price: 0, duration_minutes: 90 },
+    { name: 'Other (assessment first)', price: 0, duration_minutes: 45 },
 ];
 
 const DEFAULT_PLUMBER_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
-    { name: 'Plumbing inspection & leak detection', price: 0, duration_minutes: 20 },
-    { name: 'Minor leak fix (tap/valve/joint)', price: 0, duration_minutes: 20 },
-    { name: 'Blocked drain clearing', price: 0, duration_minutes: 30 },
-    { name: 'Faucet / mixer install', price: 0, duration_minutes: 20 },
-    { name: 'Angle valve / stop cock replacement', price: 0, duration_minutes: 15 },
-    { name: 'Health faucet / jet spray install', price: 0, duration_minutes: 15 },
-    { name: 'Sink / wash basin install', price: 0, duration_minutes: 60 },
-    { name: 'Toilet seat cover replacement', price: 0, duration_minutes: 10 },
-    { name: 'Western commode install/replacement', price: 0, duration_minutes: 60 },
-    { name: 'Flush tank/valve repair (exposed)', price: 0, duration_minutes: 30 },
-    { name: 'Shower/hand-shower install', price: 0, duration_minutes: 30 },
-    { name: 'Diverter replacement (concealed)', price: 0, duration_minutes: 60 },
-    { name: 'Geyser plumbing connections', price: 0, duration_minutes: 30 },
-    { name: 'RO (water purifier) inlet & drain setup', price: 0, duration_minutes: 30 },
-    { name: 'Overhead/loft tank connections (basic)', price: 0, duration_minutes: 90 },
-    { name: 'Float valve / ball cock replacement', price: 0, duration_minutes: 20 },
-    { name: 'Trap (P/S) replacement / drain repair', price: 0, duration_minutes: 30 },
-    { name: 'Pipe repair (PVC/CPVC) – small section', price: 0, duration_minutes: 45 },
-    { name: 'Silicone / chemical sealant works', price: 0, duration_minutes: 10 },
-    { name: 'Other (assessment first)', price: 0, duration_minutes: 30 },
+    { name: 'Plumbing inspection & leak detection', price: 0, duration_minutes: 30 },
+    { name: 'Minor leak fix (tap/valve/joint)', price: 0, duration_minutes: 30 },
+    { name: 'Blocked drain clearing', price: 0, duration_minutes: 45 },
+    { name: 'Faucet / mixer install', price: 0, duration_minutes: 30 },
+    { name: 'Angle valve / stop cock replacement', price: 0, duration_minutes: 20 },
+    { name: 'Health faucet / jet spray install', price: 0, duration_minutes: 20 },
+    { name: 'Sink / wash basin install', price: 0, duration_minutes: 90 },
+    { name: 'Toilet seat cover replacement', price: 0, duration_minutes: 15 },
+    { name: 'Western commode install/replacement', price: 0, duration_minutes: 90 },
+    { name: 'Flush tank/valve repair (exposed)', price: 0, duration_minutes: 45 },
+    { name: 'Shower/hand-shower install', price: 0, duration_minutes: 45 },
+    { name: 'Diverter replacement (concealed)', price: 0, duration_minutes: 90 },
+    { name: 'Geyser plumbing connections', price: 0, duration_minutes: 45 },
+    { name: 'RO (water purifier) inlet & drain setup', price: 0, duration_minutes: 45 },
+    { name: 'Overhead/loft tank connections (basic)', price: 0, duration_minutes: 120 },
+    { name: 'Float valve / ball cock replacement', price: 0, duration_minutes: 30 },
+    { name: 'Trap (P/S) replacement / drain repair', price: 0, duration_minutes: 45 },
+    { name: 'Pipe repair (PVC/CPVC) – small section', price: 0, duration_minutes: 60 },
+    { name: 'Silicone / chemical sealant works', price: 0, duration_minutes: 20 },
+    { name: 'Other (assessment first)', price: 0, duration_minutes: 45 },
+];
+
+const DEFAULT_SALOON_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
+    { name: 'Haircut – Men', price: 0, duration_minutes: 30 },
+    { name: 'Haircut – Women', price: 0, duration_minutes: 45 },
+    { name: 'Beard trim / shave', price: 0, duration_minutes: 20 },
+    { name: 'Hair coloring (global)', price: 0, duration_minutes: 120 },
+    { name: 'Facial – basic cleanup', price: 0, duration_minutes: 35 },
+    { name: 'Facial – advanced (detan, anti-aging)', price: 0, duration_minutes: 75 },
+    { name: 'Other grooming (eyebrows, threading, etc.)', price: 0, duration_minutes: 15 },
+];
+
+const DEFAULT_WASH_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
+    { name: 'Bike – basic wash', price: 0, duration_minutes: 25 },
+    { name: 'Car – exterior wash', price: 0, duration_minutes: 35 },
+    { name: 'Car – interior vacuum & wipe', price: 0, duration_minutes: 45 },
+    { name: 'Car – full wash (in/out)', price: 0, duration_minutes: 75 },
+    { name: 'Car – deep interior detailing', price: 0, duration_minutes: 150 },
+    { name: 'Other (assessment first)', price: 0, duration_minutes: 45 },
 ];
 
 async function setupDefaultBusinessData(client: Client | Pool, user: User) {
     if (user.role !== 'Business') return;
 
     let defaultServices: Omit<NewBusinessService, 'user_id'>[] = [];
+    let resourceName = `${user.name} (Self)`;
+    let scheduleIsAllWeek = false;
+
     if (user.business_category === 'Electrician') {
         defaultServices = DEFAULT_ELECTRICIAN_SERVICES;
     } else if (user.business_category === 'Plumber') {
         defaultServices = DEFAULT_PLUMBER_SERVICES;
+    } else if (user.business_category === 'Saloon / Barber Shop') {
+        defaultServices = DEFAULT_SALOON_SERVICES;
+        resourceName = 'Chair 1';
+        scheduleIsAllWeek = true;
+    } else if (user.business_category === 'Car/Bike Washing') {
+        defaultServices = DEFAULT_WASH_SERVICES;
+        resourceName = 'WashingBay 1';
+        scheduleIsAllWeek = true;
     }
 
     if (defaultServices.length === 0) return;
@@ -1140,20 +1170,19 @@ async function setupDefaultBusinessData(client: Client | Pool, user: User) {
     }
 
     // Add resource
-    const resourceName = `${user.name} (Self)`;
     await client.query(`INSERT INTO business_resources (user_id, name) VALUES ($1, $2)`, [user.id, resourceName]);
 
     // Add schedule
     const hoursInsertQuery = `INSERT INTO business_hours (user_id, day_of_week, start_time, end_time, is_closed) VALUES ($1, $2, $3, $4, $5)`;
     for (let i = 0; i < 7; i++) { // 0=Sunday, 6=Saturday
-        const isClosed = (i === 0); // Sunday is closed
+        const isClosed = scheduleIsAllWeek ? false : (i === 0);
         const startTime = isClosed ? null : '09:00';
         const endTime = isClosed ? null : '18:00';
         await client.query(hoursInsertQuery, [user.id, i, startTime, endTime, isClosed]);
     }
     
     // Set timezone
-    await client.query(`UPDATE users SET timezone = 'Asia/Kolkata' WHERE id = $1`, [user.id]);
+    await client.query(`UPDATE users SET timezone = 'Asia/Calcutta' WHERE id = $1`, [user.id]);
     
     console.log(`Default data setup complete for user ID ${user.id}.`);
 }
