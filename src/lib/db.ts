@@ -1075,6 +1075,90 @@ export async function getLikedPostIdsForUserDb(userId: number, postIds: number[]
   }
 }
 
+const DEFAULT_ELECTRICIAN_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
+    { name: 'Electrical inspection & fault finding', price: 0, duration_minutes: 20 },
+    { name: 'Switch / socket repair (per point)', price: 0, duration_minutes: 15 },
+    { name: 'Fuse / MCB / RCCB replacement', price: 0, duration_minutes: 20 },
+    { name: 'Earthing / grounding check', price: 0, duration_minutes: 30 },
+    { name: 'Ceiling fan install / replacement', price: 0, duration_minutes: 30 },
+    { name: 'Tube light / LED batten install', price: 0, duration_minutes: 20 },
+    { name: 'LED panel light install', price: 0, duration_minutes: 30 },
+    { name: 'Chandelier install', price: 0, duration_minutes: 60 },
+    { name: 'Doorbell install - wireless', price: 0, duration_minutes: 10 },
+    { name: 'Doorbell install - wired', price: 0, duration_minutes: 20 },
+    { name: 'Inverter/UPS install & wiring', price: 0, duration_minutes: 60 },
+    { name: 'Geyser electrical connection', price: 0, duration_minutes: 20 },
+    { name: 'Smart bulb setup (per bulb)', price: 0, duration_minutes: 5 },
+    { name: 'Smart switch module (per gang/panel)', price: 0, duration_minutes: 20 },
+    { name: 'New power point creation', price: 0, duration_minutes: 45 },
+    { name: 'Loose connection / overheating fix', price: 0, duration_minutes: 15 },
+    { name: 'Wiring repair - single room (minor)', price: 0, duration_minutes: 60 },
+    { name: 'Other (assessment first)', price: 0, duration_minutes: 30 },
+];
+
+const DEFAULT_PLUMBER_SERVICES: Omit<NewBusinessService, 'user_id'>[] = [
+    { name: 'Plumbing inspection & leak detection', price: 0, duration_minutes: 20 },
+    { name: 'Minor leak fix (tap/valve/joint)', price: 0, duration_minutes: 20 },
+    { name: 'Blocked drain clearing', price: 0, duration_minutes: 30 },
+    { name: 'Faucet / mixer install', price: 0, duration_minutes: 20 },
+    { name: 'Angle valve / stop cock replacement', price: 0, duration_minutes: 15 },
+    { name: 'Health faucet / jet spray install', price: 0, duration_minutes: 15 },
+    { name: 'Sink / wash basin install', price: 0, duration_minutes: 60 },
+    { name: 'Toilet seat cover replacement', price: 0, duration_minutes: 10 },
+    { name: 'Western commode install/replacement', price: 0, duration_minutes: 60 },
+    { name: 'Flush tank/valve repair (exposed)', price: 0, duration_minutes: 30 },
+    { name: 'Shower/hand-shower install', price: 0, duration_minutes: 30 },
+    { name: 'Diverter replacement (concealed)', price: 0, duration_minutes: 60 },
+    { name: 'Geyser plumbing connections', price: 0, duration_minutes: 30 },
+    { name: 'RO (water purifier) inlet & drain setup', price: 0, duration_minutes: 30 },
+    { name: 'Overhead/loft tank connections (basic)', price: 0, duration_minutes: 90 },
+    { name: 'Float valve / ball cock replacement', price: 0, duration_minutes: 20 },
+    { name: 'Trap (P/S) replacement / drain repair', price: 0, duration_minutes: 30 },
+    { name: 'Pipe repair (PVC/CPVC) – small section', price: 0, duration_minutes: 45 },
+    { name: 'Silicone / chemical sealant works', price: 0, duration_minutes: 10 },
+    { name: 'Other (assessment first)', price: 0, duration_minutes: 30 },
+];
+
+async function setupDefaultBusinessData(client: Client | Pool, user: User) {
+    if (user.role !== 'Business') return;
+
+    let defaultServices: Omit<NewBusinessService, 'user_id'>[] = [];
+    if (user.business_category === 'Electrician') {
+        defaultServices = DEFAULT_ELECTRICIAN_SERVICES;
+    } else if (user.business_category === 'Plumber') {
+        defaultServices = DEFAULT_PLUMBER_SERVICES;
+    }
+
+    if (defaultServices.length === 0) return;
+
+    console.log(`Setting up default data for ${user.business_category}: ${user.name}`);
+
+    // Add services
+    const serviceInsertQuery = `INSERT INTO business_services (user_id, name, price, duration_minutes) VALUES ($1, $2, $3, $4)`;
+    for (const service of defaultServices) {
+        await client.query(serviceInsertQuery, [user.id, service.name, service.price, service.duration_minutes]);
+    }
+
+    // Add resource
+    const resourceName = `${user.name} (Self)`;
+    await client.query(`INSERT INTO business_resources (user_id, name) VALUES ($1, $2)`, [user.id, resourceName]);
+
+    // Add schedule
+    const hoursInsertQuery = `INSERT INTO business_hours (user_id, day_of_week, start_time, end_time, is_closed) VALUES ($1, $2, $3, $4, $5)`;
+    for (let i = 0; i < 7; i++) { // 0=Sunday, 6=Saturday
+        const isClosed = (i === 0); // Sunday is closed
+        const startTime = isClosed ? null : '09:00';
+        const endTime = isClosed ? null : '18:00';
+        await client.query(hoursInsertQuery, [user.id, i, startTime, endTime, isClosed]);
+    }
+    
+    // Set timezone
+    await client.query(`UPDATE users SET timezone = 'Asia/Kolkata' WHERE id = $1`, [user.id]);
+    
+    console.log(`Default data setup complete for user ID ${user.id}.`);
+}
+
+
 export async function createUserDb(newUser: NewUser, status: UserStatus): Promise<User> {
     await ensureDbInitialized();
     const dbPool = getDbPool();
@@ -1143,6 +1227,11 @@ export async function createUserDb(newUser: NewUser, status: UserStatus): Promis
           );
       }
       
+      // Setup default services/hours for specific business types
+      if (createdUser.role === 'Business') {
+          await setupDefaultBusinessData(client, createdUser);
+      }
+
       await client.query('COMMIT');
       return createdUser;
     } catch(e) {
