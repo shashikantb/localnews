@@ -2,7 +2,7 @@
 'use client';
 
 import type { FC } from 'react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Post, User } from '@/lib/db-types';
 import { getMediaPosts } from '@/app/actions';
@@ -25,16 +25,21 @@ interface CachedReels {
   currentPage: number;
 }
 
-const ReelsViewer: FC<{ sessionUser: User | null }> = ({ sessionUser }) => {
+interface ReelsViewerProps {
+    sessionUser: User | null;
+    initialPosts: Post[];
+    initialIndex: number;
+}
+
+const ReelsViewer: FC<ReelsViewerProps> = ({ sessionUser, initialPosts, initialIndex }) => {
   const { toast } = useToast();
-  const router = useRouter();
   
-  const [reelPosts, setReelPosts] = useState<Post[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [reelPosts, setReelPosts] = useState<Post[]>(initialPosts);
+  const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMore, setHasMore] = useState(initialPosts.length === REELS_PER_PAGE);
 
   // Function to save data to cache
   const saveToCache = useCallback((posts: Post[], page: number, more: boolean) => {
@@ -51,11 +56,10 @@ const ReelsViewer: FC<{ sessionUser: User | null }> = ({ sessionUser }) => {
     }
   }, []);
 
-  // Function to fetch posts, which will be used for both initial load and revalidation
   const fetchAndCacheReels = useCallback(async (page: number, append: boolean = false) => {
-    if (!append) { // If it's a refresh/revalidation, not loading more
+    if (!append) {
        setIsLoading(true);
-    } else { // If it's for "infinite scroll"
+    } else {
        if (isLoadingMore || !hasMore) return;
        setIsLoadingMore(true);
     }
@@ -85,55 +89,6 @@ const ReelsViewer: FC<{ sessionUser: User | null }> = ({ sessionUser }) => {
   }, [toast, saveToCache, isLoadingMore, hasMore]);
 
 
-  // Effect for initial load and revalidation logic (Stale-While-Revalidate)
-  useEffect(() => {
-    let isMounted = true;
-    
-    // 1. Load from cache immediately
-    try {
-      const cachedItem = localStorage.getItem(REELS_CACHE_KEY);
-      if (cachedItem) {
-        const cachedData: CachedReels = JSON.parse(cachedItem);
-        const isCacheStale = (Date.now() - cachedData.timestamp) > CACHE_EXPIRY_MS;
-        
-        if (cachedData.posts.length > 0) {
-            setReelPosts(cachedData.posts);
-            setCurrentPage(cachedData.currentPage);
-            setHasMore(cachedData.hasMore);
-            setIsLoading(false); // We have something to show, so stop initial loading state
-        }
-        
-        // 2. Revalidate in the background if cache is stale
-        if (isCacheStale) {
-          console.log("Reels cache is stale, revalidating in background...");
-          fetchAndCacheReels(1, false);
-        }
-      } else {
-         // No cache, so fetch fresh data
-         fetchAndCacheReels(1, false);
-      }
-    } catch (error) {
-      console.warn("Failed to read cache, fetching fresh data.", error);
-      fetchAndCacheReels(1, false);
-    }
-
-    // 3. Revalidate on focus
-    const handleRevalidate = () => {
-      if (isMounted && !document.hidden) {
-        console.log("Tab is focused, checking for stale reels data...");
-        fetchAndCacheReels(1, false);
-      }
-    };
-    window.addEventListener('visibilitychange', handleRevalidate);
-
-    return () => {
-      isMounted = false;
-      window.removeEventListener('visibilitychange', handleRevalidate);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Intentionally empty to run only once on mount
-
-  
   // Effect to fetch more posts when user gets close to the end
   useEffect(() => {
     if (hasMore && !isLoading && !isLoadingMore && reelPosts.length > 0 && currentIndex >= reelPosts.length - 3) {
