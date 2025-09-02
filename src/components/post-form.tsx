@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import type { FC } from 'react';
@@ -32,7 +31,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Loader2, X, UploadCloud, Film, Image as ImageIcon, Tag, ChevronDown, Camera, User, Search, UserPlus, Video, XCircle, Users, MapPinOff, Zap, Clock, Eye, ListOrdered, PlusCircle, Trash2 } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { searchUsers, getSignedUploadUrl } from '@/app/actions';
@@ -375,6 +374,7 @@ export const PostForm: FC<PostFormProps> = ({ onSubmit, submitting, sessionUser,
         } catch (error: any) {
           console.error("A critical error occurred during the upload process:", error);
           toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+          setIsUploading(false); // Make sure to reset state on failure
           return;
         } finally {
           setIsUploading(false);

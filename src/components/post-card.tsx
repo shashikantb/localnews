@@ -90,11 +90,10 @@ interface PostCardProps {
   userLocation: { latitude: number; longitude: number } | null;
   sessionUser: User | null;
   isFirst?: boolean;
-  isViewer?: boolean;
-  onNavigate?: () => void;
+  onPostClick?: (postId: number) => void;
 }
 
-export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, isFirst = false, isViewer = false, onNavigate }) => {
+export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, isFirst = false, onPostClick }) => {
   const { toast } = useToast();
   const router = useRouter();
   
@@ -124,7 +123,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
   const [displayLikeCount, setDisplayLikeCount] = useState<number>(post.likecount);
   const [isLiking, setIsLiking] = useState<boolean>(false);
   const [displayCommentCount, setDisplayCommentCount] = useState<number>(post.commentcount);
-  const [showComments, setShowComments] = useState(isViewer);
+  const [showComments, setShowComments] = useState(false);
   const [currentOrigin, setCurrentOrigin] = useState('');
   const [mediaError, setMediaError] = useState(false);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
@@ -134,8 +133,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
   const cardRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [wasViewed, setWasViewed] = useState(false);
-  const [isMuted, setIsMuted] = useState(!isViewer);
-
+  
   // More robust check for YouTube URLs, not dependent on mediatype.
   const isYouTubeVideo = post.mediaurls?.[0]?.includes('youtube.com/embed');
   const hasVisibleMedia = post.mediaurls && post.mediaurls.length > 0 && (isYouTubeVideo || ['image', 'video', 'gallery'].includes(post.mediatype || ''));
@@ -185,7 +183,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
   
   useEffect(() => {
     const videoElement = videoRef.current;
-    if (!videoElement || isYouTubeVideo || isViewer) return;
+    if (!videoElement || isYouTubeVideo) return;
 
     const observer = new IntersectionObserver(
         (entries) => {
@@ -204,17 +202,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
     return () => {
         if(videoElement) observer.unobserve(videoElement);
     };
-  }, [post.id, isYouTubeVideo, isViewer]);
-  
-  useEffect(() => {
-    const videoElement = videoRef.current;
-    if (videoElement && isViewer) {
-      videoElement.play().catch(e => console.warn("Video autoplay was prevented.", e));
-    } else if (videoElement) {
-        videoElement.pause();
-    }
-  }, [isViewer])
-
+  }, [post.id, isYouTubeVideo]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -425,19 +413,23 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
     }
   };
 
-  const handleCommentToggle = () => {
-    if (isViewer) return;
-    setShowComments(!showComments);
+  const handleCardClick = () => {
+    if (onPostClick) {
+      onPostClick(post.id);
+    } else {
+      router.push(`/reels?id=${post.id}`);
+    }
   };
 
   return (
     <Card ref={cardRef} className={cn(
         "overflow-hidden shadow-lg transition-all duration-300 ease-out border border-border/60 rounded-xl bg-card/90 backdrop-blur-sm hover:border-primary/30",
         isAnnouncement && "bg-primary/5 border-primary/20",
-        isRadarPost && "border-accent/50 bg-gradient-to-br from-accent/5 to-card",
-        isViewer && "h-full w-full max-w-full flex flex-col shadow-none rounded-none border-0 bg-black"
-    )}>
-        {!isViewer && isRadarPost && (
+        isRadarPost && "border-accent/50 bg-gradient-to-br from-accent/5 to-card"
+    )}
+    onClick={handleCardClick}
+    >
+        {isRadarPost && (
             <div className="p-2 text-xs font-semibold text-center bg-accent/20 text-accent-foreground border-b border-accent/30 flex items-center justify-center gap-4">
                 <div className="flex items-center gap-1.5">
                     <Zap className="h-4 w-4" />
@@ -473,7 +465,6 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
         )}
       <CardHeader className={cn(
           "pb-3 pt-5 px-5 flex flex-row items-start space-x-4",
-          isViewer && "bg-black/20 text-white",
           isAnnouncement && "bg-primary/10",
           isRadarPost && "bg-transparent"
       )}>
@@ -487,11 +478,11 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2 flex-wrap">
               {post.authorid && !isAnnouncement ? (
-                <Link href={`/users/${post.authorid}`} className={cn("text-sm font-semibold flex items-center hover:underline", isViewer && "text-white")}>
+                <Link href={`/users/${post.authorid}`} className={cn("text-sm font-semibold flex items-center hover:underline")}>
                   {authorName}
                 </Link>
               ) : (
-                <p className={cn("text-sm font-semibold flex items-center", isViewer && "text-white")}>
+                <p className={cn("text-sm font-semibold flex items-center")}>
                   {authorName}
                 </p>
               )}
@@ -502,14 +493,14 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
                   />
               )}
             </div>
-            <CardDescription className={cn("text-xs font-medium flex-shrink-0 ml-2", isViewer ? "text-gray-300" : "text-muted-foreground")}>
+            <CardDescription className={cn("text-xs font-medium flex-shrink-0 ml-2", "text-muted-foreground")}>
               {timeAgo}
             </CardDescription>
           </div>
             {isAnnouncement ? (
                 <Badge variant="default" className="mt-1">Official Announcement</Badge>
             ) : !post.hide_location && post.city && post.city !== "Unknown City" && (
-                 <p className={cn("text-sm flex items-center mt-0.5", isViewer ? "text-gray-300" : "text-muted-foreground")}>
+                 <p className={cn("text-sm flex items-center mt-0.5", "text-muted-foreground")}>
                     <MapPin className="w-4 h-4 mr-1.5 text-primary/70 flex-shrink-0" /> {post.city}
                 </p>
             )}
@@ -519,7 +510,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
             <AlertDialog>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className={cn("h-8 w-8", isViewer ? "text-gray-300" : "text-muted-foreground")}>
+                  <Button variant="ghost" size="icon" className={cn("h-8 w-8", "text-muted-foreground")}>
                     <span className="sr-only">Post options</span>
                     <MoreHorizontal className="h-5 w-5" />
                   </Button>
@@ -552,9 +543,9 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
         </div>
       </CardHeader>
       
-      <CardContent className={cn("px-5 pb-3", hasVisibleMedia ? 'pt-4' : 'pt-2', isViewer && "flex-1 flex flex-col p-0")}>
+      <CardContent className={cn("px-5 pb-3", hasVisibleMedia ? 'pt-4' : 'pt-2')}>
         {hasVisibleMedia && (
-            <div className={cn("relative w-full aspect-[16/10] overflow-hidden rounded-lg border-2 border-border/50 shadow-inner bg-muted/50 group", isViewer && "flex-1 rounded-none border-0 bg-black")}>
+            <div className={cn("relative w-full aspect-[16/10] overflow-hidden rounded-lg border-2 border-border/50 shadow-inner bg-muted/50 group")}>
                 {isYouTubeVideo ? (
                     <iframe
                         src={post.mediaurls[0]}
@@ -564,11 +555,23 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
                         allowFullScreen
                         className="w-full h-full pointer-events-none"
                     ></iframe>
-                ) : post.mediatype === 'image' ? (
-                    <Image src={post.mediaurls[0]} alt="Post image" fill style={{ objectFit: "contain" }} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 600px, 700px" className="transition-transform duration-300" data-ai-hint="user generated content" priority={isFirst} />
-                ) : post.mediatype === 'gallery' ? (
-                    <>
-                        <Image src={post.mediaurls[currentImageIndex]} alt={`Post image ${currentImageIndex + 1}`} fill style={{ objectFit: "contain" }} sizes="(max-width: 640px) 100vw, (max-width: 1024px) 600px, 700px" className="transition-opacity duration-300" data-ai-hint="user generated content" priority={isFirst} />
+                ) : post.mediatype === 'video' ? (
+                   <>
+                    <video ref={videoRef} loop playsInline muted src={post.mediaurls[0]} className={cn("w-full h-full object-contain", mediaError && "hidden")} onError={() => setMediaError(true)} />
+                     {mediaError && (
+                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
+                            <AlertTriangle className="w-8 h-8 mb-2 text-yellow-400" />
+                            <p className="text-sm text-center font-semibold mb-3">This video could not be loaded.</p>
+                            <Button onClick={handleRetryVideo} variant="secondary" size="sm">
+                                <RefreshCw className="w-4 h-4 mr-2"/>
+                                Retry
+                            </Button>
+                        </div>
+                    )}
+                   </>
+                ) : (post.mediatype === 'image' || post.mediatype === 'gallery') ? (
+                     <>
+                        <img src={post.mediaurls[currentImageIndex]} alt={`Post image ${currentImageIndex + 1}`} className="w-full h-full object-contain" data-ai-hint="user generated content" />
                         {post.mediaurls.length > 1 && (
                             <>
                                 <div className="absolute top-1/2 left-2 -translate-y-1/2 z-10">
@@ -588,37 +591,10 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
                             </>
                         )}
                     </>
-                ) : post.mediatype === 'video' ? (
-                  <>
-                    <video ref={videoRef} loop playsInline src={post.mediaurls[0]} className={cn("w-full h-full object-contain", mediaError && "hidden")} onError={() => setMediaError(true)} muted={!isViewer || isMuted} autoPlay={!isViewer} />
-                    {mediaError && (
-                        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center text-white p-4">
-                            <AlertTriangle className="w-8 h-8 mb-2 text-yellow-400" />
-                            <p className="text-sm text-center font-semibold mb-3">This video could not be loaded.</p>
-                            <Button onClick={handleRetryVideo} variant="secondary" size="sm">
-                                <RefreshCw className="w-4 h-4 mr-2"/>
-                                Retry
-                            </Button>
-                        </div>
-                    )}
-                     {isViewer && (
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsMuted(prev => !prev);
-                            }}
-                            className="absolute top-4 right-14 p-2 bg-black/40 text-white rounded-full hover:bg-black/60 z-30"
-                        >
-                            {isMuted ? <VolumeX className="w-5 h-5"/> : <Volume2 className="w-5 h-5"/>}
-                        </Button>
-                    )}
-                  </>
                 ) : null}
             </div>
         )}
-        <div className={cn(isViewer && hasVisibleMedia && "p-4 bg-black/20")}>
+        <div className="pt-2">
             {renderContentWithMentionsAndLinks()}
         </div>
         {pollState && (
@@ -661,7 +637,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
             </div>
         )}
       </CardContent>
-      <div className={cn(isViewer && "flex-shrink-0")}>
+      <div>
         {post.hashtags && post.hashtags.length > 0 && (
           <div className="px-5 pt-1 pb-2 flex flex-wrap gap-2 items-center">
             {post.hashtags.map(tag => (
@@ -707,7 +683,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
             <ThumbsUp className={cn('w-5 h-5 transition-all duration-200 group-hover:scale-110 group-hover:text-blue-500', isLikedByClient ? 'text-blue-500 fill-blue-500' : 'text-muted-foreground')} />
             <span className="font-medium text-sm">{displayLikeCount} {displayLikeCount === 1 ? 'Like' : 'Likes'}</span>
           </Button>
-          <Button variant="ghost" size="sm" onClick={handleCommentToggle} className="flex items-center space-x-1.5 text-muted-foreground hover:text-primary transition-colors duration-150 group" aria-label="View comments" title="Comments">
+          <Button variant="ghost" size="sm" onClick={() => setShowComments(!showComments)} className="flex items-center space-x-1.5 text-muted-foreground hover:text-primary transition-colors duration-150 group" aria-label="View comments" title="Comments">
             <MessageCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
             <span className="font-medium text-sm">{displayCommentCount} {showComments ? 'Hide' : (displayCommentCount === 1 ? 'Comment' : 'Comments')}</span>
           </Button>
