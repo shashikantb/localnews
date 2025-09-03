@@ -307,6 +307,12 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, f
         setIsVoting(false);
     };
 
+  const handleCardClick = () => {
+    if (hasVisibleMedia) {
+        router.push(`/reels?id=${post.id}&feedType=${feedType}`);
+    }
+  };
+
   const renderContentWithMentionsAndLinks = () => {
     let contentToRender = post.content;
     
@@ -411,14 +417,11 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, f
         setCurrentImageIndex((prev) => (prev - 1 + post.mediaurls!.length) % post.mediaurls!.length);
     }
   };
-
-  const handleCardClick = () => {
-    router.push(`/reels?id=${post.id}&feedType=${feedType}`);
-  };
-
+  
   return (
     <Card ref={cardRef} className={cn(
-        "overflow-hidden shadow-lg transition-all duration-300 ease-out border border-border/60 rounded-xl bg-card/90 backdrop-blur-sm hover:border-primary/30",
+        "overflow-hidden shadow-lg transition-all duration-300 ease-out border border-border/60 rounded-xl bg-card/90 backdrop-blur-sm",
+        hasVisibleMedia && "cursor-pointer hover:border-primary/30",
         isAnnouncement && "bg-primary/5 border-primary/20",
         isRadarPost && "border-accent/50 bg-gradient-to-br from-accent/5 to-card"
     )}
@@ -698,5 +701,3 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, f
     </Card>
   );
 };
-
-    
