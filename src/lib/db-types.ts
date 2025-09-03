@@ -300,6 +300,7 @@ export interface Conversation {
   display_avatar_url?: string | null; // Will be participant avatar or group avatar
   last_message_content?: string | null;
   last_message_sender_id?: number | null;
+  last_message_sender_name?: string | null; // Joined from users table
   unread_count: number;
   member_count: number;
 }

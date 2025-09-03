@@ -16,6 +16,7 @@ import { Search, Loader2, Users } from 'lucide-react';
 import CreateGroupDialog from './create-group-dialog';
 import { Button } from './ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { getSession } from '@/app/auth/actions';
 
 const POLLING_INTERVAL = 15000; // 15 seconds
 const CACHE_KEY = 'localpulse-chat-cache';
@@ -26,10 +27,15 @@ interface CachedChats {
   conversations: Conversation[];
 }
 
-const ConversationItem = ({ conv }: { conv: Conversation }) => {
+const ConversationItem = ({ conv, sessionUser }: { conv: Conversation, sessionUser: User | null }) => {
     const pathname = usePathname();
     const isActive = pathname === `/chat/${conv.id}`;
     const showUnread = conv.unread_count > 0 && !isActive;
+
+    let lastMessageText = conv.last_message_content || 'No messages yet.';
+    if (conv.is_group && conv.last_message_sender_id !== sessionUser?.id && conv.last_message_sender_name) {
+        lastMessageText = `${conv.last_message_sender_name}: ${lastMessageText}`;
+    }
 
     return (
         <Link
@@ -58,7 +64,7 @@ const ConversationItem = ({ conv }: { conv: Conversation }) => {
                 </div>
                 <div className="flex justify-between items-center mt-0.5">
                     <p className={cn("text-sm text-muted-foreground break-words truncate", showUnread ? "font-bold text-foreground" : "")}>
-                        {conv.last_message_content || 'No messages yet.'}
+                        {lastMessageText}
                     </p>
                     {showUnread && (
                         <span className="flex-shrink-0 ml-2 h-5 w-5 bg-accent text-accent-foreground text-xs font-bold flex items-center justify-center rounded-full">
@@ -78,6 +84,7 @@ const ChatSidebar = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [searchResults, setSearchResults] = useState<User[]>([]);
     const [isSearching, setIsSearching] = useState(false);
+    const [sessionUser, setSessionUser] = useState<User | null>(null);
     const { toast } = useToast();
 
     const fetchAndSetConversations = useCallback(async () => {
@@ -103,6 +110,10 @@ const ChatSidebar = () => {
     // Initial load effect
     useEffect(() => {
         let isMounted = true;
+
+        getSession().then(session => {
+            if(isMounted) setSessionUser(session.user);
+        });
         
         // Load from cache first
         try {
@@ -226,7 +237,7 @@ const ChatSidebar = () => {
                         ) : conversations.length > 0 ? (
                             <div className="p-2 space-y-1">
                                 {conversations.map(conv => (
-                                    <ConversationItem key={conv.id} conv={conv} />
+                                    <ConversationItem key={conv.id} conv={conv} sessionUser={sessionUser} />
                                 ))}
                             </div>
                         ) : (

@@ -1190,7 +1190,7 @@ async function setupDefaultBusinessData(client: Client | Pool, user: User) {
         const isClosed = scheduleIsAllWeek ? false : (i === 0);
         const startTime = isClosed ? null : '09:00';
         const endTime = isClosed ? null : '18:00';
-        await client.query(hoursInsertQuery, [user.id, i, startTime, endTime, isClosed]);
+        await client.query(hoursInsertQuery, [userId, i, startTime, endTime, isClosed]);
     }
     
     // Set timezone from the user object if available, otherwise default.
@@ -2143,6 +2143,7 @@ export async function getConversationsForUserDb(userId: number): Promise<Convers
         p_other.user_id as participant_id,
         lm.content as last_message_content,
         lm.sender_id as last_message_sender_id,
+        sender_user.name as last_message_sender_name,
         p_me.unread_count,
         (SELECT COUNT(*) FROM conversation_participants WHERE conversation_id = c.id) as member_count
       FROM
@@ -2159,9 +2160,11 @@ export async function getConversationsForUserDb(userId: number): Promise<Convers
           ORDER BY created_at DESC
           LIMIT 1
       ) lm ON true
+      LEFT JOIN
+          users as sender_user ON lm.sender_id = sender_user.id
       WHERE
           p_me.user_id = $1
-      GROUP BY c.id, u_other.name, u_other.profilepictureurl, p_other.user_id, lm.content, lm.sender_id, p_me.unread_count
+      GROUP BY c.id, u_other.name, u_other.profilepictureurl, p_other.user_id, lm.content, lm.sender_id, sender_user.name, p_me.unread_count
       ORDER BY c.last_message_at DESC;
     `;
     
