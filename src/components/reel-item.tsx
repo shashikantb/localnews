@@ -15,7 +15,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { ReelCommentsSkeleton } from './reel-comments-skeleton';
-import { Skeleton } from './ui/skeleton';
 
 const ReelComments = dynamic(() => import('./reel-comments'), {
     loading: () => <ReelCommentsSkeleton />,
@@ -51,7 +50,7 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
   const [showComments, setShowComments] = useState(false);
   const [currentOrigin, setCurrentOrigin] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isMuted, setIsMuted] = useState(false); // Default to unmuted
+  const [isMuted, setIsMuted] = useState(false);
   const [mediaError, setMediaError] = useState(false);
 
   useEffect(() => {
@@ -69,7 +68,7 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
         setIsLikedByClient(getAnonymousLikedPosts().includes(post.id));
     }
     setShowComments(false);
-    setIsMuted(false); // Ensure new videos start unmuted
+    setIsMuted(false);
     setMediaError(false);
     
   }, [post.id, post.likecount, post.commentcount, post.isLikedByCurrentUser, sessionUser]);
@@ -216,7 +215,8 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
           <>
             {isYouTubeVideo ? (
               <iframe
-                  src={post.mediaurls[0]}
+                  // Only set the src when the reel is active to prevent background playback
+                  src={isActive ? `${post.mediaurls[0]}?autoplay=1&mute=0` : ""}
                   title="YouTube video player"
                   frameBorder="0"
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
@@ -321,5 +321,3 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
     </div>
   );
 };
-
-    
