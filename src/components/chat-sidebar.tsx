@@ -51,7 +51,7 @@ const ConversationItem = ({ conv, sessionUser }: { conv: Conversation, sessionUs
                 <AvatarImage src={conv.display_avatar_url || undefined} alt={conv.display_name} />
                 <AvatarFallback>{conv.display_name?.charAt(0) || '?'}</AvatarFallback>
             </Avatar>
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-baseline">
                     <p className={cn("font-semibold truncate", showUnread ? "text-primary" : "")}>
                         {conv.display_name}
@@ -63,7 +63,7 @@ const ConversationItem = ({ conv, sessionUser }: { conv: Conversation, sessionUs
                     )}
                 </div>
                 <div className="flex justify-between items-center mt-0.5">
-                    <p className={cn("text-sm text-muted-foreground break-words truncate", showUnread ? "font-bold text-foreground" : "")}>
+                    <p className={cn("text-sm text-muted-foreground truncate", showUnread ? "font-bold text-foreground" : "")}>
                         {lastMessageText}
                     </p>
                     {showUnread && (
