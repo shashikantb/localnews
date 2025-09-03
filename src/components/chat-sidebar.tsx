@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getConversations, searchUsers, startChatAndRedirect } from '@/app/actions';
@@ -86,6 +86,7 @@ const ChatSidebar = () => {
     const [isSearching, setIsSearching] = useState(false);
     const [sessionUser, setSessionUser] = useState<User | null>(null);
     const { toast } = useToast();
+    const pathname = usePathname();
 
     const fetchAndSetConversations = useCallback(async () => {
         try {
@@ -107,7 +108,7 @@ const ChatSidebar = () => {
         }
     }, [toast]);
     
-    // Initial load effect
+    // Initial load effect from cache + fetch
     useEffect(() => {
         let isMounted = true;
 
@@ -115,22 +116,19 @@ const ChatSidebar = () => {
             if(isMounted) setSessionUser(session.user);
         });
         
-        // Load from cache first
         try {
             const cachedItem = localStorage.getItem(CACHE_KEY);
             if(cachedItem) {
                 const cachedData: CachedChats = JSON.parse(cachedItem);
                 if(isMounted) {
                     setConversations(cachedData.conversations);
-                    setIsLoading(false); // We have something to show
+                    setIsLoading(false);
                 }
                 
-                // Revalidate if cache is stale
                 if(Date.now() - cachedData.timestamp > CACHE_EXPIRY_MS) {
                     fetchAndSetConversations();
                 }
             } else {
-                // No cache, fetch from server
                 fetchAndSetConversations();
             }
         } catch(error) {
@@ -140,6 +138,14 @@ const ChatSidebar = () => {
 
         return () => { isMounted = false; };
     }, [fetchAndSetConversations]);
+    
+    // Force a refresh when user navigates to the main chat page
+    useEffect(() => {
+        if (pathname === '/chat') {
+            fetchAndSetConversations();
+        }
+    }, [pathname, fetchAndSetConversations]);
+
 
     // Polling effect
     useEffect(() => {
