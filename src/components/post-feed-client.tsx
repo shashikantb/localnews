@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { type FC } from 'react';
@@ -468,7 +467,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
     if (node) observer.current.observe(node);
   }, [activeTab, businessFeed.isLoading, businessFeed.hasMore, feeds, handleLoadMore]);
 
-  const swipeHandlers = useSwipeable({
+  const feedContainerSwipeHandlers = useSwipeable({
     onSwipedDown: () => {
       if (window.scrollY === 0) refreshFeed();
     },
@@ -602,8 +601,8 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
           </Card>
         )}
         {feed.posts.length > 0 ? (
-          feed.posts.map((post, index) => (
-            <PostCard key={post.id} post={post} userLocation={location} sessionUser={sessionUser} isFirst={index === 0} />
+          feed.posts.map((post) => (
+            <PostCard key={post.id} post={post} userLocation={location} sessionUser={sessionUser} feedType={activeTab} />
           ))
         ) : (
           <NoPostsContent feedType={activeTab} />
@@ -625,7 +624,7 @@ const PostFeedClient: FC<PostFeedClientProps> = ({ sessionUser, initialPosts }) 
   ];
 
   return (
-    <div {...swipeHandlers}>
+    <div {...feedContainerSwipeHandlers}>
        <AlertDialog open={showTroubleshootingDialog} onOpenChange={setShowTroubleshootingDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>

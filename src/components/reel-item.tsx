@@ -51,7 +51,7 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
   const [showComments, setShowComments] = useState(false);
   const [currentOrigin, setCurrentOrigin] = useState('');
   const videoRef = useRef<HTMLVideoElement>(null);
-  const [isInternallyMuted, setIsInternallyMuted] = useState(true);
+  const [isMuted, setIsMuted] = useState(false); // Default to unmuted
   const [mediaError, setMediaError] = useState(false);
 
   useEffect(() => {
@@ -69,10 +69,10 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
         setIsLikedByClient(getAnonymousLikedPosts().includes(post.id));
     }
     setShowComments(false);
-    setIsInternallyMuted(true);
+    setIsMuted(false); // Ensure new videos start unmuted
     setMediaError(false);
     
-  }, [post.id, post.likecount, post.commentcount, post.isLikedByCurrentUser, sessionUser, post.mediaurls, post.mediatype, isActive]);
+  }, [post.id, post.likecount, post.commentcount, post.isLikedByCurrentUser, sessionUser]);
 
 
   useEffect(() => {
@@ -82,13 +82,13 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
     }
 
     if (isActive) {
-      videoElement.muted = isInternallyMuted;
+      videoElement.muted = isMuted;
       const playPromise = videoElement.play();
       if (playPromise !== undefined) {
         playPromise.catch(error => {
           console.warn("Unmuted autoplay failed. Muting and retrying.", error);
           if (videoElement) { 
-            setIsInternallyMuted(true);
+            setIsMuted(true);
             videoElement.muted = true;
             videoElement.play().catch(finalError => {
                console.error("Muted autoplay also failed.", finalError);
@@ -99,7 +99,7 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
     } else {
       videoElement.pause();
     }
-  }, [isActive, post.mediatype, post.mediaurls, isInternallyMuted]);
+  }, [isActive, post.mediatype, post.mediaurls, isMuted]);
   
   const handleRetryVideo = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -180,7 +180,7 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
       } else {
         const newMutedState = !currentVideo.muted;
         currentVideo.muted = newMutedState;
-        setIsInternallyMuted(newMutedState);
+        setIsMuted(newMutedState);
       }
     }
   };
@@ -246,12 +246,12 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
                 )}
                 {!mediaError && (
                   <>
-                    <div 
+                    <button 
                       className="absolute top-4 right-4 p-2 bg-black/50 rounded-full cursor-pointer z-10"
                       onClick={(e) => { e.stopPropagation(); handleVideoTap(); }}
                     >
-                      {isInternallyMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
-                    </div>
+                      {isMuted ? <VolumeX className="w-5 h-5 text-white" /> : <Volume2 className="w-5 h-5 text-white" />}
+                    </button>
                     {videoRef.current?.paused && isActive && (
                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-0">
                             <PlayCircle className="w-16 h-16 text-white/50 backdrop-blur-sm rounded-full" />
@@ -321,3 +321,5 @@ export const ReelItem: FC<ReelItemProps> = ({ post, isActive, sessionUser }) => 
     </div>
   );
 };
+
+    

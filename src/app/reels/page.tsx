@@ -4,20 +4,34 @@ import { Suspense } from 'react';
 import { ReelsPageSkeleton } from '@/components/reels-page-skeleton';
 import ReelsViewer from '@/components/reels-viewer';
 import { getSession } from '../auth/actions';
-import { getMediaPosts } from '@/app/actions';
+import { getMediaPosts, getFamilyPosts, getPosts } from '@/app/actions';
+import type { Post } from '@/lib/db-types';
 
 export const dynamic = 'force-dynamic';
 
 interface ReelsPageProps {
   searchParams: {
     id?: string;
+    feedType?: 'nearby' | 'family';
   };
 }
 
-// This component now fetches all media posts and determines the starting point.
 async function ReelsLoader({ searchParams }: ReelsPageProps) {
   const { user: sessionUser } = await getSession();
-  const posts = await getMediaPosts({ page: 1, limit: 100 }); // Fetch a large number of posts for the viewer
+  
+  let posts: Post[] = [];
+  const feedType = searchParams.feedType;
+
+  if (feedType === 'family') {
+      if (sessionUser) {
+        posts = await getFamilyPosts({ page: 1, limit: 100 }); // Fetch all family posts
+      }
+  } else if (feedType === 'nearby') {
+      posts = await getPosts({ page: 1, limit: 100 }); // Fetch all nearby posts
+  } else {
+      // Default case for when user clicks the "Reels" tab directly
+      posts = await getMediaPosts({ page: 1, limit: 100 }); 
+  }
 
   let initialIndex = 0;
   if (searchParams.id) {
@@ -50,3 +64,5 @@ const ReelsPage: FC<ReelsPageProps> = ({ searchParams }) => {
 };
 
 export default ReelsPage;
+
+    

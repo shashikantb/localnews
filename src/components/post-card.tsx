@@ -89,11 +89,10 @@ interface PostCardProps {
   post: Post;
   userLocation: { latitude: number; longitude: number } | null;
   sessionUser: User | null;
-  isFirst?: boolean;
-  onPostClick?: (postId: number) => void;
+  feedType?: 'nearby' | 'family';
 }
 
-export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, isFirst = false, onPostClick }) => {
+export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, feedType = 'nearby' }) => {
   const { toast } = useToast();
   const router = useRouter();
   
@@ -414,11 +413,7 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
   };
 
   const handleCardClick = () => {
-    if (onPostClick) {
-      onPostClick(post.id);
-    } else {
-      router.push(`/reels?id=${post.id}`);
-    }
+    router.push(`/reels?id=${post.id}&feedType=${feedType}`);
   };
 
   return (
@@ -703,3 +698,5 @@ export const PostCard: FC<PostCardProps> = ({ post, userLocation, sessionUser, i
     </Card>
   );
 };
+
+    
